@@ -8,6 +8,10 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
+// eigen
+#include "Eigen/Dense"
+#include "Eigen/Core"
+
 // mujoco stuff
 #include "mujoco.h"
 #include "GLFW/glfw3.h"
@@ -20,7 +24,7 @@
 // ********************************** Mujoco Structs *************************************** //
 
 //simulation end time
-char path[] = "../models/";
+char path[] = "../../models/";
 char xmlfile[] = "achilles.xml";
 
 // MuJoCo data structures
@@ -155,14 +159,13 @@ int main(int argc, const char **argv) {
     //create data
     d = mj_makeData(m);
 
-
     /* ------------------------- GLFW Init -------------------------*/
     // initialize GLFW
     if (!glfwInit()) {
         mju_error("Could not initialize GLFW");
     }
 
-     // create window, make OpenGL context current, request v-sync
+    // create window, make OpenGL context current, request v-sync
     GLFWwindow *window = glfwCreateWindow(1244, 700, "Demo", NULL, NULL);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
@@ -194,10 +197,84 @@ int main(int argc, const char **argv) {
     mjcb_control = mycontroller;
     init_controller(m, d);    
 
-    // initialize random seed //
+    // initialize random seed
     srand(time(NULL));
 
-    /* ------------------------- Controller -------------------------*/ 
+    /* ------------------------- Socket -------------------------*/ 
+    // Setup the socket to communicate between the simulator and the controller
+    int *new_socket = new int;
+    int valread;
+    struct sockaddr_in serv_addr;
+
+    // // [receive - RX] Torques and horizon states: TODO: Fill in
+    // scalar_t RX_torques[23] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+    // // [to send - TX] States: time[1], pos[3], quat[4], vel[3], omega[3], contact[1], leg (pos,vel)[2], flywheel speed [3]
+    // scalar_t TX_state[20] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    // if ((*new_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    //     printf("\n Socket creation error \n");
+    //     return -1;
+    // }
+    // serv_addr.sin_family = AF_INET;
+    // serv_addr.sin_port = htons(PORT);
+    
+    // // Convert IPv4 and IPv6 addresses from text to binary form
+    // if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+    //     printf("\nInvalid address/ Address not supported \n");
+    //     return -1;
+    // }
+    // if (connect(*new_socket, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+    //     printf("\nConnection Failed \n");
+    //     return -1;
+    // }
+
+    /* ------------------------- Simulation -------------------------*/ 
+    
+    // Set the initial condition [pos, orientation, vel, angular rate]
+    d->qpos[0] = 0.0;
+    d->qpos[1] = 0.0;
+    d->qpos[2] = 6.0;
+    d->qpos[4] = 0.0;
+    d->qpos[5] =  0.0;
+    d->qpos[6] = 0.0;
+    d->qvel[0] = 0.0;
+    d->qvel[1] = 0.0;
+    d->qvel[2] = 0.0;
+    d->qvel[3] = 0.0;
+    d->qvel[4] = 0.0;
+    d->qvel[5] = 0.0;
+
+    // get framebuffer viewport
+    mj_step(m, d); // populate state info
+    mjrRect viewport = {0, 0, 0, 0};
+    glfwGetFramebufferSize(window, &viewport.width, &viewport.height);
+ 
+    // update scene and render
+    //cam.lookat[0] = d->qpos[0];
+    mjv_updateScene(m, d, &opt, NULL, &cam, mjCAT_ALL, &scn);
+    mjr_render(viewport, &scn, &con);
+ 
+    // swap OpenGL buffers (blocking call due to v-sync)
+    glfwSwapBuffers(window);
+ 
+    // process pending GUI events, call GLFW callbacks
+    glfwPollEvents();
+    sleep(1);
+    c = d->contact;
+ 
+    // Instantiate perturbation object
+    mjvPerturb* pert = new mjvPerturb();
+    pert->select = 1;
+    pert->active = 1;
+    opt.flags[mjVIS_PERTFORCE] = 1;
+    int iter = 0;
+
+
+    // terminate GLFW (crashes with Linux NVidia drivers)
+    #if defined(__APPLE__) || defined(_WIN32)
+        glfwTerminate();
+    #endif
 
     std::cout << "Hello, World!\n";
     return 0;
