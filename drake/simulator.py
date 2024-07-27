@@ -2,6 +2,7 @@
 
 from pydrake.all import *
 import numpy as np
+from controller_SE2 import HLIP
 
 # simulation parameters
 sim_time = 10
@@ -16,14 +17,14 @@ meshcat = StartMeshcat()
 
 # simulation parameters
 sim_hz = 1000
-config = MultibodyPlantConfig()
-config.time_step = 1 / sim_hz 
-config.discrete_contact_approximation = "lagged"
-config.contact_model = "hydroelastic_with_fallback"
+sim_config = MultibodyPlantConfig()
+sim_config.time_step = 1 / sim_hz 
+sim_config.discrete_contact_approximation = "lagged"
+sim_config.contact_model = "hydroelastic_with_fallback"
 
 # Set up the Drake system diagram
 builder = DiagramBuilder()
-plant, scene_graph = AddMultibodyPlant(config, builder)
+plant, scene_graph = AddMultibodyPlant(sim_config, builder)
 
 # Add the harpy model
 robot = Parser(plant).AddModels(model_file)[0]
@@ -38,8 +39,26 @@ plant.RegisterCollisionGeometry(
 # add gravity
 plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 
+# add low level PD controllers
+Kp = 450 * np.ones(plant.num_actuators())
+Kd = 15 * np.ones(plant.num_actuators())
+actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
+for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):
+    plant.get_joint_actuator(actuator_index).set_controller_gains(
+    PdControllerGains(p=Kp, d=Kd)
+)
+
 # finalize the plant
 plant.Finalize()
+
+# add the controller
+controller = builder.AddSystem(HLIP(model_file, meshcat))
+
+# build the diagram 
+builder.Connect(plant.get_state_output_port(), 
+                controller.GetInputPort("x_hat"))
+builder.Connect(controller.GetOutputPort("x_des"),
+                plant.get_desired_state_input_port(robot))
 
 # add the visualizer
 AddDefaultVisualization(builder, meshcat)
@@ -58,12 +77,12 @@ plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 #                0, 0, 0, 0,    # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow
 #                0, 0, 0, 0, 0, # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
 #                0, 0, 0, 0])   # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow
-q0 = np.array([0, 1.02,       # position (x,z)
-               0,             # theta
-               0, 0, 0,       # left leg: hip_pitch, knee, ankle 
-               0, 0,    # left arm: shoulder_pitch, elbow
-               0, 0, 0,      # right leg: hip_pitch, knee, ankle
-               0, 0])   # right arm: shoulder_pitch, elbow
+q0 = np.array([0, 1.02,  # position (x,z)
+               0,        # theta
+               0, 0, 0,  # left leg: hip_pitch, knee, ankle 
+               0, 0,     # left arm: shoulder_pitch, elbow
+               0, 0, 0,  # right leg: hip_pitch, knee, ankle
+               0, 0])    # right arm: shoulder_pitch, elbow
 v0 = np.zeros(plant.num_velocities())
 plant.SetPositions(plant_context, q0)
 plant.SetVelocities(plant_context, v0)

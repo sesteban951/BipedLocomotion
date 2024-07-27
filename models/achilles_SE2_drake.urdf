@@ -172,19 +172,19 @@
     <dynamics damping="0.01"/>
   </joint>
 
-  <!-- <link name="left_foot">
-    <inertial>
+  <link name="left_foot">
+    <!-- <inertial>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <mass value="0.001"/>
       <inertia ixx="1e-06" ixy="0.0" ixz="0.0" iyy="1e-06" iyz="0.0" izz="1e-06"/>
-    </inertial>
+    </inertial> -->
   </link>
   
   <joint name="left_foot_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 0"/>
     <parent link="left_ankle_pitch"/>
     <child link="left_foot"/>
-  </joint> -->
+  </joint>
 
   <link name="left_foot_toe">
     <inertial>
@@ -479,18 +479,18 @@
     <dynamics damping="0.01"/>
   </joint>
 
-  <!-- <link name="right_foot">
-    <inertial>
+  <link name="right_foot">
+    <!-- <inertial>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <mass value="0.001"/>
       <inertia ixx="1e-06" ixy="0.0" ixz="0.0" iyy="1e-06" iyz="0.0" izz="1e-06"/>
-    </inertial>
+    </inertial> -->
   </link>
   <joint name="right_foot_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 0"/>
     <parent link="right_ankle_pitch"/>
     <child link="right_foot"/>
-  </joint> -->
+  </joint>
 
    <link name="right_foot_toe">
     <inertial>
