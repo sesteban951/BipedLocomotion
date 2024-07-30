@@ -14,6 +14,16 @@ class HLIP(LeafSystem):
         # meshcat
         self.meshcat = meshcat
 
+        # visualization colors and shapes
+        self.red_color = Rgba(1, 0, 0, 1)
+        self.green_color = Rgba(0, 1, 0, 1)
+        self.blue_color = Rgba(0, 0, 1, 1)
+        self.sphere = Sphere(0.025)
+
+        self.meshcat.SetObject("com_pos", self.sphere, self.green_color)
+        self.meshcat.SetObject("p_right", self.sphere, self.red_color)
+        self.meshcat.SetObject("p_left", self.sphere, self.blue_color)
+
         # create internal model of the robot
         self.plant = MultibodyPlant(0)
         Parser(self.plant).AddModels(model_file)
@@ -31,6 +41,7 @@ class HLIP(LeafSystem):
     
         # relevant frames
         self.torso_frame = self.plant.GetFrameByName("torso")
+        self.static_com_frame = self.plant.GetFrameByName("static_com")
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
         self.right_foot_frame = self.plant.GetFrameByName("right_foot")
         self.stance_foot_frame = self.right_foot_frame
@@ -45,8 +56,8 @@ class HLIP(LeafSystem):
         self.num_steps = 0
 
         # walking parameters
-        self.z_nom = 0.95
-        self.T = 0.25
+        self.z_nom = 0.65
+        self.T = 0.35
 
         # HLIP parameters
         g = 9.81
@@ -62,8 +73,8 @@ class HLIP(LeafSystem):
         self.p_com_B = np.zeros(3)
 
         # swing foot parameters
-        self.z_apex = 0.15
-        self.z_offset = 0.03
+        self.z_apex = 0.2
+        self.z_offset = 0.0
         self.z0 = 0.0
         self.zf = 0.0
 
@@ -89,34 +100,60 @@ class HLIP(LeafSystem):
         # instantiate inverse kinematics solver
         self.ik = InverseKinematics(self.plant)
 
+        # remove all the bounding box constraints
+        # TODO: add the bounding box constraints back in 
+        # constraints = self.ik.prog().GetAllConstraints()
+        # self.ik.prog().RemoveConstraint(constraints[0])
+
+        # # remove the arm decision varaibles
+        # # TODO: add the arm decision variables back in
+        # joint_idx = [6, 7, 11, 12]
+        # for j in joint_idx:
+        #     self.ik.prog().RemoveDecisionVariable(self.ik.q()[j])
+
         # inverse kinematics solver settings
-        self.epsilon_feet = 0.01   # foot position tolerance     [m]
-        self.epsilon_base = 0.01   # torso position tolerance    [m]
-        epsilon_orient = 1.0      # torso orientation tolerance [deg]
-        bias_orient = 1.0         # torso orientation bias      [deg]
+        self.epsilon_feet = 0.05    # foot position tolerance     [m]
+        self.epsilon_base = 0.1     # torso position tolerance    [m]
+        foot_epsilon_orient = 5.0   # foot orientation tolerance  [deg]
+        base_epsilon_orient = 5.0   # torso orientation tolerance [deg]
         self.tol_feet = np.array([[self.epsilon_feet], [np.inf], [self.epsilon_feet]])  # x-z only
         self.tol_base = np.array([[self.epsilon_base], [np.inf], [self.epsilon_base]])  # z only
 
         # Add torso position constraint
         self.p_torso_cons = self.ik.AddPositionConstraint(self.torso_frame, [0, 0, 0], 
                                                           self.plant.world_frame(), 
-                                                          [0,0,0], [0,0,0]) 
+                                                          [0, 0, 0], [0, 0, 0]) 
         
         # Add torso orientation constraint (torso coord frame, x is z-world, y is neg y-world, z is x-world)
-        R_bias = RotationMatrix(RollPitchYaw(0, bias_orient * (np.pi/180), 0))
         self.r_torso_cons = self.ik.AddOrientationConstraint(self.torso_frame, RotationMatrix(),
-                                                            self.plant.world_frame(), R_bias,
-                                                            epsilon_orient * (np.pi/180))
+                                                            self.plant.world_frame(), RotationMatrix(),
+                                                            base_epsilon_orient * (np.pi/180))
         
-        # Add foot constraints
+        # Add foot location constraints
         self.p_left_cons =  self.ik.AddPositionConstraint(self.left_foot_frame, [0, 0, 0],
                                                           self.plant.world_frame(), 
-                                                          [0,0,0], [0,0,0])
+                                                          [0, 0, 0], [0, 0, 0])
         self.p_right_cons = self.ik.AddPositionConstraint(self.right_foot_frame, [0, 0, 0],
                                                           self.plant.world_frame(), 
-                                                          [0,0,0], [0,0,0]) 
-
+                                                          [0, 0, 0], [0, 0, 0]) 
         
+        # Add foot orientation constraints
+        self.r_left_cons =  self.ik.AddOrientationConstraint(self.left_foot_frame, RotationMatrix(),
+                                                             self.plant.world_frame(), RotationMatrix(),
+                                                             foot_epsilon_orient * (np.pi/180))
+        self.r_right_cons = self.ik.AddOrientationConstraint(self.right_foot_frame, RotationMatrix(),
+                                                             self.plant.world_frame(), RotationMatrix(),
+                                                             foot_epsilon_orient * (np.pi/180))
+        
+        print(self.ik.prog())
+
+        # draw constant center of mass bar
+        cyl = Cylinder(0.005, 100.0)
+        self.meshcat.SetObject("z_bar",cyl, Rgba(1, 1, 1, 1))
+        rpy = RollPitchYaw(0, np.pi/2, 0)
+        p = np.array([0, 0, 0.70])
+        self.meshcat.SetTransform("z_bar", RigidTransform(rpy,p), self.t_current)
+
     ########################################################################################################
 
     # ---------------------------------------------------------------------------------------- #
@@ -178,10 +215,17 @@ class HLIP(LeafSystem):
     # update the COM state of the Robot
     def update_hlip_state_R(self):
         
-        # compute p_com
+        # compute the static p_com
+        self.p_static_com = self.plant.CalcPointsPositions(self.plant_context,
+                                                           self.static_com_frame,
+                                                           [0,0,0],
+                                                           self.plant.world_frame()).flatten()
+        print("p_com_static: ", self.p_static_com)
+
+        # compute the dynamic p_com
         self.p_com = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context)
 
-        # get in the torso frame
+        # get p_com in the torso frame
         self.p_com_B = self.plant.CalcPointsPositions(self.plant_context,
                                                       self.plant.world_frame(),
                                                       self.p_com,
@@ -189,7 +233,7 @@ class HLIP(LeafSystem):
         
         # apply the com offset in body frame
         self.p_com_B[0] = self.p_com_B[0] + self.com_x_offset # x offset
-        
+
         # apply the com offset in world frame
         self.p_com = self.plant.CalcPointsPositions(self.plant_context,
                                                     self.torso_frame,
@@ -212,6 +256,25 @@ class HLIP(LeafSystem):
         # update HLIP state for the robot
         self.p_R = (self.p_com - self.p_stance.T).T
         self.v_R = self.v_com
+
+        # visualize the CoM position
+        self.meshcat.SetTransform("com_pos", RigidTransform(self.p_com), self.t_current)
+
+        # visualize the CoM velocity
+        if self.v_com[0] >= 0:
+            v_norm = np.linalg.norm(self.v_com[0]) + 1E-5
+            cyl = Cylinder(0.005, v_norm)
+            self.meshcat.SetObject("com_vel",cyl, self.green_color)
+            rpy = RollPitchYaw(0, np.pi/2, 0)
+            p = self.p_com + np.array([v_norm,0,0]) * 0.5
+            self.meshcat.SetTransform("com_vel", RigidTransform(rpy,p), self.t_current)
+        else:
+            v_norm = np.linalg.norm(self.v_com[0]) + 1E-5
+            cyl = Cylinder(0.005, v_norm)
+            self.meshcat.SetObject("com_vel",cyl, self.green_color)
+            rpy = RollPitchYaw(0, -np.pi/2, 0)
+            p = self.p_com + np.array([-v_norm,0,0]) * 0.5
+            self.meshcat.SetTransform("com_vel", RigidTransform(rpy,p), self.t_current)
 
     # ---------------------------------------------------------------------------------------- #
     # update where to place the foot, (i.e., apply discrete control to the HLIP model)
@@ -319,9 +382,9 @@ class HLIP(LeafSystem):
         intial_guess = self.plant.GetPositions(self.plant_context)
         self.ik.prog().SetInitialGuess(self.ik.q(), intial_guess)
         res = SnoptSolver().Solve(self.ik.prog())
-        assert res.is_success(), "Inverse Kinematics Failed!"
         
-        return res.GetSolution(self.ik.q())       
+        return res
+        # return res.GetSolution(self.ik.q())
 
     # ---------------------------------------------------------------------------------------- #
     def CalcOutput(self, context, output):
@@ -340,26 +403,47 @@ class HLIP(LeafSystem):
                                                          self.torso_frame,
                                                          [0,0,0],
                                                          self.plant.world_frame())
+        print("p_torso_current: ", p_torso_current)
 
         # compute desired foot trajectories
         p_right, p_left = self.update_foot_traj()
 
         # solve the inverse kinematics problem
-        p_torso_des = np.array([p_torso_current[0], p_torso_current[1], [self.z_nom - self.p_com_B[2]]])
+        # p_torso_des = np.array([p_torso_current[0], p_torso_current[1], [self.z_nom + self.p_com_B[2]]])
+        p_torso_des = np.array([p_torso_current[0], p_torso_current[1], [self.z_nom]])
         p_right_des = np.array([p_right[0], [0], p_right[2]])
         p_left_des = np.array([p_left[0], [0], p_left[2]])
 
+        print("\n ****************************** \n")
+        print("time: ", self.t_current) 
+
+        # print("p_torso_des: ", p_torso_des)
+        # print("p_right_des: ", p_right_des)
+        # print("p_left_des: ", p_left_des)
+
         # solve the IK problem
-        q_ik = self.DoInverseKinematics(p_torso_des, 
+        res = self.DoInverseKinematics(p_torso_des, 
                                         p_right_des, 
                                         p_left_des)
+        
+        # extract the IK solution
+        if res.is_success():
+            q_ik = res.GetSolution(self.ik.q())
+        else:
+            q_ik = self.plant.GetPositions(self.plant_context)
+            print("\n ******************** IK failed ********************* \n")
+            # exit()
 
         # compute the nominal state
-        q_des = np.array([q_ik[3], q_ik[4], q_ik[5], # left leg: hip_pitch, knee, ankle
-                          0 , 0,                     # left arm: shoulder pitch, elbow
-                          q_ik[8], q_ik[9], q_ik[10], # right leg: hip_pitch, knee, ankle
-                          0, 0])                     # right arm: shoulder pitch, elbow     
-        v_des = np.zeros(6)
+        # q_des = np.array([q_ik[3], q_ik[4], q_ik[5], # left leg: hip_pitch, knee, ankle
+        #                   0 , 0,                     # left arm: shoulder pitch, elbow
+        #                   q_ik[8], q_ik[9], q_ik[10], # right leg: hip_pitch, knee, ankle
+        #                   0, 0])                     # right arm: shoulder pitch, elbow  
+        # q_des = np.array([q_ik[3], q_ik[4], q_ik[5],  # left leg: hip_pitch, knee, ankle
+        #                   q_ik[6], q_ik[7], q_ik[8]]) # right leg: hip_pitch, knee, ankle
+        q_des = np.array([0, 0, 0,  # left leg: hip_pitch, knee, ankle
+                          0, 0, 0]) # right leg: hip_pitch, knee, ankle
+        v_des = np.zeros(self.plant.num_actuators())
         x_des = np.block([q_des, v_des])
 
         output.SetFromVector(x_des)
