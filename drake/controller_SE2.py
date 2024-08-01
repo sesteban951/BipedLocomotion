@@ -39,7 +39,6 @@ class HLIP(LeafSystem):
                             self.CalcOutput)
     
         # relevant frames
-        # self.torso_frame = self.plant.GetFrameByName("torso")
         self.static_com_frame = self.plant.GetFrameByName("static_com") # nominal is 0.734 z in world frame
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
         self.right_foot_frame = self.plant.GetFrameByName("right_foot")
@@ -55,8 +54,8 @@ class HLIP(LeafSystem):
         self.num_steps = 0
 
         # walking parameters
-        self.z_nom = 0.65
-        self.T = 0.35
+        self.z_nom = 0.66
+        self.T = 0.3
 
         # HLIP parameters
         g = 9.81
@@ -71,7 +70,7 @@ class HLIP(LeafSystem):
         self.v_R = np.zeros(3)
 
         # swing foot parameters
-        self.z_apex = 0.15
+        self.z_apex = 0.01
         self.z_offset = 0.0
         self.z0 = 0.0
         self.zf = 0.0
@@ -130,11 +129,11 @@ class HLIP(LeafSystem):
                                                              foot_epsilon_orient * (np.pi/180))
 
         # draw constant center of mass bar
-        cyl = Cylinder(0.005, 100.0)
-        self.meshcat.SetObject("z_bar",cyl, Rgba(1, 1, 1, 1))
-        rpy = RollPitchYaw(0, np.pi/2, 0)
-        p = np.array([0, 0, self.z_nom])
-        self.meshcat.SetTransform("z_bar", RigidTransform(rpy,p), self.t_current)
+        # cyl = Cylinder(0.005, 100.0)
+        # self.meshcat.SetObject("z_bar",cyl, Rgba(1, 1, 1, 1))
+        # rpy = RollPitchYaw(0, np.pi/2, 0)
+        # p = np.array([0, 0, self.z_nom])
+        # self.meshcat.SetTransform("z_bar", RigidTransform(rpy,p), self.t_current)
 
     ########################################################################################################
 
@@ -353,6 +352,9 @@ class HLIP(LeafSystem):
         self.plant.SetPositionsAndVelocities(self.plant_context, x_hat)
         self.t_current = context.get_time()
 
+        print("\n *************************************** \n")
+        print("time: ", self.t_current) 
+        
         # update everything
         self.update_foot_role()
         self.update_hlip_state_R()
@@ -362,7 +364,14 @@ class HLIP(LeafSystem):
                                                               self.static_com_frame,
                                                               [0,0,0],
                                                               self.plant.world_frame())
-        print("p_static_com_current: ", p_static_com_current)
+        p_left_current = self.plant.CalcPointsPositions(self.plant_context,
+                                                        self.left_foot_frame,
+                                                        [0,0,0],
+                                                        self.plant.world_frame())
+        p_right_current = self.plant.CalcPointsPositions(self.plant_context,
+                                                         self.right_foot_frame,
+                                                         [0,0,0],
+                                                         self.plant.world_frame())
 
         # compute desired foot trajectories
         p_right, p_left = self.update_foot_traj()
@@ -370,14 +379,6 @@ class HLIP(LeafSystem):
         # solve the inverse kinematics problem
         p_right_des = np.array([p_right[0], [0], p_right[2]])
         p_left_des = np.array([p_left[0], [0], p_left[2]])
-        # p_right_des = np.array([[0.02], [0], [0.1]])
-        # p_left_des = np.array([[0.02], [0.02], [0.02]])
-
-        print("\n *************************************** \n")
-        print("time: ", self.t_current) 
-
-        # print("p_right_des: ", p_right_des)
-        # print("p_left_des: ", p_left_des)
 
         # solve the IK problem
         res = self.DoInverseKinematics(p_right_des, 

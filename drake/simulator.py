@@ -5,8 +5,8 @@ import numpy as np
 from controller_SE2 import HLIP
 
 # simulation parameters
-sim_time = 2.0
-realtime_rate = 0.2
+sim_time = 30.
+realtime_rate = 1.0
 
 # load model
 # model_file = "../models/achilles_drake.urdf"
@@ -34,16 +34,20 @@ plant.RegisterCollisionGeometry(
     plant.world_body(),
     RigidTransform(p = [0,0,-25]),
     Box(50,50,50), "ground",
-    CoulombFriction(0.5, 0.5))
+    CoulombFriction(0.7, 0.7))
 
 # add gravity
 plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 
 # add low level PD controllers
-kp = 450
-Kp = np.array([kp, kp, kp, kp, kp, kp])
-kd = 10
-Kd = np.array([kd, kd, kd, kp, kd, kd])
+kp_hip = 500
+kp_knee = 500
+kp_ankle = 200
+kd_hip = 10
+kd_knee = 10
+kd_ankle = 15
+Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_hip, kp_knee, kp_ankle])
+Kd = np.array([kd_hip, kd_knee, kd_ankle, kd_hip, kd_knee, kd_ankle])
 actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
 for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):
     plant.get_joint_actuator(actuator_index).set_controller_gains(
@@ -85,7 +89,7 @@ plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 #                0, 0,     # left arm: shoulder_pitch, elbow
 #                0, 0, 0,  # right leg: hip_pitch, knee, ankle
 #                0, 0])    # right arm: shoulder_pitch, elbow
-q0 = np.array([0, 1.02,  # position (x,z)
+q0 = np.array([0, 1.,  # position (x,z)
                0,        # theta
                0, 0, 0,  # left leg: hip_pitch, knee, ankle 
                0, 0, 0]) # right leg: hip_pitch, knee, ankle
