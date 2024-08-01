@@ -5,8 +5,8 @@ import numpy as np
 from controller_SE2 import HLIP
 
 # simulation parameters
-sim_time = 10.0
-realtime_rate = 1.0
+sim_time = 2.0
+realtime_rate = 0.25
 
 # load model
 # model_file = "../models/achilles_drake.urdf"
@@ -16,7 +16,7 @@ model_file = "../models/achilles_SE2_drake.urdf"
 meshcat = StartMeshcat()
 
 # simulation parameters
-sim_hz = 1000
+sim_hz = 800
 sim_config = MultibodyPlantConfig()
 sim_config.time_step = 1 / sim_hz 
 sim_config.discrete_contact_approximation = "lagged"
@@ -40,7 +40,7 @@ plant.RegisterCollisionGeometry(
 plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 
 # add low level PD controllers
-kp = 1000
+kp = 500
 Kp = np.array([kp, kp, kp, kp, kp, kp])
 kd = 10
 Kd = np.array([kd, kd, kd, kp, kd, kd])
