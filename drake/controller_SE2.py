@@ -39,8 +39,8 @@ class HLIP(LeafSystem):
                             self.CalcOutput)
     
         # relevant frames
-        self.torso_frame = self.plant.GetFrameByName("torso")
-        self.static_com_frame = self.plant.GetFrameByName("static_com")
+        # self.torso_frame = self.plant.GetFrameByName("torso")
+        self.static_com_frame = self.plant.GetFrameByName("static_com") # nominal is 0.734 z in world frame
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
         self.right_foot_frame = self.plant.GetFrameByName("right_foot")
         self.stance_foot_frame = self.right_foot_frame
@@ -55,8 +55,8 @@ class HLIP(LeafSystem):
         self.num_steps = 0
 
         # walking parameters
-        self.z_nom = 0.4
-        self.T = 0.3
+        self.z_nom = 0.65
+        self.T = 0.35
 
         # HLIP parameters
         g = 9.81
@@ -69,10 +69,9 @@ class HLIP(LeafSystem):
         self.v_com = np.zeros(3)   
         self.p_R = np.zeros(3)     
         self.v_R = np.zeros(3)
-        self.p_com_B = np.zeros(3)  # center of mass state in base frame
 
         # swing foot parameters
-        self.z_apex = 0.2
+        self.z_apex = 0.15
         self.z_offset = 0.0
         self.z0 = 0.0
         self.zf = 0.0
@@ -87,7 +86,7 @@ class HLIP(LeafSystem):
         # blending foot placement
         self.alpha = 1.0
         self.u_applied = 0
-        self.bez_order = 7
+        self.bez_order = 5
         self.switched_stance_foot = False
 
         # timing variables
@@ -97,35 +96,22 @@ class HLIP(LeafSystem):
         # instantiate inverse kinematics solver
         self.ik = InverseKinematics(self.plant)
 
-        # remove all the bounding box constraints
-        # TODO: add the bounding box constraints back in 
-        # constraints = self.ik.prog().GetAllConstraints()
-        # self.ik.prog().RemoveConstraint(constraints[0])
-
-        # remove the arm decision varaibles
-        # TODO: add the arm decision variables back in
-        # joint_idx = [6, 7, 11, 12]
-        # for j in joint_idx:
-        #     self.ik.prog().RemoveDecisionVariable(self.ik.q()[j])
-
         # inverse kinematics solver settings
-        epsilon_feet = 0.01     # foot position tolerance     [m]
-        epsilon_base = 0.01     # torso position tolerance    [m]
+        epsilon_feet = 0.0     # foot position tolerance     [m]
+        epsilon_base = 0.0     # torso position tolerance    [m]
         foot_epsilon_orient = 0.0   # foot orientation tolerance  [deg]
         base_epsilon_orient = 0.0   # torso orientation tolerance [deg]
         self.tol_feet = np.array([[epsilon_feet], [np.inf], [epsilon_feet]])  # x-z only
-        # self.tol_base = np.array([[self.epsilon_base], [np.inf], [self.epsilon_base]])  # z only
-        self.tol_base = np.array([[np.inf], [np.inf], [epsilon_base]])  # z only
 
-        # Add torso position constraint
-        self.p_torso_cons = self.ik.AddPositionConstraint(self.torso_frame, [0, 0, 0], 
-                                                          self.plant.world_frame(), 
-                                                          [0, 0, 0], [0, 0, 0]) 
+        # Add com position constraint
+        self.p_com_cons = self.ik.AddPositionConstraint(self.static_com_frame, [0, 0, 0], 
+                                                        self.plant.world_frame(), 
+                                                        [-np.inf, -np.inf, self.z_nom - epsilon_base], [np.inf, np.inf, self.z_nom + epsilon_base]) 
         
-        # Add torso orientation constraint (torso coord frame, x is z-world, y is neg y-world, z is x-world)
-        self.r_torso_cons = self.ik.AddOrientationConstraint(self.torso_frame, RotationMatrix(),
-                                                            self.plant.world_frame(), RotationMatrix(),
-                                                            base_epsilon_orient * (np.pi/180))
+        # Add com orientation constraint (torso coord frame, x is z-world, y is neg y-world, z is x-world)
+        self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(),
+                                                           self.plant.world_frame(), RotationMatrix(),
+                                                           base_epsilon_orient * (np.pi/180))
         
         # Add foot position constraints
         self.p_left_cons =  self.ik.AddPositionConstraint(self.left_foot_frame, [0, 0, 0],
@@ -142,14 +128,12 @@ class HLIP(LeafSystem):
         self.r_right_cons = self.ik.AddOrientationConstraint(self.right_foot_frame, RotationMatrix(),
                                                              self.plant.world_frame(), RotationMatrix(),
                                                              foot_epsilon_orient * (np.pi/180))
-        
-        print(self.ik.prog())
 
         # draw constant center of mass bar
         cyl = Cylinder(0.005, 100.0)
         self.meshcat.SetObject("z_bar",cyl, Rgba(1, 1, 1, 1))
         rpy = RollPitchYaw(0, np.pi/2, 0)
-        p = np.array([0, 0, 0.70])
+        p = np.array([0, 0, self.z_nom])
         self.meshcat.SetTransform("z_bar", RigidTransform(rpy,p), self.t_current)
 
     ########################################################################################################
@@ -221,18 +205,6 @@ class HLIP(LeafSystem):
 
         # compute the dynamic p_com in world frame
         self.p_com = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context)
-
-        # get p_com in the base frame
-        self.p_com_B = self.plant.CalcPointsPositions(self.plant_context,
-                                                      self.plant.world_frame(),
-                                                      self.p_com,
-                                                      self.torso_frame).flatten()
-
-        # apply the com offset in world frame
-        # self.p_com = self.plant.CalcPointsPositions(self.plant_context,
-        #                                             self.torso_frame,
-        #                                             self.p_com_B,
-        #                                             self.plant.world_frame()).flatten()
 
         # compute v_com, via Jacobian (3xn) and generalized velocity (nx1)
         J = self.plant.CalcJacobianCenterOfMassTranslationalVelocity(self.plant_context, 
@@ -354,13 +326,7 @@ class HLIP(LeafSystem):
     
     # ---------------------------------------------------------------------------------------- #
     # given desired foot and torso positions, solve the IK problem
-    def DoInverseKinematics(self, p_torso, p_right, p_left):
-
-        # Update constraint on the torso position
-        p_torso_lb = p_torso - self.tol_base
-        p_torso_ub = p_torso + self.tol_base
-        self.p_torso_cons.evaluator().UpdateLowerBound(p_torso_lb)
-        self.p_torso_cons.evaluator().UpdateUpperBound(p_torso_ub)
+    def DoInverseKinematics(self, p_right, p_left):
 
         # Update constraints on the positions of the feet
         p_left_lb = p_left - self.tol_feet
@@ -378,7 +344,6 @@ class HLIP(LeafSystem):
         res = SnoptSolver().Solve(self.ik.prog())
         
         return res
-        # return res.GetSolution(self.ik.q())
 
     # ---------------------------------------------------------------------------------------- #
     def CalcOutput(self, context, output):
@@ -393,30 +358,29 @@ class HLIP(LeafSystem):
         self.update_hlip_state_R()
 
         # query the relevant current positions
-        p_torso_current = self.plant.CalcPointsPositions(self.plant_context,
-                                                         self.torso_frame,
-                                                         [0,0,0],
-                                                         self.plant.world_frame())
-        print("p_torso_current: ", p_torso_current)
+        p_static_com_current = self.plant.CalcPointsPositions(self.plant_context,
+                                                              self.static_com_frame,
+                                                              [0,0,0],
+                                                              self.plant.world_frame())
+        print("p_static_com_current: ", p_static_com_current)
 
         # compute desired foot trajectories
         p_right, p_left = self.update_foot_traj()
 
         # solve the inverse kinematics problem
-        p_torso_des = np.array([p_torso_current[0], p_torso_current[1], [self.z_nom]])
         p_right_des = np.array([p_right[0], [0], p_right[2]])
         p_left_des = np.array([p_left[0], [0], p_left[2]])
+        # p_right_des = np.array([[0.02], [0], [0.1]])
+        # p_left_des = np.array([[0.02], [0.02], [0.02]])
 
-        print("\n ****************************** \n")
+        print("\n *************************************** \n")
         print("time: ", self.t_current) 
 
-        print("p_torso_des: ", p_torso_des)
-        print("p_right_des: ", p_right_des)
-        print("p_left_des: ", p_left_des)
+        # print("p_right_des: ", p_right_des)
+        # print("p_left_des: ", p_left_des)
 
         # solve the IK problem
-        res = self.DoInverseKinematics(p_torso_des, 
-                                       p_right_des, 
+        res = self.DoInverseKinematics(p_right_des, 
                                        p_left_des)
         
         # extract the IK solution
@@ -424,18 +388,13 @@ class HLIP(LeafSystem):
             q_ik = res.GetSolution(self.ik.q())
         else:
             q_ik = self.plant.GetPositions(self.plant_context)
-            print("\n ******************** IK failed ********************* \n")
-            # exit()
+            print("\n !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IK failed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n")
 
         # compute the nominal state
-        # q_des = np.array([q_ik[3], q_ik[4], q_ik[5], # left leg: hip_pitch, knee, ankle
-        #                   0 , 0,                     # left arm: shoulder pitch, elbow
-        #                   q_ik[8], q_ik[9], q_ik[10], # right leg: hip_pitch, knee, ankle
-        #                   0, 0])                     # right arm: shoulder pitch, elbow  
-        # q_des = np.array([q_ik[3], q_ik[4], q_ik[5],  # left leg: hip_pitch, knee, ankle
-        #                   q_ik[6], q_ik[7], q_ik[8]]) # right leg: hip_pitch, knee, ankle
-        q_des = np.array([0, 0, 0,  # left leg: hip_pitch, knee, ankle
-                          0, 0, 0]) # right leg: hip_pitch, knee, ankle
+        q_des = np.array([q_ik[3], q_ik[4], q_ik[5],  # left leg: hip_pitch, knee, ankle
+                          q_ik[6], q_ik[7], q_ik[8]]) # right leg: hip_pitch, knee, ankle
+        # q_des = np.array([0, 0, 0,  # left leg: hip_pitch, knee, ankle
+        #                   0, 0, 0]) # right leg: hip_pitch, knee, ankle
         v_des = np.zeros(self.plant.num_actuators())
         x_des = np.block([q_des, v_des])
 
