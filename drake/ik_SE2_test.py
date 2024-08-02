@@ -38,18 +38,15 @@ class Controller(LeafSystem):
                             self.CalcOutput)
     
         # relevant frames
-        # self.torso_frame = self.plant.GetFrameByName("torso")
-        self.static_com_frame = self.plant.GetFrameByName("static_com") # nominal is 0.734 z in world frame
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
         self.right_foot_frame = self.plant.GetFrameByName("right_foot")
+        
         # instantiate inverse kinematics solver
         self.ik = InverseKinematics(self.plant)
 
         # inverse kinematics solver settings
         epsilon_feet = 0.0     # foot position tolerance     [m]
-        epsilon_base = 0.0     # torso position tolerance    [m]
         foot_epsilon_orient = 0.0   # foot orientation tolerance  [deg]
-        base_epsilon_orient = 0.0   # torso orientation tolerance [deg]
         self.tol_feet = np.array([[epsilon_feet], [np.inf], [epsilon_feet]])  # x-z only
         
         # Add foot position constraints

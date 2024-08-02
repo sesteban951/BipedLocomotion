@@ -9,25 +9,14 @@
     <color rgba="0.92 0.39 0.043 1" />
   </material>
 
-  <!-- x direction prismatic -->
-  <link name="base_x"/>
-  <joint name="base_x_joint" type="fixed">
-    <parent link="world"/>
-    <child link="base_x"/>
-    <axis xyz="1 0 0"/>
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-  </joint>
-
-  <!-- z direction prismatic -->
-  <link name="base_z"/>
-  <joint name="base_z_joint" type="fixed">
-    <parent link="base_x"/>
-    <child link="base_z"/>
-    <axis xyz="0 0 1"/>
-    <origin rpy="0 0 0" xyz="0 0 1.1"/>
-  </joint>
-
   <!-- Base -->
+  <link name="base_link"/>
+  <joint name="base_to_world_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <parent link="world"/>
+    <child link="base_link"/>
+  </joint>
+
   <link name="torso">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 -0.107903"/>
@@ -42,10 +31,9 @@
     </visual>
   </link>
   <joint name="base_to_torso_joint" type="fixed">
-    <parent link="base_z"/>
+    <parent link="base_link"/>
     <child link="torso"/>
-    <axis xyz="0 1 0"/>
-    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <origin rpy="0 0 0" xyz="0 0 1.1"/>
   </joint>
 
   <!-- Left Leg -->
@@ -62,7 +50,7 @@
       </geometry>
     </visual>
   </link>
-  <joint name="left_hip_yaw_joint" type="fixed">
+  <joint name="left_hip_yaw_joint" type="revolute">
     <axis xyz="0 0 1"/>
     <limit effort="35.0" lower="-1" upper="1" velocity="20"/>
     <dynamics damping="0.01"/>
@@ -84,7 +72,7 @@
       </geometry>
     </visual>
   </link>
-  <joint name="left_hip_roll_joint" type="fixed">
+  <joint name="left_hip_roll_joint" type="revolute">
     <axis xyz="1 0 0"/>
     <limit effort="70.0" lower="-1" upper="1" velocity="10"/>
     <dynamics damping="0.01"/>
@@ -108,7 +96,7 @@
   </link>
   <joint name="left_hip_pitch_joint" type="revolute">
     <axis xyz="0 1 0"/>
-    <limit effort="35.0" lower="-1.5" upper="1.5" velocity="20"/>    
+    <limit effort="35.0" lower="-1.5" upper="1.5" velocity="20"/>
     <dynamics damping="0.01"/>
     <origin rpy="0 0 0" xyz="0.055 0.0395 0"/>
     <parent link="left_hip_roll"/>
@@ -369,7 +357,7 @@
       </geometry>
     </visual>
   </link>
-  <joint name="right_hip_yaw_joint" type="fixed">
+  <joint name="right_hip_yaw_joint" type="revolute">
     <axis xyz="0 0 1"/>
     <limit effort="35.0" lower="-1" upper="1" velocity="20"/>
     <dynamics damping="0.01"/>
@@ -391,7 +379,7 @@
       </geometry>
     </visual>
   </link>
-  <joint name="right_hip_roll_joint" type="fixed">
+  <joint name="right_hip_roll_joint" type="revolute">
     <axis xyz="1 0 0"/>
     <limit effort="70.0" lower="-1" upper="1" velocity="10"/>
     <dynamics damping="0.01"/>
@@ -415,8 +403,8 @@
   </link>
   <joint name="right_hip_pitch_joint" type="revolute">
     <axis xyz="0 1 0"/>
-    <limit effort="35.0" lower="-1.5" upper="1.5" velocity="20"/> 
-    <!-- <dynamics damping="0.01"/> -->
+    <limit effort="35.0" lower="-1.5" upper="1.5" velocity="20"/>
+    <dynamics damping="0.01"/>
     <origin rpy="0 0 0" xyz="0.055 -0.0395 0"/>
     <parent link="right_hip_roll"/>
     <child link="right_hip_pitch"/>
@@ -672,7 +660,7 @@
     <child link="static_com"/>
   </joint>
 
-  <!-- <transmission name="left_hip_yaw_transmission">
+  <transmission name="left_hip_yaw_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="left_hip_yaw_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -680,8 +668,8 @@
     <actuator name="left_hip_yaw_actuator">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
-  </transmission> -->
-  <!-- <transmission name="left_hip_roll_transmission">
+  </transmission>
+  <transmission name="left_hip_roll_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="left_hip_roll_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -689,7 +677,7 @@
     <actuator name="left_hip_roll_actuator">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
-  </transmission> -->
+  </transmission>
   <transmission name="left_hip_pitch_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="left_hip_pitch_joint">
@@ -717,8 +705,8 @@
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
   </transmission> 
-
-  <!-- <transmission name="left_shoulder_pitch_transmission">
+<!-- 
+  <transmission name="left_shoulder_pitch_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="left_shoulder_pitch_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -726,8 +714,8 @@
     <actuator name="left_shoulder_pitch_actuator">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
-  </transmission> -->
-  <!-- <transmission name="left_shoulder_roll_transmission">
+  </transmission>
+  <transmission name="left_shoulder_roll_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="left_shoulder_roll_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -735,8 +723,8 @@
     <actuator name="left_shoulder_roll_actuator">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
-  </transmission> -->
-  <!-- <transmission name="left_shoulder_yaw_transmission">
+  </transmission>
+  <transmission name="left_shoulder_yaw_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="left_shoulder_yaw_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -744,8 +732,8 @@
     <actuator name="left_shoulder_yaw_actuator">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
-  </transmission> -->
-  <!-- <transmission name="left_elbow_pitch_transmission">
+  </transmission>
+  <transmission name="left_elbow_pitch_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="left_elbow_pitch_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -755,7 +743,7 @@
     </actuator>
   </transmission> -->
 
-  <!-- <transmission name="right_hip_yaw_transmission">
+  <transmission name="right_hip_yaw_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="right_hip_yaw_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -763,8 +751,8 @@
     <actuator name="right_hip_yaw_actuator">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
-  </transmission> -->
-  <!-- <transmission name="right_hip_roll_transmission">
+  </transmission>
+  <transmission name="right_hip_roll_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="right_hip_roll_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -772,7 +760,7 @@
     <actuator name="right_hip_roll_actuator">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
-  </transmission> -->
+  </transmission>
   <transmission name="right_hip_pitch_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="right_hip_pitch_joint">
@@ -800,8 +788,8 @@
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
   </transmission> 
-
-  <!-- <transmission name="right_shoulder_pitch_transmission">
+<!-- 
+  <transmission name="right_shoulder_pitch_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="right_shoulder_pitch_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -809,8 +797,8 @@
     <actuator name="right_shoulder_pitch_actuator">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
-  </transmission> -->
-  <!-- <transmission name="right_shoulder_roll_transmission">
+  </transmission>
+  <transmission name="right_shoulder_roll_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="right_shoulder_roll_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -818,8 +806,8 @@
     <actuator name="right_shoulder_roll_actuator">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
-  </transmission> -->
-  <!-- <transmission name="right_shoulder_yaw_transmission">
+  </transmission>
+  <transmission name="right_shoulder_yaw_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="right_shoulder_yaw_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
@@ -827,8 +815,8 @@
     <actuator name="right_shoulder_yaw_actuator">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
-  </transmission> -->
-  <!-- <transmission name="right_elbow_pitch_transmission">
+  </transmission>
+  <transmission name="right_elbow_pitch_transmission">
     <type>transmission_interface/SimpleTransmission</type>
     <joint name="right_elbow_pitch_joint">
       <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
