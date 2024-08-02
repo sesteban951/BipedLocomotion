@@ -2,15 +2,14 @@
 
 from pydrake.all import *
 import numpy as np
-from controller_SE2 import HLIP
+from controller_SE3 import HLIP
 
 # simulation parameters
-sim_time = 30.
+sim_time = 5.
 realtime_rate = 1.0
 
 # load model
-# model_file = "../models/achilles_drake.urdf"
-model_file = "../models/achilles_SE2_drake.urdf"
+model_file = "../models/achilles_SE3_drake.urdf"
 
 # start meshcat
 meshcat = StartMeshcat()
@@ -40,14 +39,14 @@ plant.RegisterCollisionGeometry(
 plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 
 # add low level PD controllers
-kp_hip = 500
-kp_knee = 500
-kp_ankle = 200
-kd_hip = 10
-kd_knee = 10
-kd_ankle = 2
-Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_hip, kp_knee, kp_ankle])
-Kd = np.array([kd_hip, kd_knee, kd_ankle, kd_hip, kd_knee, kd_ankle])
+kp_hip = 0.01
+kp_knee = 0.01
+kp_ankle = 0.01
+kd_hip = 0.01
+kd_knee = 0.01
+kd_ankle = 0.01
+Kp = np.array([kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle, kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle])
+Kd = np.array([kd_hip, kd_hip, kp_hip, kd_knee, kd_ankle, kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle])
 actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
 for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):
     plant.get_joint_actuator(actuator_index).set_controller_gains(
@@ -77,22 +76,10 @@ diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
 # configuration 
-# q0 = np.array([1, 0, 0, 0,    # quaternion (w,x,y,z)
-#                0, 0, 1.02,    # position (x,y,z)
-#                0, 0, 0, 0, 0, # left leg: hip_yaw, hip_roll, hip_pitch, knee, ankle 
-#                0, 0, 0, 0,    # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow
-#                0, 0, 0, 0, 0, # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
-#                0, 0, 0, 0])   # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow
-# q0 = np.array([0, 1.02,  # position (x,z)
-#                0,        # theta
-#                0, 0, 0,  # left leg: hip_pitch, knee, ankle 
-#                0, 0,     # left arm: shoulder_pitch, elbow
-#                0, 0, 0,  # right leg: hip_pitch, knee, ankle
-#                0, 0])    # right arm: shoulder_pitch, elbow
-q0 = np.array([0, 1.,  # position (x,z)
-               0,        # theta
-               0, 0, 0,  # left leg: hip_pitch, knee, ankle 
-               0, 0, 0]) # right leg: hip_pitch, knee, ankle
+q0 = np.array([1, 0, 0, 0,     # orientation: w, x, y, z
+               0, 0, 2.0,        # position: x, y, z
+               0, 0, 0, 0, 0,  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle 
+               0, 0, 0, 0, 0]) # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
 v0 = np.zeros(plant.num_velocities())
 plant.SetPositions(plant_context, q0)
 plant.SetVelocities(plant_context, v0)

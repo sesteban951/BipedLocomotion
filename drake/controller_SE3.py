@@ -352,50 +352,50 @@ class HLIP(LeafSystem):
         self.plant.SetPositionsAndVelocities(self.plant_context, x_hat)
         self.t_current = context.get_time()
 
-        print("\n *************************************** \n")
-        print("time: ", self.t_current) 
+        # print("\n *************************************** \n")
+        # print("time: ", self.t_current) 
         
-        # update everything
-        self.update_foot_role()
-        self.update_hlip_state_R()
+        # # update everything
+        # self.update_foot_role()
+        # self.update_hlip_state_R()
 
-        # query the relevant current positions
-        p_static_com_current = self.plant.CalcPointsPositions(self.plant_context,
-                                                              self.static_com_frame,
-                                                              [0,0,0],
-                                                              self.plant.world_frame())
-        p_left_current = self.plant.CalcPointsPositions(self.plant_context,
-                                                        self.left_foot_frame,
-                                                        [0,0,0],
-                                                        self.plant.world_frame())
-        p_right_current = self.plant.CalcPointsPositions(self.plant_context,
-                                                         self.right_foot_frame,
-                                                         [0,0,0],
-                                                         self.plant.world_frame())
+        # # query the relevant current positions
+        # p_static_com_current = self.plant.CalcPointsPositions(self.plant_context,
+        #                                                       self.static_com_frame,
+        #                                                       [0,0,0],
+        #                                                       self.plant.world_frame())
+        # p_left_current = self.plant.CalcPointsPositions(self.plant_context,
+        #                                                 self.left_foot_frame,
+        #                                                 [0,0,0],
+        #                                                 self.plant.world_frame())
+        # p_right_current = self.plant.CalcPointsPositions(self.plant_context,
+        #                                                  self.right_foot_frame,
+        #                                                  [0,0,0],
+        #                                                  self.plant.world_frame())
 
-        # compute desired foot trajectories
-        p_right, p_left = self.update_foot_traj()
+        # # compute desired foot trajectories
+        # p_right, p_left = self.update_foot_traj()
 
-        # solve the inverse kinematics problem
-        p_right_des = np.array([p_right[0], [0], p_right[2]])
-        p_left_des = np.array([p_left[0], [0], p_left[2]])
+        # # solve the inverse kinematics problem
+        # p_right_des = np.array([p_right[0], [0], p_right[2]])
+        # p_left_des = np.array([p_left[0], [0], p_left[2]])
 
-        # solve the IK problem
-        res = self.DoInverseKinematics(p_right_des, 
-                                       p_left_des)
+        # # solve the IK problem
+        # res = self.DoInverseKinematics(p_right_des, 
+        #                                p_left_des)
         
-        # extract the IK solution
-        if res.is_success():
-            q_ik = res.GetSolution(self.ik.q())
-        else:
-            q_ik = self.plant.GetPositions(self.plant_context)
-            print("\n !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IK failed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n")
+        # # extract the IK solution
+        # if res.is_success():
+        #     q_ik = res.GetSolution(self.ik.q())
+        # else:
+        #     q_ik = self.plant.GetPositions(self.plant_context)
+        #     print("\n !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IK failed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n")
 
         # compute the nominal state
-        q_des = np.array([q_ik[3], q_ik[4], q_ik[5],  # left leg: hip_pitch, knee, ankle
-                          q_ik[6], q_ik[7], q_ik[8]]) # right leg: hip_pitch, knee, ankle
-        # q_des = np.array([0, 0, 0,  # left leg: hip_pitch, knee, ankle
-        #                   0, 0, 0]) # right leg: hip_pitch, knee, ankle
+        # q_des = np.array([q_ik[7],  q_ik[8],  q_ik[9],  q_ik[10], q_ik[11],  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle 
+        #                   q_ik[12], q_ik[13], q_ik[14], q_ik[15], q_ik[16]]) # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
+        q_des = np.array([1, 0, 0, 0, 0, 
+                          -1, 0, 0, 0, 0])
         v_des = np.zeros(self.plant.num_actuators())
         x_des = np.block([q_des, v_des])
 
