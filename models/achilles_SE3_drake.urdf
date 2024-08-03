@@ -10,7 +10,7 @@
   </material>
 
   <!-- Base -->
-  <link name="base"/>
+  <link name="base_link"/>
   <link name="torso">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 -0.107903"/>
@@ -25,7 +25,7 @@
     </visual>
   </link>
   <joint name="base_to_torso_joint" type="fixed">
-    <parent link="base"/>
+    <parent link="base_link"/>
     <child link="torso"/>
     <origin rpy="0 0 0" xyz="0 0 0"/>
   </joint>

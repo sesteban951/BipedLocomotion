@@ -5,7 +5,7 @@ import numpy as np
 from controller_SE3 import HLIP
 
 # simulation parameters
-sim_time = 5.
+sim_time = 6.0
 realtime_rate = 1.0
 
 # load model
@@ -39,14 +39,14 @@ plant.RegisterCollisionGeometry(
 plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 
 # add low level PD controllers
-kp_hip = 0.01
-kp_knee = 0.01
-kp_ankle = 0.01
-kd_hip = 0.01
-kd_knee = 0.01
-kd_ankle = 0.01
+kp_hip = 500
+kp_knee = 500
+kp_ankle = 200
+kd_hip = 10
+kd_knee = 10
+kd_ankle = 2
 Kp = np.array([kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle, kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle])
-Kd = np.array([kd_hip, kd_hip, kp_hip, kd_knee, kd_ankle, kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle])
+Kd = np.array([kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle, kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle])
 actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
 for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):
     plant.get_joint_actuator(actuator_index).set_controller_gains(
@@ -77,10 +77,13 @@ plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
 # configuration 
 q0 = np.array([1, 0, 0, 0,     # orientation: w, x, y, z
-               0, 0, 2.0,        # position: x, y, z
+               0, 0, 1.,     # position: x, y, z
                0, 0, 0, 0, 0,  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle 
                0, 0, 0, 0, 0]) # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
-v0 = np.zeros(plant.num_velocities())
+v0 = np.array([0, 0, 0,     
+               0, 0, 0,   
+               0, 0, 0, 0, 0, 
+               0, 0, 0, 0, 0]) 
 plant.SetPositions(plant_context, q0)
 plant.SetVelocities(plant_context, v0)
 
