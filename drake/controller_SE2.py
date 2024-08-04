@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from pydrake.all import *
 import numpy as np
+import scipy as sp
 
 class HLIP(LeafSystem):
 
@@ -65,9 +66,15 @@ class HLIP(LeafSystem):
 
         # Robot LIP state
         self.p_com = np.zeros(3)    # center of mass state in world frame
-        self.v_com = np.zeros(3)   
-        self.p_R = np.zeros(3)     
-        self.v_R = np.zeros(3)
+        self.v_com = np.zeros(3)    # center of mass velocity in world frame
+        self.p_R = np.zeros(3)      # center of mass state in stance foot frame
+        self.v_R = np.zeros(3)      # center of mass velocity in stance foot frame
+        
+        # LIP model preimpact states
+        self.p_H_minus = 0
+        self.v_H_minus = 0
+        self.p_R_minus = 0
+        self.v_R_minus = 0
 
         # swing foot parameters
         self.z_apex = 0.01
@@ -75,10 +82,11 @@ class HLIP(LeafSystem):
         self.z0 = 0.0
         self.zf = 0.0
 
-        # Gains (using the deadbeat gain)
-        coth = (np.exp(2 * self.T * lam) + 1) / (np.exp(2 * self.T * lam) - 1)
+        # create lambda function for hyperbolic cotangent
+        coth = lambda x: (np.exp(2 * x) + 1) / (np.exp(2 * x) - 1)
         self.Kp_db = 1
-        self.Kd_db = (1/lam) * coth
+        self.Kd_db = (1/lam) * coth(lam * self.T)       
+        self.sigma_P1 = lam * coth(0.5 * lam * self.T)  # orbital slope
         self.u_ff = 0.0
         self.v_des = 0.0
 
@@ -222,6 +230,17 @@ class HLIP(LeafSystem):
         self.p_R = (self.p_com - self.p_stance.T).T
         self.v_R = self.v_com
 
+        print("p_R: ", self.p_R[0])   
+        print("v_R: ", self.v_R[0])
+
+        # compute the preimpact state
+        x0 = np.array([self.p_com[0], self.v_com[0]]).T
+        x_R_minus = sp.linalg.expm(self.A * (self.T - self.t_phase)) @ x0
+        self.p_R_minus = x_R_minus[0]
+        self.v_R_minus = x_R_minus[1]
+        print("p_R_minus: ", self.p_R_minus)
+        print("v_R_minus: ", self.v_R_minus)
+
         # visualize the CoM position
         self.meshcat.SetTransform("com_pos", RigidTransform(self.p_com), self.t_current)
 
@@ -259,6 +278,9 @@ class HLIP(LeafSystem):
 
         # check if in new step period
         if self.switched_stance_foot == True:
+
+            # compute the new preimpact states
+
             # reset the filter (blending history)
             self.u_applied = u[0]
             self.switched_stance_foot = False

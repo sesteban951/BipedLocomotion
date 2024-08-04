@@ -5,8 +5,8 @@ import numpy as np
 from controller_SE2 import HLIP
 
 # simulation parameters
-sim_time = 30.
-realtime_rate = 1.0
+sim_time = 3.
+realtime_rate = 0.1
 
 # load model
 # model_file = "../models/achilles_drake.urdf"
@@ -94,6 +94,7 @@ q0 = np.array([0, 1.,  # position (x,z)
                0, 0, 0,  # left leg: hip_pitch, knee, ankle 
                0, 0, 0]) # right leg: hip_pitch, knee, ankle
 v0 = np.zeros(plant.num_velocities())
+v0[0] = -0.1
 plant.SetPositions(plant_context, q0)
 plant.SetVelocities(plant_context, v0)
 
