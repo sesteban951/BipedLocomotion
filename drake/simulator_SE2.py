@@ -3,9 +3,10 @@
 from pydrake.all import *
 import numpy as np
 from controller_SE2 import HLIP
+from joystick import GamepadCommand
 
 # simulation parameters
-sim_time = 10.
+sim_time = 45.
 realtime_rate = 1.0
 
 # load model
@@ -16,7 +17,7 @@ model_file = "../models/achilles_SE2_drake.urdf"
 meshcat = StartMeshcat()
 
 # simulation parameters
-sim_hz = 800
+sim_hz = 750
 sim_config = MultibodyPlantConfig()
 sim_config.time_step = 1 / sim_hz 
 sim_config.discrete_contact_approximation = "lagged"
@@ -40,12 +41,12 @@ plant.RegisterCollisionGeometry(
 plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 
 # add low level PD controllers
-kp_hip = 500
-kp_knee = 500
-kp_ankle = 200
+kp_hip = 750
+kp_knee = 750
+kp_ankle = 150
 kd_hip = 10
 kd_knee = 10
-kd_ankle = 2
+kd_ankle = 1
 Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_hip, kp_knee, kp_ankle])
 Kd = np.array([kd_hip, kd_knee, kd_ankle, kd_hip, kd_knee, kd_ankle])
 actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
@@ -60,11 +61,18 @@ plant.Finalize()
 # add the controller
 controller = builder.AddSystem(HLIP(model_file, meshcat))
 
+# add the joystick
+gamepad = builder.AddSystem(GamepadCommand())
+
+# exit()
+
 # build the diagram 
 builder.Connect(plant.get_state_output_port(), 
                 controller.GetInputPort("x_hat"))
 builder.Connect(controller.GetOutputPort("x_des"),
                 plant.get_desired_state_input_port(robot))
+builder.Connect(gamepad.get_output_port(), 
+                controller.GetInputPort("joy_command"))
 
 # add the visualizer
 AddDefaultVisualization(builder, meshcat)
@@ -77,18 +85,6 @@ diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
 # configuration 
-# q0 = np.array([1, 0, 0, 0,    # quaternion (w,x,y,z)
-#                0, 0, 1.02,    # position (x,y,z)
-#                0, 0, 0, 0, 0, # left leg: hip_yaw, hip_roll, hip_pitch, knee, ankle 
-#                0, 0, 0, 0,    # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow
-#                0, 0, 0, 0, 0, # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
-#                0, 0, 0, 0])   # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow
-# q0 = np.array([0, 1.02,  # position (x,z)
-#                0,        # theta
-#                0, 0, 0,  # left leg: hip_pitch, knee, ankle 
-#                0, 0,     # left arm: shoulder_pitch, elbow
-#                0, 0, 0,  # right leg: hip_pitch, knee, ankle
-#                0, 0])    # right arm: shoulder_pitch, elbow
 q0 = np.array([0, 1.,  # position (x,z)
                0,        # theta
                0, 0, 0,  # left leg: hip_pitch, knee, ankle 

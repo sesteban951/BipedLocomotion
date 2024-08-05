@@ -31,13 +31,13 @@ class HLIP(LeafSystem):
         self.plant_context = self.plant.CreateDefaultContext()
 
         # Leaf System input port
-        self.input_port = self.DeclareVectorInputPort(
-                            "x_hat", 
-                            BasicVector(self.plant.num_positions() + self.plant.num_velocities()))
-        self.DeclareVectorOutputPort(
-                            "x_des",
-                            BasicVector(2 * self.plant.num_actuators()),
-                            self.CalcOutput)
+        self.input_port = self.DeclareVectorInputPort("x_hat", 
+                                                      BasicVector(self.plant.num_positions() + self.plant.num_velocities()))
+        self.gamepad_port = self.DeclareVectorInputPort("joy_command",
+                                                        BasicVector(4))  # LS_x, LS_y, RS_x, A button (Xbox)
+        self.DeclareVectorOutputPort("x_des",
+                                     BasicVector(2 * self.plant.num_actuators()),
+                                     self.CalcOutput)
     
         # relevant frames
         self.static_com_frame = self.plant.GetFrameByName("static_com") # nominal is 0.734 z in world frame
@@ -55,8 +55,8 @@ class HLIP(LeafSystem):
         self.num_steps = 0
 
         # walking parameters
-        self.z_nom = 0.66
-        self.T_SSP = 0.35   # single support phase
+        self.z_nom = 0.64
+        self.T_SSP = 0.3   # single support phase
         self.T_DSP = 0.0   # double support phase
 
         # HLIP parameters
@@ -89,7 +89,8 @@ class HLIP(LeafSystem):
         self.Kd_db = self. T_DSP + (1/lam) * coth(lam * self.T_SSP) # deadbeat gains      
         self.sigma_P1 = lam * coth(0.5 * lam * self.T_SSP)          # orbital slope
         self.u_ff = 0.0
-        self.v_des = 0.1
+        self.v_des = 0.0
+        self.v_max = 0.3
 
         # blending foot placement
         self.alpha = 1.0
@@ -103,6 +104,7 @@ class HLIP(LeafSystem):
 
         # instantiate inverse kinematics solver
         self.ik = InverseKinematics(self.plant)
+        self.q_ik_sol = np.zeros(self.plant.num_positions())
 
         # inverse kinematics solver settings
         epsilon_feet = 0.0     # foot position tolerance     [m]
@@ -364,8 +366,9 @@ class HLIP(LeafSystem):
         self.p_right_cons.evaluator().UpdateUpperBound(p_right_ub)
 
         # solve the IK problem        
-        intial_guess = self.plant.GetPositions(self.plant_context)
-        self.ik.prog().SetInitialGuess(self.ik.q(), intial_guess)
+        initial_guess = self.plant.GetPositions(self.plant_context)
+        # initial_guess = self.q_ik_sol
+        self.ik.prog().SetInitialGuess(self.ik.q(), initial_guess)
         res = SnoptSolver().Solve(self.ik.prog())
         
         return res
@@ -373,13 +376,17 @@ class HLIP(LeafSystem):
     # ---------------------------------------------------------------------------------------- #
     def CalcOutput(self, context, output):
 
+        print("\n *************************************** \n")
+        print("time: ", self.t_current) 
+
         # set our interal model to match the state estimate
         x_hat = self.EvalVectorInput(context, 0).get_value()
         self.plant.SetPositionsAndVelocities(self.plant_context, x_hat)
         self.t_current = context.get_time()
 
-        print("\n *************************************** \n")
-        print("time: ", self.t_current) 
+        # evaluate the joystick command
+        joy_command = self.gamepad_port.Eval(context)
+        self.v_des = joy_command[0] * self.v_max
         
         # update everything
         self.update_foot_role()
@@ -417,9 +424,10 @@ class HLIP(LeafSystem):
         # extract the IK solution
         if res.is_success():
             q_ik = res.GetSolution(self.ik.q())
+            self.q_ik_sol = q_ik
         else:
-            q_ik = self.plant.GetPositions(self.plant_context)
-            print("\n ************* IK failed ************* \n")
+            q_ik = self.q_ik_sol
+            print("\n ************* IK failed! ************* \n")
 
         # compute the nominal state
         q_des = np.array([q_ik[3], q_ik[4], q_ik[5],  # left leg: hip_pitch, knee, ankle
