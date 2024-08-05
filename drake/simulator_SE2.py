@@ -5,8 +5,8 @@ import numpy as np
 from controller_SE2 import HLIP
 
 # simulation parameters
-sim_time = 3.
-realtime_rate = 0.1
+sim_time = 10.
+realtime_rate = 1.0
 
 # load model
 # model_file = "../models/achilles_drake.urdf"
@@ -16,7 +16,7 @@ model_file = "../models/achilles_SE2_drake.urdf"
 meshcat = StartMeshcat()
 
 # simulation parameters
-sim_hz = 1000
+sim_hz = 800
 sim_config = MultibodyPlantConfig()
 sim_config.time_step = 1 / sim_hz 
 sim_config.discrete_contact_approximation = "lagged"
@@ -94,7 +94,7 @@ q0 = np.array([0, 1.,  # position (x,z)
                0, 0, 0,  # left leg: hip_pitch, knee, ankle 
                0, 0, 0]) # right leg: hip_pitch, knee, ankle
 v0 = np.zeros(plant.num_velocities())
-v0[0] = -0.1
+v0[0] = 0.0 # forward velocity
 plant.SetPositions(plant_context, q0)
 plant.SetVelocities(plant_context, v0)
 

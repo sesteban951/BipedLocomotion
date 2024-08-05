@@ -56,7 +56,8 @@ class HLIP(LeafSystem):
 
         # walking parameters
         self.z_nom = 0.66
-        self.T = 0.3
+        self.T_SSP = 0.35   # single support phase
+        self.T_DSP = 0.0   # double support phase
 
         # HLIP parameters
         g = 9.81
@@ -77,23 +78,23 @@ class HLIP(LeafSystem):
         self.v_R_minus = 0
 
         # swing foot parameters
-        self.z_apex = 0.01
+        self.z_apex = 0.05    # NOTE: this is affected by bezier curve swing belnding
         self.z_offset = 0.0
         self.z0 = 0.0
         self.zf = 0.0
 
         # create lambda function for hyperbolic cotangent
         coth = lambda x: (np.exp(2 * x) + 1) / (np.exp(2 * x) - 1)
-        self.Kp_db = 1
-        self.Kd_db = (1/lam) * coth(lam * self.T)       
-        self.sigma_P1 = lam * coth(0.5 * lam * self.T)  # orbital slope
+        self.Kp_db = 1                                              # deadbeat gains
+        self.Kd_db = self. T_DSP + (1/lam) * coth(lam * self.T_SSP) # deadbeat gains      
+        self.sigma_P1 = lam * coth(0.5 * lam * self.T_SSP)          # orbital slope
         self.u_ff = 0.0
-        self.v_des = 0.0
+        self.v_des = 0.1
 
         # blending foot placement
         self.alpha = 1.0
         self.u_applied = 0
-        self.bez_order = 5
+        self.bez_order = 7
         self.switched_stance_foot = False
 
         # timing variables
@@ -150,7 +151,7 @@ class HLIP(LeafSystem):
     def update_foot_role(self):
         
         # check if entered new step period
-        if self.t_phase >= self.T:
+        if self.t_phase >= self.T_SSP:
             self.num_steps += 1
             self.update_foot_role_flag = True
 
@@ -176,7 +177,7 @@ class HLIP(LeafSystem):
                 # switch the roles of the feet
                 self.stance_foot_frame = self.right_foot_frame
                 self.swing_foot_frame = self.left_foot_frame
-            
+    
             # right foot is swing foot
             else:
 
@@ -198,9 +199,18 @@ class HLIP(LeafSystem):
             self.update_foot_role_flag = False            
 
         # update the phase time
-        self.t_phase = self.t_current - self.num_steps * self.T
+        self.t_phase = self.t_current - self.num_steps * self.T_SSP
 
     # ---------------------------------------------------------------------------------------- #
+
+    # update the COM state of the HLIP (need this incase you want to change v_des)
+    def update_hlip_state_H(self):
+            
+        # Eq (20) Xiaobing Xiong, Ames
+        T = self.T_SSP + self.T_DSP
+        self.p_H_minus = (self.v_des * T) / (2 + self.T_DSP * self.sigma_P1)
+        self.v_H_minus = self.sigma_P1 * (self.v_des * T) / (2 + self.T_DSP * self.sigma_P1)
+
     # update the COM state of the Robot
     def update_hlip_state_R(self):
         
@@ -230,16 +240,11 @@ class HLIP(LeafSystem):
         self.p_R = (self.p_com - self.p_stance.T).T
         self.v_R = self.v_com
 
-        print("p_R: ", self.p_R[0])   
-        print("v_R: ", self.v_R[0])
-
         # compute the preimpact state
         x0 = np.array([self.p_com[0], self.v_com[0]]).T
-        x_R_minus = sp.linalg.expm(self.A * (self.T - self.t_phase)) @ x0
+        x_R_minus = sp.linalg.expm(self.A * (self.T_SSP - self.t_phase)) @ x0
         self.p_R_minus = x_R_minus[0]
         self.v_R_minus = x_R_minus[1]
-        print("p_R_minus: ", self.p_R_minus)
-        print("v_R_minus: ", self.v_R_minus)
 
         # visualize the CoM position
         self.meshcat.SetTransform("com_pos", RigidTransform(self.p_com), self.t_current)
@@ -267,26 +272,24 @@ class HLIP(LeafSystem):
         # x-direction [p, v]
         px = self.p_R[0]
         vx = self.v_R[0]
+        px_R_minus = self.p_R_minus
+        vx_R_minus = self.v_R_minus
+        px_H_minus = self.p_H_minus
+        vx_H_minus = self.v_H_minus
 
-        # desired velocity
-        v_des = self.v_des
-
-        # compute raibert heuristic foot gains
-        kp = self.Kp_db
-        kd = self.Kd_db
-        u = self.u_ff + kp * (px) + kd * (vx - v_des)
-
+        # compute foot placement
+        # u = (self.u_ff + self.v_des * self.T_SSP + self.Kp_db * (px) + self.Kd_db * (vx - self.v_des))[0]
+        # u = self.u_ff + self.v_des * self.T_SSP + self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)
+        u = self.u_ff + self.v_des * self.T_SSP + self.Kp_db * (px[0] - px_H_minus) + self.Kd_db * (vx - vx_H_minus)
+        
         # check if in new step period
         if self.switched_stance_foot == True:
-
-            # compute the new preimpact states
-
             # reset the filter (blending history)
-            self.u_applied = u[0]
+            self.u_applied = u
             self.switched_stance_foot = False
         else:
             # compute the blended foot placement
-            self.u_applied = self.alpha * u[0] + (1 - self.alpha) * self.u_applied
+            self.u_applied = self.alpha * u + (1 - self.alpha) * self.u_applied
 
         return self.u_applied
 
@@ -312,7 +315,7 @@ class HLIP(LeafSystem):
                               ctrl_pts_z.T))
 
         # evaluate bezier at time t
-        bezier = BezierCurve(0, self.T, ctrl_pts)
+        bezier = BezierCurve(0, self.T_SSP, ctrl_pts)
         b = np.array(bezier.value(self.t_phase))
 
         # swing ans stance foot targets
@@ -324,12 +327,13 @@ class HLIP(LeafSystem):
                                           self.z_offset])[None].T
         
         # linearly interpolate the current swnig foot position with the primary target
-        alpha = self.t_phase / self.T
+        alpha = self.t_phase / self.T_SSP
         p_swing_current = self.plant.CalcPointsPositions(self.plant_context,
                                                          self.swing_foot_frame,
                                                          [0,0,0],
                                                          self.plant.world_frame())
         swing_target = (1 - alpha) * p_swing_current + (alpha) * primary_swing_target
+        swing_target = primary_swing_target
 
         # left foot in swing
         if self.num_steps % 2 == 0:
@@ -379,21 +383,25 @@ class HLIP(LeafSystem):
         
         # update everything
         self.update_foot_role()
+        self.update_hlip_state_H()
         self.update_hlip_state_R()
 
+        print("self.p_R: ", self.p_R[0][0])
+        print("self.v_R: ", self.v_R[0])
+
         # query the relevant current positions
-        p_static_com_current = self.plant.CalcPointsPositions(self.plant_context,
-                                                              self.static_com_frame,
-                                                              [0,0,0],
-                                                              self.plant.world_frame())
-        p_left_current = self.plant.CalcPointsPositions(self.plant_context,
-                                                        self.left_foot_frame,
-                                                        [0,0,0],
-                                                        self.plant.world_frame())
-        p_right_current = self.plant.CalcPointsPositions(self.plant_context,
-                                                         self.right_foot_frame,
-                                                         [0,0,0],
-                                                         self.plant.world_frame())
+        # p_static_com_current = self.plant.CalcPointsPositions(self.plant_context,
+        #                                                       self.static_com_frame,
+        #                                                       [0,0,0],
+        #                                                       self.plant.world_frame())
+        # p_left_current = self.plant.CalcPointsPositions(self.plant_context,
+        #                                                 self.left_foot_frame,
+        #                                                 [0,0,0],
+        #                                                 self.plant.world_frame())
+        # p_right_current = self.plant.CalcPointsPositions(self.plant_context,
+        #                                                  self.right_foot_frame,
+        #                                                  [0,0,0],
+        #                                                  self.plant.world_frame())
 
         # compute desired foot trajectories
         p_right, p_left = self.update_foot_traj()
@@ -411,7 +419,7 @@ class HLIP(LeafSystem):
             q_ik = res.GetSolution(self.ik.q())
         else:
             q_ik = self.plant.GetPositions(self.plant_context)
-            print("\n !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IK failed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n")
+            print("\n ************* IK failed ************* \n")
 
         # compute the nominal state
         q_des = np.array([q_ik[3], q_ik[4], q_ik[5],  # left leg: hip_pitch, knee, ankle
