@@ -24,18 +24,15 @@ class GamepadCommand(LeafSystem):
         self.keepPlaying = True
         
         # look for plugged in joysticks
-        self.joysticks = []
-        self.joysticks.append(pygame.joystick.Joystick(0))
-        self.joysticks[0].init()  # just initialize the first joystick
-        self.detected_joystick = None
-
-        # print message for number of joysticks found
-        if len(self.joysticks) == 0:
+        if pygame.joystick.get_count() == 0:
             print("No joysticks connected.")
             self.detected_joystick = False
         else:
             print("Found ", pygame.joystick.get_count(), " joysticks")
             self.detected_joystick = True
+            self.joysticks = []
+            self.joysticks.append(pygame.joystick.Joystick(0))
+            self.joysticks[0].init()  # just initialize the first joystick
 
     def CalcOutput(self, context, output):
         """
@@ -45,7 +42,7 @@ class GamepadCommand(LeafSystem):
         # just set the output to zero if no joystick is detected
         if self.detected_joystick == False:
             # print("Gamepad not connected, sending zero commands.")
-            output.SetFromVector(np.zeros(3))
+            output.SetFromVector(np.zeros(4))
         else:
 
             # Update internal state of Pygame

@@ -10,7 +10,6 @@ sim_time = 45.
 realtime_rate = 1.0
 
 # load model
-# model_file = "../models/achilles_drake.urdf"
 model_file = "../models/achilles_SE2_drake.urdf"
 
 # start meshcat
@@ -85,7 +84,7 @@ diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
 # configuration 
-q0 = np.array([0, 1.,  # position (x,z)
+q0 = np.array([0, 1.0,  # position (x,z)
                0,        # theta
                0, 0, 0,  # left leg: hip_pitch, knee, ankle 
                0, 0, 0]) # right leg: hip_pitch, knee, ankle

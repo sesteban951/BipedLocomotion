@@ -83,11 +83,13 @@ class HLIP(LeafSystem):
         self.z0 = 0.0
         self.zf = 0.0
 
-        # create lambda function for hyperbolic cotangent
+        # create lambda function for hyperbolic trig
         coth = lambda x: (np.exp(2 * x) + 1) / (np.exp(2 * x) - 1)
+
+        # define the deadbeat gains and orbital slopes
         self.Kp_db = 1                                              # deadbeat gains
         self.Kd_db = self. T_DSP + (1/lam) * coth(lam * self.T_SSP) # deadbeat gains      
-        self.sigma_P1 = lam * coth(0.5 * lam * self.T_SSP)          # orbital slope
+        self.sigma_P1 = lam * coth(0.5 * lam * self.T_SSP)          # orbital slope (P1)
         self.u_ff = 0.0
         self.v_des = 0.0
         self.v_max = 0.3
@@ -118,7 +120,7 @@ class HLIP(LeafSystem):
                                                         self.plant.world_frame(), 
                                                         [-np.inf, -np.inf, self.z_nom - epsilon_base], [np.inf, np.inf, self.z_nom + epsilon_base]) 
         
-        # Add com orientation constraint (torso coord frame, x is z-world, y is neg y-world, z is x-world)
+        # Add com orientation constraint
         self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(),
                                                            self.plant.world_frame(), RotationMatrix(),
                                                            base_epsilon_orient * (np.pi/180))
@@ -243,7 +245,7 @@ class HLIP(LeafSystem):
         self.v_R = self.v_com
 
         # compute the preimpact state
-        x0 = np.array([self.p_com[0], self.v_com[0]]).T
+        x0 = np.array([self.p_R[0][0], self.v_R[0]]).T
         x_R_minus = sp.linalg.expm(self.A * (self.T_SSP - self.t_phase)) @ x0
         self.p_R_minus = x_R_minus[0]
         self.v_R_minus = x_R_minus[1]
