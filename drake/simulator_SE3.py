@@ -5,8 +5,8 @@ import numpy as np
 from controller_SE3 import HLIP
 
 # simulation parameters
-sim_time = 1.0
-realtime_rate = 0.03
+sim_time = 15.0
+realtime_rate = 1.0
 
 # load model
 model_file = "../models/achilles_SE3_drake.urdf"

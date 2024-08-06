@@ -118,10 +118,10 @@ class HLIP(LeafSystem):
         self.q_ik_sol = np.zeros(self.plant.num_positions())
 
         # inverse kinematics solver settings
-        epsilon_feet = 0.001     # foot position tolerance     [m]
-        epsilon_base = 0.001     # torso position tolerance    [m]
-        foot_epsilon_orient = 1.0   # foot orientation tolerance  [deg]
-        base_epsilon_orient = 1.0   # torso orientation tolerance [deg]
+        epsilon_feet = 0.00     # foot position tolerance     [m]
+        epsilon_base = 0.00     # torso position tolerance    [m]
+        foot_epsilon_orient = 0.0   # foot orientation tolerance  [deg]
+        base_epsilon_orient = 0.0   # torso orientation tolerance [deg]
         self.tol_feet = np.array([[epsilon_feet], [epsilon_feet], [epsilon_feet]])
 
         # NOTE: I might want to switch to doing everything 
@@ -146,11 +146,17 @@ class HLIP(LeafSystem):
                                                           [0, 0, 0], [0, 0, 0]) 
         
         # Add foot orientation constraints (both feet pointing towards x-world direction)
+        # self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
+        #                                                             self.plant.world_frame(), [1, 0, 0],
+        #                                                             0, foot_epsilon_orient * (np.pi/180))
+        # self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
+        #                                                             self.plant.world_frame(), [1, 0, 0],
+        #                                                             0, foot_epsilon_orient * (np.pi/180))
         self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
-                                                                    self.plant.world_frame(), [1, 0, 0],
+                                                                    self.static_com_frame, [1, 0, 0],
                                                                     0, foot_epsilon_orient * (np.pi/180))
         self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
-                                                                    self.plant.world_frame(), [1, 0, 0],
+                                                                    self.static_com_frame, [1, 0, 0],
                                                                     0, foot_epsilon_orient * (np.pi/180))
 
     ########################################################################################################
@@ -315,6 +321,11 @@ class HLIP(LeafSystem):
 
         # compute foot placement in y-direction
         u_y = self.u_ff_y + self.v_des_y * self.T_SSP + self.Kp_db * (py[0] - py_H_minus) + self.Kd_db * (vy - vy_H_minus)
+
+        if self.swing_foot_frame == self.left_foot_frame:
+            u_y += 0.09
+        else:
+            u_y += -0.09
 
         # check if in new step period
         if self.switched_stance_foot == True:
