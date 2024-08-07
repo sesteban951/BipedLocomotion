@@ -30,6 +30,13 @@ class Controller(LeafSystem):
         # relevant frames
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
         self.right_foot_frame = self.plant.GetFrameByName("right_foot")
+        self.stance_foot_frame = self.right_foot_frame
+        self.swing_foot_frame = self.left_foot_frame
+        
+        self.T = 1.0
+        self.t_phase = 0.0
+        self.num_steps = 0
+        self.update_foot_role_flag = True
 
         self.plant.Finalize()
         self.plant_context = self.plant.CreateDefaultContext()
@@ -48,56 +55,139 @@ class Controller(LeafSystem):
 
         # inverse kinematics solver settings
         epsilon_feet = 0.005        # foot position tolerance     [m]
-        foot_epsilon_orient = 1.0   # foot orientation tolerance  [deg]
+        self.foot_epsilon_orient = 0.0   # foot orientation tolerance  [deg]
         self.tol_feet = np.array([[epsilon_feet], [epsilon_feet], [epsilon_feet]])  # x-z only
         
-        # Add foot position constraints
+        # Add foot position constraints (continuously updated)
         self.p_left_cons =  self.ik.AddPositionConstraint(self.left_foot_frame, [0, 0, 0],
                                                           self.plant.world_frame(), 
-                                                          [0, 0, 0], [1, 0, 0])
+                                                          [0, 0, 0], [0, 0, 0])
         self.p_right_cons = self.ik.AddPositionConstraint(self.right_foot_frame, [0, 0, 0],
                                                           self.plant.world_frame(), 
                                                           [0, 0, 0], [0, 0, 0]) 
 
-        # Add foot orientation constraints
-        self.r_left_cons =  self.ik.AddOrientationConstraint(self.left_foot_frame, RotationMatrix(),
-                                                             self.plant.world_frame(), RotationMatrix(),
-                                                             foot_epsilon_orient * (np.pi/180))
-        self.r_right_cons = self.ik.AddOrientationConstraint(self.right_foot_frame, RotationMatrix(),
-                                                             self.plant.world_frame(), RotationMatrix(),
-                                                             foot_epsilon_orient * (np.pi/180))
+        # Add foot orientation constraints (removed and created at each HLIP step)
+        self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
+                                                                    self.plant.world_frame(), [1, 0, 0],
+                                                                    0, 0.0)
+        self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
+                                                                    self.plant.world_frame(), [1, 0, 0],
+                                                                    0, 0.0)
 
     # ---------------------------------------------------------------------------------------- #
+
+    # update the foot role
+    def update_foot_roles(self):
+        
+        # check if entered new step period
+        if self.t_phase >= self.T:
+            self.num_steps += 1
+            self.update_foot_role_flag = True
+
+        # update the foot role
+        if self.update_foot_role_flag == True:
+
+             # left foot is swing foot
+            if self.num_steps %2 == 0:
+
+                # set the last known swing foot position as the desried stance foot position
+                p_stance = self.plant.CalcPointsPositions(self.plant_context,
+                                                          self.stance_foot_frame, [0, 0, 0],
+                                                          self.plant.world_frame())
+                R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
+                                                                 self.plant.world_frame(),
+                                                                 self.stance_foot_frame)
+                _, _, yaw = RollPitchYaw(R_stance).vector()
+                self.p_control_stance_W = np.array([p_stance[0], p_stance[1], p_stance[2]])
+                self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0, yaw)).matrix()
+
+                # remove the old foot orientation constraints
+                self.ik.prog().RemoveConstraint(self.r_left_cons)
+                self.ik.prog().RemoveConstraint(self.r_right_cons)
+
+                # add the new foot orientation constraints
+                self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
+                                                                            self.plant.world_frame(), self.R_control_stance_W @ [1, 0, 0],
+                                                                            0, self.foot_epsilon_orient * np.pi / 180)
+                self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
+                                                                             self.plant.world_frame(), self.R_control_stance_W @ [1, 0, 0],
+                                                                             0, self.foot_epsilon_orient * np.pi / 180)                
+
+                # update the stance foot position constraints
+                p_right_lb = self.p_control_stance_W - self.tol_feet
+                p_right_ub = self.p_control_stance_W + self.tol_feet
+                self.p_right_cons.evaluator().UpdateLowerBound(p_right_lb)
+                self.p_right_cons.evaluator().UpdateUpperBound(p_right_ub)
+                self.meshcat.SetTransform("p_right", RigidTransform(self.p_control_stance_W))
+
+                # switch the roles of the feet
+                self.swing_foot_frame = self.left_foot_frame
+                self.stance_foot_frame = self.right_foot_frame
+
+            # right foot is swing foot
+            else:
+
+                # set the last known swing foot position as the desried stance foot position
+                p_stance = self.plant.CalcPointsPositions(self.plant_context,
+                                                            self.stance_foot_frame, [0, 0, 0],
+                                                            self.plant.world_frame())
+                R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
+                                                                self.plant.world_frame(),
+                                                                self.stance_foot_frame)
+                _, _, yaw = RollPitchYaw(R_stance).vector()
+                self.p_control_stance_W = np.array([p_stance[0], p_stance[1], p_stance[2]])
+                self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0, yaw)).matrix()
+
+                # remove the old foot orientation constraints
+                self.ik.prog().RemoveConstraint(self.r_left_cons)
+                self.ik.prog().RemoveConstraint(self.r_right_cons)
+
+                # add the new foot orientation constraints
+                self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
+                                                                            self.plant.world_frame(), [np.cos(yaw), np.sin(yaw), 0],
+                                                                            0, self.foot_epsilon_orient * np.pi / 180)
+                self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
+                                                                             self.plant.world_frame(), [np.cos(yaw), np.sin(yaw), 0],
+                                                                             0, self.foot_epsilon_orient * np.pi / 180)
+                
+                # update the stance foot position constraints
+                p_left_lb = self.p_control_stance_W - self.tol_feet
+                p_left_ub = self.p_control_stance_W + self.tol_feet
+                self.p_left_cons.evaluator().UpdateLowerBound(p_left_lb)
+                self.p_left_cons.evaluator().UpdateUpperBound(p_left_ub)
+                self.meshcat.SetTransform("p_left", RigidTransform(self.p_control_stance_W))
+
+                # switch the roles of the feet
+                self.swing_foot_frame = self.right_foot_frame
+                self.stance_foot_frame = self.left_foot_frame
+
+            # reset the foot role flag after switching
+            self.update_foot_role_flag = False   
+
+        # update the phase time
+        self.t_phase = self.t_current - self.num_steps * self.T
+
     # given desired foot and torso positions, solve the IK problem
-    def DoInverseKinematics(self, p_right, p_left):
+    def DoInverseKinematics(self, p_swing_C):
 
         # Update constraints on the positions of the feet
-        p_left_lb = p_left - self.tol_feet
-        p_left_ub = p_left + self.tol_feet
-        p_right_lb = p_right - self.tol_feet
-        p_right_ub = p_right + self.tol_feet
-        self.p_left_cons.evaluator().UpdateLowerBound(p_left_lb)
-        self.p_left_cons.evaluator().UpdateUpperBound(p_left_ub)
-        self.p_right_cons.evaluator().UpdateLowerBound(p_right_lb)
-        self.p_right_cons.evaluator().UpdateUpperBound(p_right_ub)
+        if self.swing_foot_frame == self.left_foot_frame:
+            p_left_W = self.p_control_stance_W + (self.R_control_stance_W @ p_swing_C).reshape(3,1)
+            self.p_left_cons.evaluator().UpdateLowerBound(p_left_W - self.tol_feet)
+            self.p_left_cons.evaluator().UpdateUpperBound(p_left_W + self.tol_feet)
+            self.meshcat.SetTransform("p_left", RigidTransform(p_left_W))
+            
+        elif self.swing_foot_frame == self.right_foot_frame:
+            p_right_W = self.p_control_stance_W + (self.R_control_stance_W @ p_swing_C).reshape(3,1)
+            self.p_right_cons.evaluator().UpdateLowerBound(p_right_W - self.tol_feet)
+            self.p_right_cons.evaluator().UpdateUpperBound(p_right_W + self.tol_feet)
+            self.meshcat.SetTransform("p_right", RigidTransform(p_right_W))
 
-        # Remove the old right foot orientation constraint
-        # self.ik.prog().RemoveConstraint(self.r_right_cons)
-
-        # # Assuming you have a new desired orientation and tolerance
-        # new_orientation = RotationMatrix()  # Replace with your desired orientation
-        # new_tolerance = 1.0 * (np.pi / 180)  # Replace with your desired tolerance
-
-        # # Add a new right foot orientation constraint
-        # self.r_right_cons = self.ik.AddOrientationConstraint(self.right_foot_frame, new_orientation,
-        #                                                      self.plant.world_frame(), RotationMatrix(),
-        #                                                      new_tolerance)
-
-        # solve the IK problem        
+        # solve the IK problem
         intial_guess = self.plant.GetPositions(self.plant_context)
         self.ik.prog().SetInitialGuess(self.ik.q(), intial_guess)
         res = SnoptSolver().Solve(self.ik.prog())
-        
+
         return res
 
     # ---------------------------------------------------------------------------------------- #
@@ -111,23 +201,19 @@ class Controller(LeafSystem):
         print("\n *************************************** \n")
         print("time: ", self.t_current) 
 
-        # solve the inverse kinematics problem
-        c_W = np.array([-0., -0.1, 0.4]).reshape(3, 1)
-        c_st = np.array([0., 0.2, 0.1]).reshape(3, 1)
-        c = np.array([0,0,0.3])
-        r = 0.05
-        rps = 0.5
-        omega = -2*np.pi*rps
-        p_right_des = np.array([[c[0] + r*np.cos(omega*self.t_current)], [-0.1], [c[2] + r*np.sin(omega*self.t_current)]])
-        p_left_des = np.array([[c[0] - r*np.cos(omega*self.t_current)], [0.1], [c[2] - r*np.sin(omega*self.t_current)]])
+        self.update_foot_roles()
 
-        # draw spehere at desired foot positions
-        self.meshcat.SetTransform("p_right", RigidTransform(p_right_des), self.t_current)
-        self.meshcat.SetTransform("p_left", RigidTransform(p_left_des), self.t_current)
+        # solve the inverse kinematics problem
+        # c = np.array([0.1,0.1,0.1])
+        # r = 0.01
+        # rps = 1.0
+        # omega = -2*np.pi*rps
+        # p_stance_des = np.array([[0.1], [-0.2], [0.3]])
+        # p_swing_des = np.array([[c[0] - r*np.cos(omega*self.t_current)], [c[1]], [c[2] - r*np.sin(omega*self.t_current)]])
 
         # solve the IK problem
-        res = self.DoInverseKinematics(p_right_des, 
-                                       p_left_des)
+        p_swing_C = np.array([0.01, 0.0, 0.1])
+        res = self.DoInverseKinematics(p_swing_C)
         
         # extract the IK solution
         q_ik = res.GetSolution(self.ik.q())
@@ -144,7 +230,7 @@ class Controller(LeafSystem):
 
 # simulation parameters
 sim_time = 10.0
-realtime_rate = 1.0
+realtime_rate = 0.1
 
 # load model
 model_file = "../models/achilles_SE3_drake_ik.urdf"
@@ -153,7 +239,7 @@ model_file = "../models/achilles_SE3_drake_ik.urdf"
 meshcat = StartMeshcat()
 
 # simulation parameters
-sim_hz = 800
+sim_hz = 500
 sim_config = MultibodyPlantConfig()
 sim_config.time_step = 1 / sim_hz 
 sim_config.discrete_contact_approximation = "lagged"

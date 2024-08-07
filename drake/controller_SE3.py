@@ -55,7 +55,7 @@ class HLIP(LeafSystem):
         self.num_steps = 0
 
         # walking parameters
-        self.z_nom = 0.65  # nominal height of the CoM
+        self.z_nom = 0.64  # nominal height of the CoM
         self.T_SSP = 0.3   # single support phase
         self.T_DSP = 0.0   # double support phase
 
@@ -124,7 +124,7 @@ class HLIP(LeafSystem):
         base_epsilon_orient = 0.0   # torso orientation tolerance [deg]
         self.tol_feet = np.array([[epsilon_feet], [epsilon_feet], [epsilon_feet]])
 
-        # NOTE: I might want to switch to doing everything 
+        # TODO: switch to doing everything 
         # in the local stance foot frame!! 
 
         # Add com position constraint
@@ -146,18 +146,18 @@ class HLIP(LeafSystem):
                                                           [0, 0, 0], [0, 0, 0]) 
         
         # Add foot orientation constraints (both feet pointing towards x-world direction)
-        # self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
-        #                                                             self.plant.world_frame(), [1, 0, 0],
-        #                                                             0, foot_epsilon_orient * (np.pi/180))
-        # self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
-        #                                                             self.plant.world_frame(), [1, 0, 0],
-        #                                                             0, foot_epsilon_orient * (np.pi/180))
         self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
-                                                                    self.static_com_frame, [1, 0, 0],
+                                                                    self.plant.world_frame(), [1, 0, 0],
                                                                     0, foot_epsilon_orient * (np.pi/180))
         self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
-                                                                    self.static_com_frame, [1, 0, 0],
+                                                                    self.plant.world_frame(), [1, 0, 0],
                                                                     0, foot_epsilon_orient * (np.pi/180))
+        # self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
+        #                                                             self.static_com_frame, [1, 0, 0],
+        #                                                             0, foot_epsilon_orient * (np.pi/180))
+        # self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
+        #                                                             self.static_com_frame, [1, 0, 0],
+        #                                                             0, foot_epsilon_orient * (np.pi/180))
 
     ########################################################################################################
 
@@ -229,8 +229,11 @@ class HLIP(LeafSystem):
 
         # y-direction [p, v] in local stance foot frame (P2 Orbit)
         # Eq (21) Xiaobing Xiong, Ames
+        if self.swing_foot_frame == self.left_foot_frame:
+            u_star = 0.1    # must satify u_L + u_R = 2 * v_des * T
+        elif self.swing_foot_frame == self.right_foot_frame:
+            u_star = -0.1   # must satify u_L + u_R = 2 * v_des * T
         self.d2 = self.lam**2 * (self.sech(0.5 * self.lam * self.T_SSP))**2 * (T * self.v_des_y) / (self.lam**2 * self.T_DSP + 2 * self.sigma_P2)
-        u_star = self.v_des_y * T
         self.p_H_minus_y = (u_star - self.T_DSP * self.d2) / (2 + self.T_DSP * self.sigma_P2)
         self.v_H_minus_y = self.sigma_P2 * self.p_H_minus_y + self.d2
 
@@ -323,9 +326,9 @@ class HLIP(LeafSystem):
         u_y = self.u_ff_y + self.v_des_y * self.T_SSP + self.Kp_db * (py[0] - py_H_minus) + self.Kd_db * (vy - vy_H_minus)
 
         if self.swing_foot_frame == self.left_foot_frame:
-            u_y += 0.09
-        else:
-            u_y += -0.09
+            u_y += 0.1   # must satify u_L + u_R = 2 * v_des * T
+        elif self.swing_foot_frame == self.right_foot_frame:
+            u_y += -0.1  # must satify u_L + u_R = 2 * v_des * T
 
         # check if in new step period
         if self.switched_stance_foot == True:
@@ -349,6 +352,7 @@ class HLIP(LeafSystem):
         u_app_x, u_app_y = self.update_foot_placement()
         u0_x = self.p_swing_init[0][0]  # inital swing foot position
         u0_y = self.p_swing_init[1][0]  # inital swing foot position
+        print("swing foot init: ", u0_x, u0_y)
         uf_x = self.p_stance[0][0] + u_app_x
         uf_y = self.p_stance[1][0] + u_app_y
 
