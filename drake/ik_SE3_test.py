@@ -17,7 +17,6 @@ class Controller(LeafSystem):
         self.red_color = Rgba(1, 0, 0, 1)
         self.green_color = Rgba(0, 1, 0, 1)
         self.blue_color = Rgba(0, 0, 1, 1)
-        self.magenta_color = Rgba(1, 0, 1, 1)
         self.sphere = Sphere(0.025)
 
         self.meshcat.SetObject("p_right", self.sphere, self.red_color)
@@ -87,12 +86,12 @@ class Controller(LeafSystem):
         # update the foot role
         if self.update_foot_role_flag == True:
 
-             # left foot is swing foot
+            # left foot is swing foot
             if self.num_steps %2 == 0:
 
                 # set the last known swing foot position as the desried stance foot position
                 p_stance = self.plant.CalcPointsPositions(self.plant_context,
-                                                          self.stance_foot_frame, [0, 0, 0],
+                                                          self.stance_foot_frame, [0, 0, 0],  # NOTE: sholdnt this be swing?
                                                           self.plant.world_frame())
                 R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
                                                                  self.plant.world_frame(),
@@ -114,11 +113,12 @@ class Controller(LeafSystem):
                                                                              0, self.foot_epsilon_orient * np.pi / 180)                
 
                 # update the stance foot position constraints
-                p_right_lb = self.p_control_stance_W - self.tol_feet
-                p_right_ub = self.p_control_stance_W + self.tol_feet
+                self.p_right_nom = np.array([[0], [-0.1], [0.2]])
+                p_right_lb = self.p_right_nom - self.tol_feet
+                p_right_ub = self.p_right_nom + self.tol_feet
                 self.p_right_cons.evaluator().UpdateLowerBound(p_right_lb)
                 self.p_right_cons.evaluator().UpdateUpperBound(p_right_ub)
-                self.meshcat.SetTransform("p_right", RigidTransform(self.p_control_stance_W))
+                self.meshcat.SetTransform("p_right", RigidTransform(self.p_right_nom), self.t_current)
 
                 # switch the roles of the feet
                 self.swing_foot_frame = self.left_foot_frame
@@ -129,14 +129,14 @@ class Controller(LeafSystem):
 
                 # set the last known swing foot position as the desried stance foot position
                 p_stance = self.plant.CalcPointsPositions(self.plant_context,
-                                                            self.stance_foot_frame, [0, 0, 0],
+                                                            self.stance_foot_frame, [0, 0, 0], # NOTE: sholdnt this be swing?
                                                             self.plant.world_frame())
                 R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
                                                                 self.plant.world_frame(),
                                                                 self.stance_foot_frame)
                 _, _, yaw = RollPitchYaw(R_stance).vector()
                 self.p_control_stance_W = np.array([p_stance[0], p_stance[1], p_stance[2]])
-                self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0, yaw)).matrix()
+                self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0.0, yaw)).matrix()
 
                 # remove the old foot orientation constraints
                 self.ik.prog().RemoveConstraint(self.r_left_cons)
@@ -151,11 +151,12 @@ class Controller(LeafSystem):
                                                                              0, self.foot_epsilon_orient * np.pi / 180)
                 
                 # update the stance foot position constraints
-                p_left_lb = self.p_control_stance_W - self.tol_feet
-                p_left_ub = self.p_control_stance_W + self.tol_feet
+                self.p_left_nom = np.array([[0], [0.1], [0.2]])
+                p_left_lb = self.p_left_nom - self.tol_feet
+                p_left_ub = self.p_left_nom + self.tol_feet
                 self.p_left_cons.evaluator().UpdateLowerBound(p_left_lb)
                 self.p_left_cons.evaluator().UpdateUpperBound(p_left_ub)
-                self.meshcat.SetTransform("p_left", RigidTransform(self.p_control_stance_W))
+                self.meshcat.SetTransform("p_left", RigidTransform(self.p_left_nom), self.t_current)
 
                 # switch the roles of the feet
                 self.swing_foot_frame = self.right_foot_frame
@@ -172,16 +173,16 @@ class Controller(LeafSystem):
 
         # Update constraints on the positions of the feet
         if self.swing_foot_frame == self.left_foot_frame:
-            p_left_W = self.p_control_stance_W + (self.R_control_stance_W @ p_swing_C).reshape(3,1)
+            p_left_W = self.p_right_nom + (self.R_control_stance_W @ p_swing_C).reshape(3,1)
             self.p_left_cons.evaluator().UpdateLowerBound(p_left_W - self.tol_feet)
             self.p_left_cons.evaluator().UpdateUpperBound(p_left_W + self.tol_feet)
-            self.meshcat.SetTransform("p_left", RigidTransform(p_left_W))
+            self.meshcat.SetTransform("p_left", RigidTransform(p_left_W), self.t_current)
             
         elif self.swing_foot_frame == self.right_foot_frame:
-            p_right_W = self.p_control_stance_W + (self.R_control_stance_W @ p_swing_C).reshape(3,1)
+            p_right_W = self.p_left_nom + (self.R_control_stance_W @ p_swing_C).reshape(3,1)
             self.p_right_cons.evaluator().UpdateLowerBound(p_right_W - self.tol_feet)
             self.p_right_cons.evaluator().UpdateUpperBound(p_right_W + self.tol_feet)
-            self.meshcat.SetTransform("p_right", RigidTransform(p_right_W))
+            self.meshcat.SetTransform("p_right", RigidTransform(p_right_W), self.t_current)
 
         # solve the IK problem
         intial_guess = self.plant.GetPositions(self.plant_context)
@@ -201,18 +202,19 @@ class Controller(LeafSystem):
         print("\n *************************************** \n")
         print("time: ", self.t_current) 
 
+        # update the foot roles
         self.update_foot_roles()
-
-        # solve the inverse kinematics problem
-        # c = np.array([0.1,0.1,0.1])
-        # r = 0.01
-        # rps = 1.0
-        # omega = -2*np.pi*rps
-        # p_stance_des = np.array([[0.1], [-0.2], [0.3]])
-        # p_swing_des = np.array([[c[0] - r*np.cos(omega*self.t_current)], [c[1]], [c[2] - r*np.sin(omega*self.t_current)]])
+        r = 0.05
+        rps = 2.0
+        omega = -2*np.pi*rps
+        if self.stance_foot_frame == self.right_foot_frame:
+            p_swing_C_center = np.array([0.0, 0.2, 0.1])
+            p_swing_C = np.array([0.0, r*np.cos(omega*self.t_phase), r*np.sin(omega*self.t_phase)]) + p_swing_C_center
+        elif self.stance_foot_frame == self.left_foot_frame:
+            p_swing_C_center = np.array([0.0, -0.2, 0.1])
+            p_swing_C = np.array([0.0, r*np.cos(omega*self.t_phase), r*np.sin(omega*self.t_phase)]) + p_swing_C_center
 
         # solve the IK problem
-        p_swing_C = np.array([0.01, 0.0, 0.1])
         res = self.DoInverseKinematics(p_swing_C)
         
         # extract the IK solution
@@ -230,7 +232,7 @@ class Controller(LeafSystem):
 
 # simulation parameters
 sim_time = 10.0
-realtime_rate = 0.1
+realtime_rate = 1.0
 
 # load model
 model_file = "../models/achilles_SE3_drake_ik.urdf"
@@ -256,9 +258,9 @@ robot = Parser(plant).AddModels(model_file)[0]
 plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 
 # add low level PD controllers
-kp = 500
+kp = 250
 Kp = np.array([kp, kp, kp, kp, kp, kp, kp, kp, kp, kp])
-kd = 10
+kd = 3
 Kd = np.array([kd, kd, kd, kd, kd, kd, kd, kd, kd, kd])
 actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
 for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):

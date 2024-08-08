@@ -45,9 +45,11 @@ class HLIP(LeafSystem):
         self.right_foot_frame = self.plant.GetFrameByName("right_foot")
         self.stance_foot_frame = self.right_foot_frame
         self.swing_foot_frame  = self.left_foot_frame
+        self.p_control_stance_W = None
+        self.R_control_stance_W = None
+        self.yaw = 0
 
         # Foot position Variables
-        self.p_stance = np.zeros(3)
         self.p_swing_init = np.zeros(3)
 
         # for updating number of steps amd switching foot stance/swing
@@ -66,8 +68,6 @@ class HLIP(LeafSystem):
                            [self.lam**2, 0]])
 
         # Robot LIP state
-        self.p_com = np.zeros(3)    # center of mass state in world frame
-        self.v_com = np.zeros(3)    # center of mass velocity in world frame
         self.p_R = np.zeros(3)      # center of mass state in stance foot frame
         self.v_R = np.zeros(3)      # center of mass velocity in stance foot frame
 
@@ -93,7 +93,7 @@ class HLIP(LeafSystem):
         self.sech = lambda x: 1 / np.cosh(x)
 
         # define deadbeat gains and orbital slopes
-        self.Kp_db = 1                                              # deadbeat gains
+        self.Kp_db = 1                                                        # deadbeat gains
         self.Kd_db = self. T_DSP + (1/self.lam) * coth(self.lam * self.T_SSP) # deadbeat gains      
         self.sigma_P1 = self.lam * coth(0.5 * self.lam * self.T_SSP)          # orbital slope (P1)
         self.sigma_P2 = self.lam * tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
@@ -118,26 +118,19 @@ class HLIP(LeafSystem):
         self.q_ik_sol = np.zeros(self.plant.num_positions())
 
         # inverse kinematics solver settings
-        epsilon_feet = 0.00     # foot position tolerance     [m]
-        epsilon_base = 0.00     # torso position tolerance    [m]
-        foot_epsilon_orient = 0.0   # foot orientation tolerance  [deg]
-        base_epsilon_orient = 0.0   # torso orientation tolerance [deg]
-        self.tol_feet = np.array([[epsilon_feet], [epsilon_feet], [epsilon_feet]])
+        self.epsilon_feet = 0.003     # foot position tolerance     [m]
+        self.epsilon_base = 0.003     # torso position tolerance    [m]
+        self.foot_epsilon_orient = 1.0   # foot orientation tolerance  [deg]
+        self.base_epsilon_orient = 1.0   # torso orientation tolerance [deg]
+        self.tol_feet = np.array([[self.epsilon_feet], [self.epsilon_feet], [self.epsilon_feet]])
 
-        # TODO: switch to doing everything 
-        # in the local stance foot frame!! 
-
-        # Add com position constraint
+        # Add com position constraint (fixed constraint)
         self.p_com_cons = self.ik.AddPositionConstraint(self.static_com_frame, [0, 0, 0], 
                                                         self.plant.world_frame(), 
-                                                        [-np.inf, -np.inf, self.z_nom - epsilon_base], [np.inf, np.inf, self.z_nom + epsilon_base]) 
-        
-        # Add com orientation constraint
-        self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(),
-                                                           self.plant.world_frame(), RotationMatrix(),
-                                                           base_epsilon_orient * (np.pi/180))
-        
-        # Add foot position constraints
+                                                        [-np.inf, -np.inf, self.z_nom - self.epsilon_base],
+                                                        [np.inf, np.inf, self.z_nom + self.epsilon_base]) 
+
+        # Add foot position constraints (continuously update the lower and upper bounds)
         self.p_left_cons =  self.ik.AddPositionConstraint(self.left_foot_frame, [0, 0, 0],
                                                           self.plant.world_frame(), 
                                                           [0, 0, 0], [0, 0, 0])
@@ -145,19 +138,13 @@ class HLIP(LeafSystem):
                                                           self.plant.world_frame(), 
                                                           [0, 0, 0], [0, 0, 0]) 
         
-        # Add foot orientation constraints (both feet pointing towards x-world direction)
+        # Add foot orientation constraints, aligns toe directions (remove and create this constraint at every discrete S2S step)
         self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
                                                                     self.plant.world_frame(), [1, 0, 0],
-                                                                    0, foot_epsilon_orient * (np.pi/180))
+                                                                    0, 0)
         self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
                                                                     self.plant.world_frame(), [1, 0, 0],
-                                                                    0, foot_epsilon_orient * (np.pi/180))
-        # self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
-        #                                                             self.static_com_frame, [1, 0, 0],
-        #                                                             0, foot_epsilon_orient * (np.pi/180))
-        # self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
-        #                                                             self.static_com_frame, [1, 0, 0],
-        #                                                             0, foot_epsilon_orient * (np.pi/180))
+                                                                    0, 0)
 
     ########################################################################################################
 
@@ -173,22 +160,46 @@ class HLIP(LeafSystem):
         # update the foot role
         if self.update_foot_role_flag == True:
 
-            # for the blended foot placement
+            # for the blended foot placement (to reset my foot placement low-pass filter)
             self.switched_stance_foot = True
             
             # left foot is swing foot
             if self.num_steps %2 == 0:
 
-                # set the last known swing foot position as the desried stance foot position
-                self.p_stance = self.plant.CalcPointsPositions(self.plant_context,
-                                                               self.swing_foot_frame,
-                                                               [0,0,0],
+                # set the last known swing foot position as the desried stance foot position (TODO: this is broken on first step)
+                p_stance = self.plant.CalcPointsPositions(self.plant_context,
+                                                               self.swing_foot_frame, [0,0,0],
                                                                self.plant.world_frame())
+                R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
+                                                                      self.plant.world_frame(),
+                                                                      self.swing_foot_frame)
+                self.yaw = RollPitchYaw(R_stance).yaw_angle()
+                self.p_control_stance_W = np.array([p_stance[0], p_stance[1], [self.z_offset]])
+                self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0, self.yaw)).matrix()
+
+                # remove the old foot orientation constraints
+                self.ik.prog().RemoveConstraint(self.r_left_cons)
+                self.ik.prog().RemoveConstraint(self.r_right_cons)
+
+                # add the new foot orientation constraints
+                self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
+                                                                            self.plant.world_frame(), self.R_control_stance_W @ [1, 0, 0],
+                                                                            0, self.foot_epsilon_orient * np.pi / 180)
+                self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
+                                                                             self.plant.world_frame(), self.R_control_stance_W @ [1, 0, 0],
+                                                                             0, self.foot_epsilon_orient * np.pi / 180)                
+
+                # update the stance foot position constraints
+                p_right_lb = self.p_control_stance_W - self.tol_feet
+                p_right_ub = self.p_control_stance_W + self.tol_feet
+                self.p_right_cons.evaluator().UpdateLowerBound(p_right_lb)
+                self.p_right_cons.evaluator().UpdateUpperBound(p_right_ub)
+
                 # set the initial swing foot position
                 self.p_swing_init = self.plant.CalcPointsPositions(self.plant_context,
-                                                                      self.stance_foot_frame,
-                                                                      [0,0,0],
-                                                                      self.plant.world_frame())
+                                                                   self.stance_foot_frame, [0,0,0],
+                                                                   self.plant.world_frame())
+                
                 # switch the roles of the feet
                 self.stance_foot_frame = self.right_foot_frame
                 self.swing_foot_frame = self.left_foot_frame
@@ -196,22 +207,46 @@ class HLIP(LeafSystem):
             # right foot is swing foot
             else:
 
-                # set the last known swing foot position as the desried stance foot position
-                self.p_stance = self.plant.CalcPointsPositions(self.plant_context,
-                                                               self.swing_foot_frame,
-                                                               [0,0,0],
+                # set the last known swing foot position as the desried stance foot position (TODO: this is broken on first step)
+                p_stance = self.plant.CalcPointsPositions(self.plant_context,
+                                                               self.swing_foot_frame,[0,0,0],
                                                                self.plant.world_frame())
+                R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
+                                                                        self.plant.world_frame(),
+                                                                        self.swing_foot_frame)
+                self.yaw = RollPitchYaw(R_stance).yaw_angle()
+                self.p_control_stance_W = np.array([p_stance[0], p_stance[1], [self.z_offset]])
+                self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0, self.yaw)).matrix()
+
+                # remove the old foot orientation constraints
+                self.ik.prog().RemoveConstraint(self.r_left_cons)
+                self.ik.prog().RemoveConstraint(self.r_right_cons)
+
+                # add the new foot orientation constraints
+                self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
+                                                                            self.plant.world_frame(), self.R_control_stance_W @ [1, 0, 0],
+                                                                            0, self.foot_epsilon_orient * np.pi / 180)
+                self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
+                                                                            self.plant.world_frame(), self.R_control_stance_W @ [1, 0, 0],
+                                                                            0, self.foot_epsilon_orient * np.pi / 180)
+
+                # update the stance foot position constraints
+                p_left_lb = self.p_control_stance_W - self.tol_feet
+                p_left_ub = self.p_control_stance_W + self.tol_feet
+                self.p_left_cons.evaluator().UpdateLowerBound(p_left_lb)
+                self.p_left_cons.evaluator().UpdateUpperBound(p_left_ub)
+
                 # set the initial swing foot position
                 self.p_swing_init = self.plant.CalcPointsPositions(self.plant_context,
-                                                                      self.stance_foot_frame,
-                                                                      [0,0,0],
-                                                                      self.plant.world_frame())
+                                                                   self.stance_foot_frame, [0,0,0],
+                                                                   self.plant.world_frame())
+                
                 # switch the roles of the feet
                 self.stance_foot_frame = self.left_foot_frame
-                self.swing_foot_frame = self.right_foot_frame    
+                self.swing_foot_frame = self.right_foot_frame
 
             # reset the foot role flag after switching
-            self.update_foot_role_flag = False            
+            self.update_foot_role_flag = False  
 
         # update the phase time
         self.t_phase = self.t_current - self.num_steps * self.T_SSP
@@ -230,24 +265,19 @@ class HLIP(LeafSystem):
         # y-direction [p, v] in local stance foot frame (P2 Orbit)
         # Eq (21) Xiaobing Xiong, Ames
         if self.swing_foot_frame == self.left_foot_frame:
-            u_star = 0.1    # must satify u_L + u_R = 2 * v_des * T
+            u_star = 0.16    # must satify u_L + u_R = 2 * v_des * T
         elif self.swing_foot_frame == self.right_foot_frame:
-            u_star = -0.1   # must satify u_L + u_R = 2 * v_des * T
+            u_star = -0.16   # must satify u_L + u_R = 2 * v_des * T
         self.d2 = self.lam**2 * (self.sech(0.5 * self.lam * self.T_SSP))**2 * (T * self.v_des_y) / (self.lam**2 * self.T_DSP + 2 * self.sigma_P2)
         self.p_H_minus_y = (u_star - self.T_DSP * self.d2) / (2 + self.T_DSP * self.sigma_P2)
         self.v_H_minus_y = self.sigma_P2 * self.p_H_minus_y + self.d2
 
     # update the COM state of the Robot
     def update_hlip_state_R(self):
-        
-        # compute the static p_com in world frame
-        self.p_static_com = self.plant.CalcPointsPositions(self.plant_context,
-                                                           self.static_com_frame,
-                                                           [0,0,0],
-                                                           self.plant.world_frame()).flatten()
 
         # compute the dynamic p_com in world frame
-        self.p_com = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context)
+        p_com_W = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context)
+        p_com_control_stance = self.R_control_stance_W.T @ (p_com_W - self.p_control_stance_W)
 
         # compute v_com, via Jacobian (3xn) and generalized velocity (nx1)
         J = self.plant.CalcJacobianCenterOfMassTranslationalVelocity(self.plant_context, 
@@ -256,15 +286,16 @@ class HLIP(LeafSystem):
                                                                      self.plant.world_frame())
         v = self.plant.GetVelocities(self.plant_context)
         v_all = J @ v
-        self.v_com = v_all[0:3]
+        v_com_W = v_all[0:3]
+        v_com_control_stance = self.R_control_stance_W.T @ v_com_W
 
-        # update CoM info
-        self.v_com = self.v_com.T
-        self.p_com = self.p_com.T
+        # update CoM info (in world frame)
+        v_com_W = v_com_W.T  
+        p_com_W = p_com_W.T
 
-        # update HLIP state for the robot
-        self.p_R = (self.p_com - self.p_stance.T).T
-        self.v_R = self.v_com
+        # update HLIP state for the robot # TODO: Need to calculate this in the local stance foot control frame
+        self.p_R = p_com_control_stance
+        self.v_R = v_com_control_stance
 
         # compute the preimpact state
         x0_x = np.array([self.p_R[0][0], self.v_R[0]]).T
@@ -277,12 +308,12 @@ class HLIP(LeafSystem):
         self.v_R_minus_y = x_R_minus_y[1]
 
         # visualize the CoM position
-        self.meshcat.SetTransform("com_pos", RigidTransform(self.p_com), self.t_current)
+        self.meshcat.SetTransform("com_pos", RigidTransform(p_com_W), self.t_current)
 
         # visualize the CoM velocity
-        p_com_xy = np.array([self.p_com[0], self.p_com[1]])
-        v_com_xy = np.array([self.v_com[0], self.v_com[1]])
-        yaw = np.arctan2(self.v_com[1], self.v_com[0])
+        p_com_xy = np.array([p_com_W[0], p_com_W[1]])
+        v_com_xy = np.array([v_com_W[0], v_com_W[1]])
+        yaw = np.arctan2(v_com_W[1], v_com_W[0])
         v_norm = np.linalg.norm(v_com_xy)
 
         # setting the rigid transform for the CoM velocity
@@ -290,13 +321,13 @@ class HLIP(LeafSystem):
             cyl = Cylinder(0.005, 0.001)
             self.meshcat.SetObject("com_vel",cyl, self.green_color)
             # self.meshcat.SetProperty("com_vel", "scale", [1, 1, 1000], self.t_current)
-            self.meshcat.SetTransform("com_vel", RigidTransform(RotationMatrix(),self.p_com), self.t_current)
+            self.meshcat.SetTransform("com_vel", RigidTransform(RotationMatrix(),p_com_W), self.t_current)
         else:
             cyl = Cylinder(0.005, v_norm)
             self.meshcat.SetObject("com_vel",cyl, self.green_color)
             rpy = RollPitchYaw(0.0, np.pi/2, yaw)
             p = 0.5 * (v_com_xy + 2*p_com_xy)
-            p = np.array([p[0], p[1], self.p_com[2]])
+            p = np.array([p[0], p[1], p_com_W[2]])
             self.meshcat.SetTransform("com_vel", RigidTransform(rpy,p), self.t_current)
 
     # ---------------------------------------------------------------------------------------- #
@@ -319,16 +350,16 @@ class HLIP(LeafSystem):
         py_H_minus = self.p_H_minus_y
         vy_H_minus = self.v_H_minus_y
 
-        # compute foot placement in x-direction
+        # compute foot placement in x-direction (local stance foot frame)
         u_x = self.u_ff_x + self.v_des_x * self.T_SSP + self.Kp_db * (px[0] - px_H_minus) + self.Kd_db * (vx - vx_H_minus)
 
-        # compute foot placement in y-direction
+        # compute foot placement in y-direction (local stance foot frame)
         u_y = self.u_ff_y + self.v_des_y * self.T_SSP + self.Kp_db * (py[0] - py_H_minus) + self.Kd_db * (vy - vy_H_minus)
 
         if self.swing_foot_frame == self.left_foot_frame:
-            u_y += 0.1   # must satify u_L + u_R = 2 * v_des * T
+            u_y += 0.16   # must satify u_L + u_R = 2 * v_des * T
         elif self.swing_foot_frame == self.right_foot_frame:
-            u_y += -0.1  # must satify u_L + u_R = 2 * v_des * T
+            u_y += -0.16  # must satify u_L + u_R = 2 * v_des * T
 
         # check if in new step period
         if self.switched_stance_foot == True:
@@ -341,20 +372,20 @@ class HLIP(LeafSystem):
             self.u_applied_x = self.alpha * u_x + (1 - self.alpha) * self.u_applied_x
             self.u_applied_y = self.alpha * u_y + (1 - self.alpha) * self.u_applied_y
 
-        # return self.u_applied_x, self.u_applied_y
         return self.u_applied_x, self.u_applied_y
 
     # ---------------------------------------------------------------------------------------- #
     # update the desired foot trjectories
     def update_foot_traj(self):
 
-        # swing foot traget
-        u_app_x, u_app_y = self.update_foot_placement()
-        u0_x = self.p_swing_init[0][0]  # inital swing foot position
-        u0_y = self.p_swing_init[1][0]  # inital swing foot position
-        print("swing foot init: ", u0_x, u0_y)
-        uf_x = self.p_stance[0][0] + u_app_x
-        uf_y = self.p_stance[1][0] + u_app_y
+        # swing foot traget in world frame
+        u_app_x, u_app_y = self.update_foot_placement() # foot placement in stance foot frame
+        u0_x = self.p_swing_init[0][0]                  # inital swing foot position
+        u0_y = self.p_swing_init[1][0]                  # inital swing foot position
+        # uf_x = self.p_control_stance_W[0][0] + u_app_x  # desired foot placement in world frame
+        # uf_y = self.p_control_stance_W[1][0] + u_app_y  # desired foot placement in world frame
+        uf_x = self.p_control_stance_W[0][0] + u_app_x * np.cos(self.yaw) 
+        uf_y = self.p_control_stance_W[1][0] + u_app_y * np.sin(self.yaw)
 
         # compute primary bezier curve control points
         if self.bez_order == 7:
@@ -369,20 +400,17 @@ class HLIP(LeafSystem):
    
         # set the primary control points
         ctrl_pts = np.vstack((ctrl_pts_x.T,
-                              ctrl_pts_y.T, 
+                              ctrl_pts_y.T,
                               ctrl_pts_z.T))
 
         # evaluate bezier at time t
         bezier = BezierCurve(0, self.T_SSP, ctrl_pts)
         b = np.array(bezier.value(self.t_phase))
 
-        # swing ans stance foot targets
+        # swing and stance foot targets
         primary_swing_target = np.array([b.T[0][0], 
                                          b.T[0][1], 
                                          b.T[0][2]])[None].T
-        stance_target = np.array([self.p_stance[0][0], 
-                                  self.p_stance[1][0], 
-                                  self.z_offset])[None].T
         
         # linearly interpolate the current swnig foot position with the primary target
         # alpha = self.t_phase / self.T_SSP
@@ -390,22 +418,10 @@ class HLIP(LeafSystem):
         #                                                  self.swing_foot_frame,
         #                                                  [0,0,0],
         #                                                  self.plant.world_frame())
-        # swing_target = (1 - alpha) * p_swing_current + (alpha) * primary_swing_target
-        swing_target = primary_swing_target
+        # swing_target_W = (1 - alpha) * p_swing_current + (alpha) * primary_swing_target
+        swing_target_W = primary_swing_target
 
-        # left foot in swing
-        if self.num_steps % 2 == 0:
-            p_right = stance_target
-            p_left = swing_target
-        # right foot in swing
-        else:
-            p_right = swing_target
-            p_left = stance_target
-
-        self.meshcat.SetTransform("p_right", RigidTransform([p_right[0][0], p_right[1][0], p_right[2][0]]), self.t_current)        
-        self.meshcat.SetTransform("p_left", RigidTransform([p_left[0][0], p_left[1][0], p_left[2][0]]), self.t_current)
-
-        return p_right, p_left
+        return swing_target_W  # return the desired swing foot in world frame
     
     # ---------------------------------------------------------------------------------------- #
     # given desired foot and torso positions, solve the IK problem
