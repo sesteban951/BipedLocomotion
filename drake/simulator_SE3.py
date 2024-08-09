@@ -5,7 +5,7 @@ import numpy as np
 from controller_SE3 import HLIP
 
 # simulation parameters
-sim_time = 5.0
+sim_time = 15.0
 realtime_rate = 1.0
 
 # load model
@@ -44,7 +44,7 @@ kp_knee = 750
 kp_ankle = 150
 kd_hip = 10
 kd_knee = 10
-kd_ankle = 1
+kd_ankle = 2
 Kp = np.array([kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle, kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle])
 Kd = np.array([kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle, kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle])
 actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
