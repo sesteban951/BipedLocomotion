@@ -66,8 +66,8 @@ class HLIP(LeafSystem):
                            [self.lam**2, 0]])
 
         # Robot LIP state
-        self.p_R = np.zeros(3)      # center of mass position (in control stance foot frame)
-        self.v_R = np.zeros(3)      # center of mass velocity (in control stance foot frame)
+        self.p_R = None     # center of mass position (in control stance foot frame)
+        self.v_R = None     # center of mass velocity (in control stance foot frame)
 
         # LIP model preimpact states
         self.p_H_minus_x = 0
@@ -393,7 +393,7 @@ class HLIP(LeafSystem):
         elif self.swing_foot_frame == self.right_foot_frame:
             u_y += self.u_R   # must satify u_L + u_R = 2 * v_des * T
 
-        # # check if in new step period
+        # check if in new step period
         # if self.switched_stance_foot == True:
         #     # reset the filter (blending history)
         #     self.u_applied_x = u_x

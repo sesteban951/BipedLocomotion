@@ -6,7 +6,7 @@ from controller_SE2 import HLIP
 from joystick import GamepadCommand
 
 # simulation parameters
-sim_time = 45.
+sim_time = 10
 realtime_rate = 1.0
 
 # load model
