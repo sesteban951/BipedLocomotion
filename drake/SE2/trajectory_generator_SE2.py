@@ -25,6 +25,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.right_foot_frame = self.plant.GetFrameByName("right_foot")
         self.stance_foot_frame = None
 
+        self.p_torso_current = np.array([0, 0, 0]).reshape(3,1)
         self.p_control_stance_W = np.array([0, 0, 0]).reshape(3,1)
         self.p_swing_init_W = np.array([0, 0, 0]).reshape(3,1)
 
@@ -84,13 +85,13 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         epsilon_base = 0.00         # base position tolerance      [m]
         foot_epsilon_orient = 0.0   # foot orientation tolerance   [deg]
         base_epsilon_orient = 0.0   # torso orientation tolerance  [deg]
+        self.tol_base = np.array([[epsilon_base], [np.inf], [epsilon_base]])
         self.tol_feet = np.array([[epsilon_feet], [np.inf], [epsilon_feet]]) 
 
-        # Add com position constraint (fixed constraint)
+        # Add com position constraint (updated at every S2S transition)
         self.p_com_cons = self.ik.AddPositionConstraint(self.static_com_frame, [0, 0, 0], 
                                                         self.plant.world_frame(), 
-                                                        [-np.inf, -np.inf, self.z_nom - epsilon_base], 
-                                                        [np.inf, np.inf, self.z_nom + epsilon_base]) 
+                                                        [0, 0, 0], [0, 0, 0])
         
         # Add com orientation constraint (fixed constraint)
         self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(),
@@ -213,6 +214,14 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
         # set the desired velocity
         self.v_des = v_des
+
+        # set the torso at the current position 
+        self.p_static_com_W = self.plant.CalcPointsPositions(self.plant_context, 
+                                                             self.static_com_frame, [0,0,0], 
+                                                             self.plant.world_frame())
+        p_static_com_target = np.array([self.p_static_com_W[0][0], 0.0, self.z_nom]).reshape(3,1)
+        self.p_com_cons.evaluator().UpdateLowerBound(p_static_com_target - self.tol_base)
+        self.p_com_cons.evaluator().UpdateUpperBound(p_static_com_target + self.tol_base)
 
         # set which foot is in stance
         if stance_foot == "left_foot":

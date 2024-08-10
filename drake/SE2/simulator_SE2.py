@@ -6,11 +6,11 @@ from controller_SE2 import HLIP
 from joystick import GamepadCommand
 
 # simulation parameters
-sim_time = 10
+sim_time = 45
 realtime_rate = 1.0
 
 # load model
-model_file = "../models/achilles_SE2_drake.urdf"
+model_file = "../../models/achilles_SE2_drake.urdf"
 
 # start meshcat
 meshcat = StartMeshcat()
