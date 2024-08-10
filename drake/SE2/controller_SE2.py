@@ -360,9 +360,9 @@ class HLIP(LeafSystem):
 
         # update the torso position constraints
         p_static_com_W = self.plant.CalcPointsPositions(self.plant_context,
-                                                              self.static_com_frame,
-                                                              [0,0,0],
-                                                              self.plant.world_frame())
+                                                        self.static_com_frame,
+                                                        [0,0,0],
+                                                        self.plant.world_frame())
         p_static_com_target = np.array([p_static_com_W[0], [0], [self.z_nom]])
         self.p_com_cons.evaluator().UpdateLowerBound(p_static_com_target - self.tol_base)
         self.p_com_cons.evaluator().UpdateUpperBound(p_static_com_target + self.tol_base)
@@ -398,7 +398,7 @@ class HLIP(LeafSystem):
 
         # evaluate the joystick command
         joy_command = self.gamepad_port.Eval(context)
-        self.v_des = joy_command[0] * self.v_max
+        self.v_des = joy_command[1] * self.v_max
         
         # update everything
         self.update_foot_role()

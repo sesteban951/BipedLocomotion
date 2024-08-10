@@ -5,11 +5,11 @@ import numpy as np
 from controller_SE3 import HLIP
 
 # simulation parameters
-sim_time = 11.6
-realtime_rate = 1.0
+sim_time = 15.0
+realtime_rate =.0
 
 # load model
-model_file = "../models/achilles_SE3_drake.urdf"
+model_file = "../../models/achilles_SE3_drake.urdf"
 
 # start meshcat
 meshcat = StartMeshcat()
