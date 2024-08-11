@@ -4,6 +4,7 @@ from pydrake.all import *
 import numpy as np
 import scipy as sp
 import time
+import math
 
 class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
@@ -37,6 +38,9 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
         # timing variables
         self.t_phase = 0.0
+
+        # total horizon length
+        self.T_horizon = 0.0
 
         # HLIP parameters
         g = 9.81
@@ -206,7 +210,17 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
     # -------------------------------------------------------------------------------------------------- #
 
     # set the trajectpry generation problem parameters
-    def set_problem_params(self, q0, v0, stance_foot, v_des):
+    def set_problem_params(self, q0, v0, stance_foot, v_des, dt, N):
+
+        # check if T_SSP is a multiple of dt
+        result = self.T_SSP / dt
+        is_divisible = abs(round(result) - result) < 1e-9
+        msg = "T_SSP must be a multiple of dt. You have T_SSP = {} and dt = {}".format(self.T_SSP, dt)
+        assert is_divisible, msg
+
+        # set the total horizon length
+        self.T_horizon = N * dt
+        print("Total horizon length: ", self.T_horizon)
 
         # set the robot state
         self.plant.SetPositions(self.plant_context, q0)
@@ -244,10 +258,10 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
                                                                  self.plant.world_frame())
 
     # main function that updates the whole problem
-    def get_trajectory(self, q0, v0, stance_foot, v_des = 0.0, N = 20):
+    def get_trajectory(self, q0, v0, stance_foot, v_des = 0.0, dt = 0.05, N = 20):
         
         # setup the problem parameters
-        self.set_problem_params(q0, v0, stance_foot, v_des)
+        self.set_problem_params(q0, v0, stance_foot, v_des, dt, N)
 
         # update everything
         self.update_hlip_state_H()
@@ -323,7 +337,8 @@ if __name__ == "__main__":
                                  v0 = v0,
                                  stance_foot = stance_foot,
                                  v_des = v_des,
-                                 N = 1000)
+                                 dt = 0.05,
+                                 N = 500)
     print("Time to solve the IK problem: ", time.time() - t0)
     print("Average time per IK problem: ", (time.time() - t0) / len(q_ik_list))
 
