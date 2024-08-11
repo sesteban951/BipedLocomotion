@@ -59,7 +59,7 @@ class HLIP(LeafSystem):
 
         # walking parameters
         self.z_nom = 0.64  # nominal height of the CoM
-        self.T_SSP = 0.35  # single support phase
+        self.T_SSP = 0.30  # single support phase
         self.T_DSP = 0.0   # double support phase
 
         # HLIP parameters
@@ -105,8 +105,10 @@ class HLIP(LeafSystem):
         self.v_max = 0.3    # ||v_des||_2 <= v_max
 
         # period 2 feedforward foot placements, must satify u_L + u_R = 2 * v_des * T
-        self.u_L = 0.28
-        self.u_R = 2 * self.v_des_y * (self.T_SSP + self.T_SSP) - self.u_L
+        u_L_bias = 0.2
+        u_R_bias = -0.2
+        self.u_L = u_L_bias + self.v_des_y * (self.T_SSP + self.T_DSP)
+        self.u_R = u_R_bias + self.v_des_y * (self.T_SSP + self.T_DSP)
 
         # blending foot placement
         self.alpha = 1.0
@@ -394,7 +396,7 @@ class HLIP(LeafSystem):
         if self.swing_foot_frame == self.left_foot_frame:
             u_y += self.u_L
         elif self.swing_foot_frame == self.right_foot_frame:
-            u_y += self.u_L
+            u_y += self.u_R
 
         # check if in new step period
         # if self.switched_stance_foot == True:
@@ -515,7 +517,9 @@ class HLIP(LeafSystem):
 
         # evaluate the joystick command
         joy_command = self.gamepad_port.Eval(context)
-        self.v_des_x = joy_command[1] * self.v_max
+        self.v_des_x = joy_command[1] * 0
+        self.v_des_y = joy_command[0] * 0.3
+        print("{}".format(self.v_des_y))
 
         # update everything
         self.update_foot_role()
