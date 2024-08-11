@@ -19,10 +19,16 @@ class HLIP(LeafSystem):
         self.green_color = Rgba(0, 1, 0, 1)
         self.blue_color = Rgba(0, 0, 1, 1)
         self.sphere = Sphere(0.025)
+        cyl = Cylinder(0.005, 0.2)
 
         self.meshcat.SetObject("com_pos", self.sphere, self.green_color)
         self.meshcat.SetObject("p_right", self.sphere, self.red_color)
         self.meshcat.SetObject("p_left", self.sphere, self.blue_color)
+
+        # stace foot frame visualization 
+        self.meshcat.SetObject("stance_x", cyl, self.red_color)
+        self.meshcat.SetObject("stance_y", cyl, self.green_color)
+        self.meshcat.SetObject("stance_z", cyl, self.blue_color)
 
         # create internal model of the robot
         self.plant = MultibodyPlant(0)
@@ -102,13 +108,11 @@ class HLIP(LeafSystem):
         self.u_ff_y = 0.0
         self.v_des_x = 0.0
         self.v_des_y = 0.0
-        self.v_max = 0.3    # ||v_des||_2 <= v_max
+        self.v_max = 0.3
 
-        # period 2 feedforward foot placements, must satify u_L + u_R = 2 * v_des * T
-        u_L_bias = 0.2
-        u_R_bias = -0.2
-        self.u_L = u_L_bias + self.v_des_y * (self.T_SSP + self.T_DSP)
-        self.u_R = u_R_bias + self.v_des_y * (self.T_SSP + self.T_DSP)
+        # period 2 feedforward foot placements
+        self.u_L_bias = 0.28   # left is swing foot, add this to the feedforward foot placement
+        self.u_R_bias = -0.28  # right is swing foot, add this to the feedforward foot placement
 
         # blending foot placement
         self.alpha = 1.0
@@ -157,6 +161,26 @@ class HLIP(LeafSystem):
                                                                     0, 0)
 
     ########################################################################################################
+
+    def draw_stance_frame(self, R, p):
+        rpy = RotationMatrix(R).ToRollPitchYaw()
+        
+        # Basis vectors
+        x_hat = R @ np.array([0.2, 0, 0]).reshape(3,1)
+        y_hat = R @ np.array([0, 0.2, 0]).reshape(3,1)
+        z_hat = R @ np.array([0, 0, 0.2]).reshape(3,1)
+        
+        px = x_hat * 0.5
+        py = y_hat * 0.5
+        pz = z_hat * 0.5
+
+        Rx = RotationMatrix(R) @ RollPitchYaw(0, np.pi/2, 0).ToRotationMatrix()
+        Ry = RotationMatrix(R) @ RollPitchYaw(np.pi/2, 0, 0).ToRotationMatrix()
+        Rz = RotationMatrix(R) @ RollPitchYaw(0, 0, np.pi/2).ToRotationMatrix()
+        self.meshcat.SetTransform("stance_x", RigidTransform(Rx, p + px), self.t_current)
+        self.meshcat.SetTransform("stance_y", RigidTransform(Ry, p + py), self.t_current)
+        self.meshcat.SetTransform("stance_z", RigidTransform(Rz, p + pz), self.t_current)
+
 
     # ---------------------------------------------------------------------------------------- #
     # update which foot should be swing and which one is stance
@@ -227,6 +251,8 @@ class HLIP(LeafSystem):
                 # switch the roles of the feet
                 self.stance_foot_frame = self.right_foot_frame
                 self.swing_foot_frame = self.left_foot_frame
+
+                # draw the stance foot frame in meshcat
             
             # right foot is swing foot
             else:
@@ -300,8 +326,10 @@ class HLIP(LeafSystem):
         self.p_H_minus_x = (self.v_des_x * T) / (2 + self.T_DSP * self.sigma_P1)
         self.v_H_minus_x = self.sigma_P1 * (self.v_des_x * T) / (2 + self.T_DSP * self.sigma_P1)
 
-        # y-direction [p, v] in local stance foot frame (P2 Orbit)
+        # y-direction [p, v] in local stance foot frame (P2 Orbit), must satisfy u_L + u_R = 2 * v_des * T
         # Eq (21) Xiaobing Xiong, Ames
+        self.u_L = self.u_L_bias + self.v_des_y * (self.T_SSP + self.T_DSP)
+        self.u_R = self.u_R_bias + self.v_des_y * (self.T_SSP + self.T_DSP)
         if self.swing_foot_frame == self.left_foot_frame:
             u_star = self.u_L    
         elif self.swing_foot_frame == self.right_foot_frame:
@@ -363,6 +391,9 @@ class HLIP(LeafSystem):
             p = np.array([p[0], p[1], p_com_W[2]])
             self.meshcat.SetTransform("com_vel", RigidTransform(rpy,p), self.t_current)
 
+        # draw teh stance foot control frame
+        self.draw_stance_frame(self.R_control_stance_W, self.p_control_stance_W)
+
     # ---------------------------------------------------------------------------------------- #
     # update where to place the foot, (i.e., apply discrete control to the HLIP model)
     def update_foot_placement(self):
@@ -388,10 +419,20 @@ class HLIP(LeafSystem):
         # u_x = self.u_ff_x + self.v_des_x * self.T_SSP + self.Kp_db * (px - px_H_minus) + self.Kd_db * (vx - vx_H_minus)
         u_x = self.u_ff_x + self.v_des_x * self.T_SSP + self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)
 
+        # TODO: fix the weird y-velocity flipped sign and the hip offset not being respected.
         # compute foot placement in y-direction (local stance foot frame)
         # u_y = self.u_ff_y + self.v_des_y * self.T_SSP + self.Kp_db * (py - 0) + self.Kd_db * (vy - 0)
         # u_y = self.u_ff_y + self.v_des_y * self.T_SSP + self.Kp_db * (py - py_H_minus) + self.Kd_db * (vy - vy_H_minus)
         u_y = self.u_ff_y + self.v_des_y * self.T_SSP + self.Kp_db * (py_R_minus - py_H_minus) + self.Kd_db * (vy_R_minus - vy_H_minus)
+
+        # print(f"py_R_minus: {py_R_minus:.3f}")
+        # print(f"py_H_minus: {py_H_minus:.3f}")
+        print(f"vy_R_minus: {vy_R_minus:.3f}")
+        print(f"vy_H_minus: {vy_H_minus:.3f}")
+
+        # print(f"v_des offset: {self.v_des_y * self.T_SSP:.3f}")
+        # print(f"p offset: {self.Kp_db * (py_R_minus - py_H_minus):.3f}")
+        # print(f"v offset: {self.Kd_db * (vy_R_minus - vy_H_minus):.3f}")
 
         if self.swing_foot_frame == self.left_foot_frame:
             u_y += self.u_L
@@ -497,9 +538,8 @@ class HLIP(LeafSystem):
             self.meshcat.SetTransform("p_left", RigidTransform(self.p_control_stance_W), self.t_current)
 
         # solve the IK problem        
-        intial_guess = self.plant.GetPositions(self.plant_context)
-        initial_guess = self.q_ik_sol
-        self.ik.prog().SetInitialGuess(self.ik.q(), intial_guess)
+        initial_guess = self.plant.GetPositions(self.plant_context)
+        self.ik.prog().SetInitialGuess(self.ik.q(), initial_guess)
         res = SnoptSolver().Solve(self.ik.prog())
         
         return res
@@ -516,15 +556,18 @@ class HLIP(LeafSystem):
         self.t_current = context.get_time()
 
         # evaluate the joystick command
-        joy_command = self.gamepad_port.Eval(context)
-        self.v_des_x = joy_command[1] * 0
-        self.v_des_y = joy_command[0] * 0.3
+        # joy_command = self.gamepad_port.Eval(context)
+        # self.v_des_x = joy_command[1] * self.v_max
+        # self.v_des_y = joy_command[0] * self.v_max
         print("{}".format(self.v_des_y))
 
         # update everything
         self.update_foot_role()
         self.update_hlip_state_H()
         self.update_hlip_state_R()
+
+        # print("p_R: ", self.p_R)
+        # print("v_R: ", self.v_R)
 
         # compute desired swing foot trajectory
         p_swing_W = self.update_foot_traj()

@@ -10,8 +10,8 @@ sys.path.append(parent_dir)
 from joystick import GamepadCommand
 
 # simulation parameters
-sim_time = 15.0
-realtime_rate =.0
+sim_time = 10.0
+realtime_rate = 1.0
 
 # load model
 model_file = "../../models/achilles_SE3_drake.urdf"
@@ -20,7 +20,7 @@ model_file = "../../models/achilles_SE3_drake.urdf"
 meshcat = StartMeshcat()
 
 # simulation parameters
-sim_hz = 750
+sim_hz = 500
 sim_config = MultibodyPlantConfig()
 sim_config.time_step = 1 / sim_hz 
 sim_config.discrete_contact_approximation = "lagged"
