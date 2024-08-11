@@ -4,6 +4,11 @@ from pydrake.all import *
 import numpy as np
 from controller_SE3 import HLIP
 
+import sys, os
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_dir)
+from joystick import GamepadCommand
+
 # simulation parameters
 sim_time = 15.0
 realtime_rate =.0
@@ -59,11 +64,16 @@ plant.Finalize()
 # add the controller
 controller = builder.AddSystem(HLIP(model_file, meshcat))
 
+# add the joystick
+gamepad = builder.AddSystem(GamepadCommand())
+
 # build the diagram 
 builder.Connect(plant.get_state_output_port(), 
                 controller.GetInputPort("x_hat"))
 builder.Connect(controller.GetOutputPort("x_des"),
                 plant.get_desired_state_input_port(robot))
+builder.Connect(gamepad.get_output_port(), 
+                controller.GetInputPort("joy_command"))
 
 # add the visualizer
 AddDefaultVisualization(builder, meshcat)

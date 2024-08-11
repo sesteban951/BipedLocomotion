@@ -70,7 +70,7 @@ class HLIP(LeafSystem):
         self.v_com = np.zeros(3)    # center of mass velocity in world frame
         self.p_R = np.zeros(3)      # center of mass state in stance foot frame
         self.v_R = np.zeros(3)      # center of mass velocity in stance foot frame
-        
+
         # LIP model preimpact states
         self.p_H_minus = 0
         self.v_H_minus = 0

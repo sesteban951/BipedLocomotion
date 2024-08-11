@@ -3,10 +3,14 @@
 from pydrake.all import *
 import numpy as np
 from controller_SE2 import HLIP
+
+import sys, os
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_dir)
 from joystick import GamepadCommand
 
 # simulation parameters
-sim_time = 45
+sim_time = 45.0
 realtime_rate = 1.0
 
 # load model
@@ -62,8 +66,6 @@ controller = builder.AddSystem(HLIP(model_file, meshcat))
 
 # add the joystick
 gamepad = builder.AddSystem(GamepadCommand())
-
-# exit()
 
 # build the diagram 
 builder.Connect(plant.get_state_output_port(), 

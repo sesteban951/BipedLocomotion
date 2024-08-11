@@ -2,7 +2,6 @@
 from pydrake.all import *
 import numpy as np
 import scipy as sp
-import time
 
 class HLIP(LeafSystem):
 
@@ -35,6 +34,9 @@ class HLIP(LeafSystem):
         self.input_port = self.DeclareVectorInputPort(
                             "x_hat", 
                             BasicVector(self.plant.num_positions() + self.plant.num_velocities()))
+        self.gamepad_port = self.DeclareVectorInputPort(
+                            "joy_command",
+                            BasicVector(4))  # LS_x, LS_y, RS_x, A button (Xbox)
         self.DeclareVectorOutputPort(
                             "x_des",
                             BasicVector(2 * self.plant.num_actuators()),
@@ -98,12 +100,12 @@ class HLIP(LeafSystem):
         self.sigma_P2 = self.lam * tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
         self.u_ff_x = 0.0
         self.u_ff_y = 0.0
-        self.v_des_x = 0.4
+        self.v_des_x = 0.0
         self.v_des_y = 0.0
-        self.v_max = 0.1    # ||v_des||_2 <= v_max
+        self.v_max = 0.3    # ||v_des||_2 <= v_max
 
         # period 2 feedforward foot placements, must satify u_L + u_R = 2 * v_des * T
-        self.u_L = 0.26
+        self.u_L = 0.28
         self.u_R = 2 * self.v_des_y * (self.T_SSP + self.T_SSP) - self.u_L
 
         # blending foot placement
@@ -390,9 +392,9 @@ class HLIP(LeafSystem):
         u_y = self.u_ff_y + self.v_des_y * self.T_SSP + self.Kp_db * (py_R_minus - py_H_minus) + self.Kd_db * (vy_R_minus - vy_H_minus)
 
         if self.swing_foot_frame == self.left_foot_frame:
-            u_y += self.u_L   # must satify u_L + u_R = 2 * v_des * T
+            u_y += self.u_L
         elif self.swing_foot_frame == self.right_foot_frame:
-            u_y += self.u_R   # must satify u_L + u_R = 2 * v_des * T
+            u_y += self.u_L
 
         # check if in new step period
         # if self.switched_stance_foot == True:
@@ -407,9 +409,6 @@ class HLIP(LeafSystem):
 
         self.u_applied_x = u_x
         self.u_applied_y = u_y
-
-        # print(self.u_applied_x)
-        # print(self.u_applied_y)
 
         return self.u_applied_x, self.u_applied_y
 
@@ -497,7 +496,7 @@ class HLIP(LeafSystem):
 
         # solve the IK problem        
         intial_guess = self.plant.GetPositions(self.plant_context)
-        # initial_guess = self.q_ik_sol
+        initial_guess = self.q_ik_sol
         self.ik.prog().SetInitialGuess(self.ik.q(), intial_guess)
         res = SnoptSolver().Solve(self.ik.prog())
         
@@ -506,36 +505,28 @@ class HLIP(LeafSystem):
     # ---------------------------------------------------------------------------------------- #
     def CalcOutput(self, context, output):
 
+        print("\n *************************************** \n")
+        print("time: ", self.t_current) 
+
         # set our interal model to match the state estimate
         x_hat = self.EvalVectorInput(context, 0).get_value()
         self.plant.SetPositionsAndVelocities(self.plant_context, x_hat)
         self.t_current = context.get_time()
 
-        print("\n *************************************** \n")
-        print("time: ", self.t_current) 
-        
+        # evaluate the joystick command
+        joy_command = self.gamepad_port.Eval(context)
+        self.v_des_x = joy_command[1] * self.v_max
+
         # update everything
-        # t0 = time.time()
         self.update_foot_role()
-        # t1 = time.time()
-        # print("update_foot_role: ", t1 - t0)
         self.update_hlip_state_H()
-        # t2 = time.time()
-        # print("update_hlip_state_H: ", t2 - t1)
         self.update_hlip_state_R()
-        # t3 = time.time()
-        # print("update_hlip_state_R: ", t3 - t2)
 
         # compute desired swing foot trajectory
-        # t4 = time.time()
         p_swing_W = self.update_foot_traj()
-        # t5 = time.time()
-        # print("update_foot_traj: ", t5 - t4)
 
         # solve the IK problem
         res = self.DoInverseKinematics(p_swing_W)
-        # t6 = time.time()
-        # print("DoInverseKinematics: ", t6 - t5)
 
         # extract the IK solution
         if res.is_success():
