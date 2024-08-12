@@ -556,9 +556,10 @@ class HLIP(LeafSystem):
         self.t_current = context.get_time()
 
         # evaluate the joystick command
-        # joy_command = self.gamepad_port.Eval(context)
-        # self.v_des_x = joy_command[1] * self.v_max
-        # self.v_des_y = joy_command[0] * self.v_max
+        joy_command = self.gamepad_port.Eval(context)
+        self.v_des_x = joy_command[1] * self.v_max
+        self.v_des_y = joy_command[0] * self.v_max
+        print("{}".format(self.v_des_x))
         print("{}".format(self.v_des_y))
 
         # update everything
