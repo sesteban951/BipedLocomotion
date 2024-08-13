@@ -32,7 +32,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.p_swing_init_W = np.array([0, 0, 0]).reshape(3,1)
 
         # walking parameters
-        self.z_nom = 0.64  # nominal height of the CoM
+        self.z_nom = 0.63  # nominal height of the CoM
         self.T_SSP = 0.3   # single support phase
         self.T_DSP = 0.0   # double support phase
         self.T = self.T_SSP + self.T_DSP
@@ -65,7 +65,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
         # swing foot parameters
         self.z_apex = 0.1     # height of the apex of the swing foot 
-        self.z_offset = 0.05   # offset of the swing foot from the ground
+        self.z_offset = 0.0   # offset of the swing foot from the ground
         self.z0_offset = 0.0
         self.zf_offset = 0.0
 
@@ -130,6 +130,33 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         else:
             self.stance_foot_frame = self.left_foot_frame
             self.swing_foot_frame = self.right_foot_frame
+
+    # -------------------------------------------------------------------------------------------------- #
+
+    # compute the bezier curve for the swing foot trajectory
+    def compute_bezier_curve(self, swing_foot_pos_init_W, swing_foot_target_W):
+
+        # initial and final positions
+        u0 = swing_foot_pos_init_W[0][0]
+        uf = swing_foot_target_W[0][0]
+
+        # compute primary bezier curve control points
+        if self.bez_order == 7:
+            ctrl_pts_x = np.array([u0, u0, u0, (u0+uf)/2, uf, uf, uf])
+            ctrl_pts_z = np.array([self.z0_offset, self.z0_offset, self.z0_offset, (16/5)*self.z_apex, self.zf_offset, self.zf_offset, self.zf_offset]) + self.z_offset
+
+        elif self.bez_order == 5:
+            ctrl_pts_x = np.array([u0, u0, (u0+uf)/2, uf, uf])
+            ctrl_pts_z = np.array([self.z0_offset, self.z0_offset, (8/3)*self.z_apex, self.zf_offset, self.zf_offset]) + self.z_offset
+
+        # set the primary control points
+        ctrl_pts = np.vstack((ctrl_pts_x, 
+                              ctrl_pts_z))
+        
+        # create the bezier curve
+        b = BezierCurve(0, self.T_SSP, ctrl_pts)
+
+        return b
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -238,9 +265,9 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.update_hlip_state_H()
 
         # compute the flow of the Robot following LIP dynamics
-        p_stance_pos_list = [self.p_control_stance_W]
-        p_stance_name_list = [self.stance_foot_frame.name()]
-        C = []
+        stance_name_list = []  # name of the stance foot frame
+        p_foot_pos_list = []   # each elemnt is a 3-tuple (p_stance, p_swing_init, p_swing_target)
+        C = []                 # list of continuous solutions
 
         for k in range(len(L)):
              
@@ -265,20 +292,24 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
             # compute the swing foot target position relative to control frame
             u = self.v_des * self.T_SSP + self.Kp_db * (p_R_minus - self.p_H_minus) + self.Kd_db * (v_R_minus - self.v_H_minus)
             
-            # add to the list of stance foot postions
-            p_swing_target = self.p_control_stance_W + np.array([u, 0, 0]).reshape(3,1)
-            p_stance_pos_list.append(p_swing_target)
+            # populate foot position information
+            p_stance = self.p_control_stance_W
+            p_swing_init = self.p_swing_init_W
+            p_swing_target = p_swing_init + np.array([u, 0, 0]).reshape(3,1)
+            p_foot_pos_info = (p_stance, p_swing_init, p_swing_target)
+            p_foot_pos_list.append(p_foot_pos_info)
+            stance_name_list.append(self.stance_foot_frame.name())
 
-            # switch the foot roles
-            self.p_control_stance_W = p_swing_target
+            # update the feet position info NOTE: I need to reason about the y-direction at some point
             self.switch_foot_roles()
-            p_stance_name_list.append(self.stance_foot_frame.name())
-
+            self.p_control_stance_W = np.array([p_swing_target[0], p_swing_target[1], [0]])
+            self.p_swing_init_W = p_swing_target
+            
             # set the new intial condition
             p_R = p_R_minus - u
             v_R = v_R_minus
 
-        return C, p_stance_pos_list, p_stance_name_list
+        return C, p_foot_pos_list, stance_name_list
 
     # precompute the execution of the LIP model in world frame, X = (Lambda, I, C)
     def compute_LIP_execution(self):
@@ -290,20 +321,29 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         L = np.arange(0, len(I))
 
         # compute the continuous solution trajectories, C
-        C, p_stance_pos_list, p_stance_name_list = self.compute_execution_solutions(L, I)
+        C, p_foot_pos_list, stance_name_list = self.compute_execution_solutions(L, I)
 
-        # plot the C trajcetories
-        # print(C)
-        # for i in range(len(C)):
-        #     traj = C[i]
-        #     print(traj)
-        #     print(len(traj))
-        #     for j in range(len(traj)):
-        #         plt.plot(traj[j][0], traj[j][1], 'ro')
-        # plt.show()
+        # execution is three tuple, X = (L, I, C)
+        X = (L, I, C)
 
-        return (L, I, C), p_stance_pos_list, p_stance_name_list
-            
+        return X, p_foot_pos_list, stance_name_list
+    
+    # -------------------------------------------------------------------------------------------------- #
+
+    # solve the inverse kinematics problem
+    def solve_ik(self, p_com_pos, p_stance, p_swing, stance_name):
+
+        # update the COM target position
+
+
+        # update the feet target positions
+        if stance_name == "left_foot":
+            left_foot_target = p_stance
+            right_foot_target = p_swing
+        elif stance_name == "right_foot":
+            left_foot_target = p_swing
+            right_foot_target = p_stance
+
     # -------------------------------------------------------------------------------------------------- #
 
     # main function that updates the whole problem
@@ -313,31 +353,48 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.set_problem_params(q0, v0, initial_stance_foot, v_des, dt, N)
 
         # compute the LIP execution in world frame, X = (Lambda, I, C)
-        L, I, C = self.compute_LIP_execution()
+        X, p_foot_pos_list, stance_name_list = self.compute_LIP_execution()
+        L, I, C = X[0], X[1], X[2]
+
+        # print(len(L))
+        # print(L)
+        # print(len(I))
+        # print(I)
+        # print(len(C))
+        # print(C)
+        # print(len(p_foot_pos_list))
+        # print(p_foot_pos_list)
+        # print(len(stance_name_list))
+        # print(stance_name_list)
+
+        # for every swing foot configuration solve the IK problem
+        q_ik_sol_list = []
+        q_sik_sol = None
+        for i in L:
+
+            # unpack the foot position information tuple
+            p_stance, p_swing_init, p_swing_target = p_foot_pos_list[i]
+            stance_foot_name = stance_name_list[i]
+            
+            # unpack the time_set
+            time_set = I[i]
+
+            # unpack the continuous solution
+            xt_R = C[i]
+
+            # compute the bezier curve for the swing foot trajectory
+            b = self.compute_bezier_curve(p_swing_init, p_swing_target)
+ 
+            # solve the IK problem
+            for t in time_set:
+                
+                b_t = b.value(t)
+                p_swing_target_W = np.array([b_t[0], [0], b_t[1]])
+                p_com_pos =   
+
+                self.solve_ik()
 
         exit()
-
-        # # for every swing foot configuration solve the IK problem
-        # q_ik_sol_list = []
-        # q_ik_sol = None
-        # for i in range(n):
-            
-        #     # set the initial guess of the IK problem
-        #     if i == 0:
-        #         q_guess = q0
-        #     else:
-        #         q_guess = q_ik_sol
-        #     # q_guess = q0
-
-        #     # solve the IK problem
-        #     res = self.solve_ik(self.p_control_stance_W, swing_traj[i], q_guess)
-            
-        #     if res.is_success():
-        #         q_ik_sol = res.GetSolution()
-        #         q_ik_sol_list.append(q_ik_sol)
-        #     else:
-        #         print("IK failed at time: {}, {}".format(i, times[i]))
-        #         break
 
         # return the trajectory
         return q_ik_sol_list
@@ -367,8 +424,8 @@ if __name__ == "__main__":
                                  v0 = v0,
                                  initial_stance_foot = stance_foot,
                                  v_des = v_des,
-                                 dt = 0.01,
-                                 N = 59)
+                                 dt = 0.03,
+                                 N = 29)
     print("Time to solve the IK problem: ", time.time() - t0)
     print("Average time per IK problem: ", (time.time() - t0) / len(q_ik_list))
 
