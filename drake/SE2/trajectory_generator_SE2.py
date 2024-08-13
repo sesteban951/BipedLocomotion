@@ -5,7 +5,6 @@ import numpy as np
 import scipy as sp
 import time
 import math
-import matplotlib.pyplot as plt
 
 class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
@@ -64,7 +63,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.v_H_minus = None
 
         # swing foot parameters
-        self.z_apex = 0.1     # height of the apex of the swing foot 
+        self.z_apex = 0.08     # height of the apex of the swing foot 
         self.z_offset = 0.0   # offset of the swing foot from the ground
         self.z0_offset = 0.0
         self.zf_offset = 0.0
@@ -111,14 +110,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
                                                              foot_epsilon_orient * (np.pi/180))
 
     # -------------------------------------------------------------------------------------------------- #
-
-    # update the COM state of the HLIP (need this incase you want to change v_des)
-    def update_hlip_state_H(self):
-        
-        # Eq (20) Xiaobing Xiong, Ames
-        T = self.T_SSP + self.T_DSP
-        self.p_H_minus = (self.v_des * T) / (2 + self.T_DSP * self.sigma_P1)
-        self.v_H_minus = self.sigma_P1 * (self.v_des * T) / (2 + self.T_DSP * self.sigma_P1)
 
     # switch the foot role positions
     def switch_foot_roles(self):
@@ -243,7 +234,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
     # compute the continous solution trajectories, C
     def compute_execution_solutions(self, L, I):
 
-        # compute the HLIP preimpact state
+        # update the COM state of the HLIP (need this incase you want to change v_des)
         self.p_H_minus = (self.v_des * self.T) / (2 + self.T_DSP * self.sigma_P1)
         self.v_H_minus = self.sigma_P1 * (self.v_des * self.T) / (2 + self.T_DSP * self.sigma_P1)
 
@@ -262,14 +253,10 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         p_R = p_com_W[0][0] - self.p_control_stance_W[0][0]
         v_R = v_com_W[0][0]
 
-        # update the HLIP preimpact state
-        self.update_hlip_state_H()
-
         # compute the flow of the Robot following LIP dynamics
         stance_name_list = []  # name of the stance foot frame
         p_foot_pos_list = []   # each elemnt is a 3-tuple (p_stance, p_swing_init, p_swing_target)
         C = []                 # list of continuous solutions
-
         for k in range(len(L)):
              
             # inital condition and time set
@@ -299,10 +286,10 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
                 p_swing_init = self.p_swing_init_W
                 p_swing_target = p_stance + np.array([u, 0, 0]).reshape(3,1)
             else:
-                p_stance, p_swing_init = p_swing_target, p_swing_target
+                p_stance_temp = p_stance
+                p_stance = p_swing_target
+                p_swing_init = p_stance_temp
                 p_swing_target = p_stance + np.array([u, 0, 0]).reshape(3,1)
-                # p_swing_target = p_swing_init + np.array([u, 0, 0]).reshape(3,1)
-                # p_swing_target = p_stance + np.array([u, 0, 0]).reshape(3,1)
             p_foot_pos_info = (p_stance, p_swing_init, p_swing_target)
             p_foot_pos_list.append(p_foot_pos_info)
             stance_name_list.append(self.stance_foot_frame.name())
@@ -375,17 +362,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         X, p_foot_pos_list, stance_name_list = self.compute_LIP_execution()
         L, I, C = X[0], X[1], X[2]
 
-        # print(len(L))
-        # print(L)
-        # print(len(I))
-        # print(I)
-        # print(len(C))
-        # print(C)
-        # print(len(p_foot_pos_list))
-        # print(p_foot_pos_list)
-        # print(len(stance_name_list))
-        # print(stance_name_list)
-
         # for every swing foot configuration solve the IK problem
         q_ik_sol_list = []
         q_ik_sol = q0
@@ -403,8 +379,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
             # compute the bezier curve for the swing foot trajectory
             b = self.compute_bezier_curve(p_swing_init, p_swing_target)
- 
-            plt.figure()
 
             # solve the IK problem
             for t, k in zip(time_set, range(len(time_set))):
@@ -413,15 +387,10 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
                 b_t = b.value(t)
                 p_swing_target_W = np.array([b_t[0], [0], b_t[1]]) # y-direction does not matter here
 
-                # print("p_swing_target_W: ", p_swing_target_W)
-
-                # plt.plot(p_swing_target_W[0], p_swing_target_W[2], 'bo')
-
                 # compute the COM position target
                 p_R = xt_R[k][0][0]
                 p_com_pos =  p_stance + np.array([p_R, 0, self.z_nom]).reshape(3,1)
-                # print("p_com_pos: ", p_com_pos)
-                # plt.plot(p_com_pos[0], p_com_pos[2], 'yo')
+
 
                 res = self.solve_ik(p_com_pos, p_stance, p_swing_target_W, stance_foot_name, q_ik_sol)
                 if res.is_success():
@@ -429,12 +398,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
                     q_ik_sol_list.append(q_ik_sol)
                 else:
                     print("IK problem failed at time: {}, index {}".format(t, i))
-
-        #     plt.plot(p_stance[0], p_stance[2], 'ro')
-        #     plt.plot(p_swing_init[0], p_swing_init[2], 'go')
-        #     plt.plot(p_swing_target[0], p_swing_target[2], 'ko')
-        #     plt.show()
-        # exit()
 
         # return the trajectory
         return q_ik_sol_list
@@ -450,14 +413,14 @@ if __name__ == "__main__":
     g = HLIPTrajectoryGeneratorSE2(model_file)
     
     # set desired problem parameters
-    v_des = 0.0
+    v_des = 0.2
     stance_foot = "right_foot"
-    q0 = np.array([0, 0.89,   # position (x,z)
-                   0.1,        # theta
+    q0 = np.array([0, 0.89,             # position (x,z)
+                   0.1,                 # theta
                    -0.11, 0.82, -0.82,  # left leg: hip_pitch, knee, ankle 
                    -0.75, 1.18, -0.54]) # right leg: hip_pitch, knee, ankle
     v0 = np.zeros(len(q0))
-    v0[0] = 0.1              # forward x-velocity
+    v0[0] = -0.1              # forward x-velocity
 
     t0 = time.time()
     q_ik_list = g.get_trajectory(q0 = q0, 
