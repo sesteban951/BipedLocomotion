@@ -26,8 +26,8 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
         self.right_foot_frame = self.plant.GetFrameByName("right_foot")
         self.stance_foot_frame = None
+        self.swing_foot_frame = None
 
-        self.p_torso_current = np.array([0, 0, 0]).reshape(3,1)
         self.p_control_stance_W = np.array([0, 0, 0]).reshape(3,1)
         self.p_swing_init_W = np.array([0, 0, 0]).reshape(3,1)
 
@@ -36,9 +36,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.T_SSP = 0.3   # single support phase
         self.T_DSP = 0.0   # double support phase
         self.T = self.T_SSP + self.T_DSP
-
-        # timing variables
-        self.t_phase = 0.0
 
         # total horizon parameters, number S2S steps
         self.dt = 0.0
@@ -52,12 +49,15 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.lam = np.sqrt(g/self.z_nom)       # natural frequency
         self.A = np.array([[0,           1],   # LIP drift matrix
                            [self.lam**2, 0]])
-        
-        # Robot LIP state
-        self.p_R = None  # center of mass position (in control stance foot frame)
-        self.v_R = None  # center of mass velocity (in control stance foot frame)
-        self.p_R_minus = None  # preimpact state
-        self.v_R_minus = None  # preimpact state
+
+        # create lambda function for hyperbolic trig
+        coth = lambda x: (np.exp(2 * x) + 1) / (np.exp(2 * x) - 1)
+
+        # define the deadbeat gains and orbital slopes
+        self.Kp_db = 1
+        self.Kd_db = self.T_DSP + (1/self.lam) * coth(self.lam * self.T_SSP)  # deadbeat gains      
+        self.sigma_P1 = self.lam * coth(0.5 * self.lam * self.T_SSP)          # orbital slope (P1)
+        self.v_des = 0.0
 
         # ROM HLIP state
         self.p_H_minus = None
@@ -72,18 +72,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         # bezier curve
         self.bezier_curve = None
         self.bez_order = 7  # 5 or 7
-
-        # create lambda function for hyperbolic trig
-        coth = lambda x: (np.exp(2 * x) + 1) / (np.exp(2 * x) - 1)
-
-        # define the deadbeat gains and orbital slopes
-        self.Kp_db = 1
-        self.Kd_db = self.T_DSP + (1/self.lam) * coth(self.lam * self.T_SSP)  # deadbeat gains      
-        self.sigma_P1 = self.lam * coth(0.5 * self.lam * self.T_SSP)          # orbital slope (P1)
-        self.v_des = 0.0
-
-        # for storing the foot placement
-        self.u = None
 
         # instantiate the inverse kinematics solver
         self.ik = InverseKinematics(self.plant)
@@ -124,89 +112,28 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
     # -------------------------------------------------------------------------------------------------- #
 
-    # update the COM state of the Robot
-    def update_hlip_state_R(self):
-
-        # compute the current COM state of the robot
-        p_com_W = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context).reshape(3,1)
-
-        # copmute the current COM velocity of the robot
-        J = self.plant.CalcJacobianCenterOfMassTranslationalVelocity(self.plant_context, 
-                                                                     JacobianWrtVariable.kV,
-                                                                     self.plant.world_frame(), 
-                                                                     self.plant.world_frame())
-        v = self.plant.GetVelocities(self.plant_context)
-        v_com_W = (J @ v).reshape(3,1)
-
-        # update HLIP state of the robot
-        self.p_R = p_com_W[0][0] - self.p_control_stance_W[0][0]
-        self.v_R = v_com_W[0][0]
+    # update the COM state of the HLIP (need this incase you want to change v_des)
+    def update_hlip_state_H(self):
         
-        # update the preipmact state of the HLIP
-        x0 = np.array([self.p_R, self.v_R]).reshape(2,1)
-        xt = sp.linalg.expm(self.A * (self.T_SSP - self.t_phase)) @ x0
-        self.p_R_minus = xt[0][0]
-        self.v_R_minus = xt[1][0]
+        # Eq (20) Xiaobing Xiong, Ames
+        T = self.T_SSP + self.T_DSP
+        self.p_H_minus = (self.v_des * T) / (2 + self.T_DSP * self.sigma_P1)
+        self.v_H_minus = self.sigma_P1 * (self.v_des * T) / (2 + self.T_DSP * self.sigma_P1)
 
-    # -------------------------------------------------------------------------------------------------- #
-
-    # update where to place the foot, (i.e., apply discrete control to the HLIP model)
-    def update_foot_placement(self):
-
-        # compute foot placement (local stance foot frame)
-        u = self.v_des * self.T_SSP + self.Kp_db * (self.p_R_minus - self.p_H_minus) + self.Kd_db * (self.v_R_minus - self.v_H_minus)
-
-        return u
-
-    # update the desired foot trajectory
-    def update_foot_traj(self):
-
-        # world frame inital and final foot placement
-        u0 = self.p_swing_init_W[0][0]
-        z0_swing = self.p_swing_init_W[2][0]
-        uf = self.p_control_stance_W[0][0] + self.update_foot_placement()
-
-        # compute the bezier curve control points
-        if self.bez_order == 7:
-            ctrl_pts_x = np.array([u0, u0, u0, (u0+uf)/2, uf, uf, uf])
-            ctrl_pts_z = np.array([z0_swing, z0_swing, z0_swing, (16/5)*self.z_apex, self.z_offset+self.zf_offset, self.z_offset+self.zf_offset, self.z_offset+self.zf_offset])
-        elif self.bez_order == 5:
-            ctrl_pts_x = np.array([u0, u0, (u0+uf)/2, uf, uf])
-            ctrl_pts_z = np.array([z0_swing, z0_swing, (8/3)*self.z_apex, self.z_offset+self.zf_offset, self.z_offset+self.zf_offset])
-
-        # build control point matrix
-        ctrl_pts = np.vstack((ctrl_pts_x, 
-                              ctrl_pts_z)) 
-
-        # build the swing foot trajectory
-        self.bezier_swing_traj = BezierCurve(0, self.T_SSP, ctrl_pts)
-
-    # -------------------------------------------------------------------------------------------------- #
-
-    # solve the inverse kinematics problem
-    def solve_ik(self, p_static_com, p_stance, p_swing, q_guess):
-
-        # udpate the foot placement constraints depending on the stance foot
+    # switch the foot role positions
+    def switch_foot_roles(self):
+        
+        # switch the stance and swing foot frames
         if self.stance_foot_frame == self.left_foot_frame:
-            self.p_left_cons.evaluator().UpdateLowerBound(p_stance - self.tol_feet)
-            self.p_left_cons.evaluator().UpdateUpperBound(p_stance + self.tol_feet)
-            self.p_right_cons.evaluator().UpdateLowerBound(p_swing - self.tol_feet)
-            self.p_right_cons.evaluator().UpdateUpperBound(p_swing + self.tol_feet)
-        elif self.stance_foot_frame == self.right_foot_frame:
-            self.p_right_cons.evaluator().UpdateLowerBound(p_stance - self.tol_feet)
-            self.p_right_cons.evaluator().UpdateUpperBound(p_stance + self.tol_feet)
-            self.p_left_cons.evaluator().UpdateLowerBound(p_swing - self.tol_feet)
-            self.p_left_cons.evaluator().UpdateUpperBound(p_swing + self.tol_feet)
-
-        # solve the IK problem
-        self.ik.prog().SetInitialGuess(self.ik.q(), q_guess)
-        res = SnoptSolver().Solve(self.ik.prog())
-
-        return res
+            self.stance_foot_frame = self.right_foot_frame
+            self.swing_foot_frame = self.left_foot_frame
+        else:
+            self.stance_foot_frame = self.left_foot_frame
+            self.swing_foot_frame = self.right_foot_frame
 
     # -------------------------------------------------------------------------------------------------- #
 
-    # set the trajectpry generation problem parameters
+    # set the trajectory generation problem parameters
     def set_problem_params(self, q0, v0, initial_stance_foot, v_des, dt, N):
 
         # make sure that N is non-zero
@@ -222,15 +149,12 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.dt = dt
         self.N = N
         self.T_horizon = N * dt
-        print("Total horizon length: ", self.T_horizon)
 
         # set the number of S2S steps
         self.num_full_steps = math.floor(self.T_horizon / self.T_SSP)
-        print("Number of full steps: ", self.num_full_steps)
 
         # check if there is leftover time
         self.T_leftover = (self.T_horizon - self.num_full_steps * self.T_SSP) > 1e-6
-        print("Is there leftover time: ", self.T_leftover)
 
         # set the robot state
         self.plant.SetPositions(self.plant_context, q0)
@@ -242,8 +166,24 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         # set the initial stance foot
         if initial_stance_foot == "left_foot":
             self.stance_foot_frame = self.left_foot_frame
+            self.swing_foot_frame = self.right_foot_frame
+
         elif initial_stance_foot == "right_foot":
             self.stance_foot_frame = self.right_foot_frame
+            self.swing_foot_frame = self.left_foot_frame
+
+        # set the intial stance foot control frame position in world frame
+        p_stance_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                    self.stance_foot_frame,
+                                                    [0,0,0],
+                                                    self.plant.world_frame())
+        self.p_control_stance_W = np.array([p_stance_W[0], p_stance_W[1], [0]])
+
+        # set the initial swing foot position in world frame
+        self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                             self.swing_foot_frame,
+                                                             [0,0,0],
+                                                             self.plant.world_frame())
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -282,7 +222,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         # compute the current COM state of the robot
         p_com_W = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context).reshape(3,1)
 
-        # copmute the current COM velocity of the robot
+        # compute the current COM velocity of the robot
         J = self.plant.CalcJacobianCenterOfMassTranslationalVelocity(self.plant_context, 
                                                                      JacobianWrtVariable.kV,
                                                                      self.plant.world_frame(),
@@ -294,31 +234,51 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         p_R = p_com_W[0][0] - self.p_control_stance_W[0][0]
         v_R = v_com_W[0][0]
 
-        # compute the flow of the Robot following LIP dynamics
-        C = []
-        u = []
+        # update the HLIP preimpact state
+        self.update_hlip_state_H()
 
-        # total horizon is less than T_SSP, so no transitions
-        if len(L) == 1:
-            
-            # intial condition and time set
+        # compute the flow of the Robot following LIP dynamics
+        p_stance_pos_list = [self.p_control_stance_W]
+        p_stance_name_list = [self.stance_foot_frame.name()]
+        C = []
+
+        for k in range(len(L)):
+             
+            # inital condition and time set
             x0 = np.array([p_R, v_R]).reshape(2,1)
-            time_set = I[0]
-            
+            time_set = I[k]
+
             # compute the flow of the LIP model
             xt_list = []
             for t in time_set:
                 xt = sp.linalg.expm(self.A * t) @ x0
                 xt_list.append(xt)
 
+            # append to the list of continuous solutions
             C.append(xt_list)
 
-        # total horizon is greater than T_SSP, so there are transitions
-        else:
+            # compute the preimpact state of the Robot LIP model
+            xt_minus = sp.linalg.expm(self.A * (self.T_SSP)) @ x0
+            p_R_minus = xt_minus[0][0]
+            v_R_minus = xt_minus[1][0]
 
-            for k in range(len(L)):
-                # inital condition and time set
-                print(k)
+            # compute the swing foot target position relative to control frame
+            u = self.v_des * self.T_SSP + self.Kp_db * (p_R_minus - self.p_H_minus) + self.Kd_db * (v_R_minus - self.v_H_minus)
+            
+            # add to the list of stance foot postions
+            p_swing_target = self.p_control_stance_W + np.array([u, 0, 0]).reshape(3,1)
+            p_stance_pos_list.append(p_swing_target)
+
+            # switch the foot roles
+            self.p_control_stance_W = p_swing_target
+            self.switch_foot_roles()
+            p_stance_name_list.append(self.stance_foot_frame.name())
+
+            # set the new intial condition
+            p_R = p_R_minus - u
+            v_R = v_R_minus
+
+        return C, p_stance_pos_list, p_stance_name_list
 
     # precompute the execution of the LIP model in world frame, X = (Lambda, I, C)
     def compute_LIP_execution(self):
@@ -330,9 +290,19 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         L = np.arange(0, len(I))
 
         # compute the continuous solution trajectories, C
-        C = self.compute_execution_solutions(L, I)
+        C, p_stance_pos_list, p_stance_name_list = self.compute_execution_solutions(L, I)
 
-        return L, I, C
+        # plot the C trajcetories
+        # print(C)
+        # for i in range(len(C)):
+        #     traj = C[i]
+        #     print(traj)
+        #     print(len(traj))
+        #     for j in range(len(traj)):
+        #         plt.plot(traj[j][0], traj[j][1], 'ro')
+        # plt.show()
+
+        return (L, I, C), p_stance_pos_list, p_stance_name_list
             
     # -------------------------------------------------------------------------------------------------- #
 
@@ -343,7 +313,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.set_problem_params(q0, v0, initial_stance_foot, v_des, dt, N)
 
         # compute the LIP execution in world frame, X = (Lambda, I, C)
-        self.compute_LIP_execution()
+        L, I, C = self.compute_LIP_execution()
 
         exit()
 
@@ -397,8 +367,8 @@ if __name__ == "__main__":
                                  v0 = v0,
                                  initial_stance_foot = stance_foot,
                                  v_des = v_des,
-                                 dt = 0.03,
-                                 N = 11)
+                                 dt = 0.01,
+                                 N = 59)
     print("Time to solve the IK problem: ", time.time() - t0)
     print("Average time per IK problem: ", (time.time() - t0) / len(q_ik_list))
 
