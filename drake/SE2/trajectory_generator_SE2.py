@@ -31,7 +31,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.p_swing_init_W = np.array([0, 0, 0]).reshape(3,1)
 
         # walking parameters
-        self.z_nom = 0.63  # nominal height of the CoM
+        self.z_nom = 0.65  # nominal height of the CoM
         self.T_SSP = 0.3   # single support phase
         self.T_DSP = 0.0   # double support phase
         self.T = self.T_SSP + self.T_DSP
@@ -63,7 +63,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.v_H_minus = None
 
         # swing foot parameters
-        self.z_apex = 0.08     # height of the apex of the swing foot 
+        self.z_apex = 0.05     # height of the apex of the swing foot 
         self.z_offset = 0.0   # offset of the swing foot from the ground
         self.z0_offset = 0.0
         self.zf_offset = 0.0
@@ -212,15 +212,18 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         # compute the execution time intervals, I
         I = []
         if (self.num_full_steps == 0) and (self.T_leftover == True):
+            print("Condition 1")
             time_set = np.linspace(0, self.T_horizon - self.dt, int(self.T_horizon / self.dt))
             I.append(time_set)
         
         elif (self.num_full_steps > 0) and (self.T_leftover == False):
+            print("Condition 2")
             for _ in range(self.num_full_steps):
                 time_set = np.linspace(0, self.T_SSP - self.dt, int(self.T_SSP / self.dt))
                 I.append(time_set)
         
         elif (self.num_full_steps > 0) and (self.T_leftover == True):
+            print("Condition 3")
             for _ in range(self.num_full_steps):
                 time_set = np.linspace(0, self.T_SSP - self.dt, int(self.T_SSP / self.dt))
                 I.append(time_set)
@@ -352,6 +355,19 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
     # -------------------------------------------------------------------------------------------------- #
 
+    # compute the velocity reference
+    def compute_velocity_reference(self, q_ref, v0):
+
+        # do finite difference, v_k = (q_k - q_k-1) / dt
+        v_ref = [v0]
+        for i in range(len(q_ref) - 1):
+            v_k = (q_ref[i] - q_ref[i-1]) / self.dt
+            v_ref.append(v_k)
+
+        return v_ref
+
+    # -------------------------------------------------------------------------------------------------- #
+
     # main function that updates the whole problem
     def get_trajectory(self, q0, v0, initial_stance_foot, v_des, dt, N):
         
@@ -364,7 +380,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
         # for every swing foot configuration solve the IK problem
         q_ik_sol_list = []
-        q_ik_sol = q0
+        q_ik_sol = q0.reshape(-1,1)
         for i in L:
 
             # unpack the foot position information tuple
@@ -394,13 +410,17 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
                 res = self.solve_ik(p_com_pos, p_stance, p_swing_target_W, stance_foot_name, q_ik_sol)
                 if res.is_success():
-                    q_ik_sol = res.GetSolution(self.ik.q())
+                    q_ik_sol = res.GetSolution(self.ik.q()).reshape(-1,1)
                     q_ik_sol_list.append(q_ik_sol)
                 else:
+                    q_ik_sol_list.append(q_ik_sol)
                     print("IK problem failed at time: {}, index {}".format(t, i))
 
+        # get the velocity reference
+        v_ref = self.compute_velocity_reference(q_ik_sol_list, v0)
+
         # return the trajectory
-        return q_ik_sol_list
+        return q_ik_sol_list, v_ref
 
 ######################################################################################################################
 
@@ -411,7 +431,7 @@ if __name__ == "__main__":
 
     # create the trajectory generator
     g = HLIPTrajectoryGeneratorSE2(model_file)
-    
+
     # set desired problem parameters
     v_des = 0.2
     stance_foot = "right_foot"
@@ -423,14 +443,14 @@ if __name__ == "__main__":
     v0[0] = -0.1              # forward x-velocity
 
     t0 = time.time()
-    q_ik_list = g.get_trajectory(q0 = q0, 
-                                 v0 = v0,
-                                 initial_stance_foot = stance_foot,
-                                 v_des = v_des,
-                                 dt = 0.03,
-                                 N = 100)
+    q_ref, v_ref = g.get_trajectory(q0 = q0, 
+                                    v0 = v0,
+                                    initial_stance_foot = stance_foot,
+                                    v_des = v_des,
+                                    dt = 0.03,
+                                    N = 19)
     print("Time to solve the IK problem: ", time.time() - t0)
-    print("Average time per IK problem: ", (time.time() - t0) / len(q_ik_list))
+    print("Average time per IK problem: ", (time.time() - t0) / len(q_ref))
 
     # start meshcat
     meshcat = StartMeshcat()
@@ -452,15 +472,15 @@ if __name__ == "__main__":
 
     time_elapsed = 0.0
     tot_time_des = 5.0
-    configs_per_sec = len(q_ik_list) / tot_time_des
+    configs_per_sec = len(q_ref) / tot_time_des
     dt = 1.0 / configs_per_sec
-    for i in range(len(q_ik_list)):
+    for i in range(len(q_ref)):
 
         # Wait for the next state estimate        
         time.sleep(dt)
 
         # Set the Drake model to have this state
-        q0 = q_ik_list[i]
+        q0 = q_ref[i]
         plant.SetPositions(plant_context, q0)
 
         # Set the time in the Drake diagram. This will allow meshcat playback to work.
