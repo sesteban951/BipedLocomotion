@@ -75,21 +75,21 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 30
+    problem.num_steps = 40
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     problem.Qq = np.diag([
-        10.0, 10.0,               # base position
-        10.0,                     # base orientation
-        10.0, 10.0, 10.0,            # left leg
-        10.0, 10.0, 10.0,            # right leg
+        50.0, 50.0,               # base position
+        25.0,                     # base orientation
+        5.0, 5.0, 1.0,            # left leg
+        5.0, 5.0, 1.0,            # right leg
     ])
-    problem.Qv = 0.005 * np.eye(nv)
+    problem.Qv = 0.2 * np.eye(nv)
     problem.R = 0.01 * np.diag([
         100.0, 100.0,                  # base position
         100.0,                         # base orientation
-        0.01, 0.01, 0.01,              # left leg
-        0.01, 0.01, 0.01,              # right leg
+        0.1, 0.1, 0.1,              # left leg
+        0.1, 0.1, 0.1,              # right leg
     ])
     problem.Qf_q = 10.0 * np.copy(problem.Qq)
     problem.Qf_v = 1.0 * np.copy(problem.Qv)
@@ -130,8 +130,8 @@ class AchillesPlanarMPC(ModelPredictiveController):
 
         # create an HLIP trajectory generator object
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file)
-        self.traj_gen_HLIP.z_nom = 0.63
-        self.traj_gen_HLIP.z_apex = 0.02
+        self.traj_gen_HLIP.z_nom = 0.62
+        self.traj_gen_HLIP.z_apex = 0.08
         self.traj_gen_HLIP.T_SSP = 0.3
         
         self.foot_stance = "left_foot"
@@ -180,27 +180,17 @@ class AchillesPlanarMPC(ModelPredictiveController):
         print("S2S_steps: ", self.S2S_steps)
         print("t_phase: ", self.t_phase)
 
-        # update the trajectory based on HLIP
-        if self.foot_stance == "left_foot":        
-            q_nom, v_nom = self.traj_gen_HLIP.get_trajectory(q0 = np.array(q0),
-                                                             v0 = np.array(v0),
-                                                             initial_stance_foot = self.foot_stance,
-                                                             v_des = self.vx_des,
-                                                             dt = self.time_step,
-                                                             N = self.num_steps + 1)
-        elif self.foot_stance == "right_foot":
-            q_nom, v_nom = self.traj_gen_HLIP.get_trajectory(q0 = np.array(q0),
-                                                             v0 = np.array(v0),
-                                                             initial_stance_foot = self.foot_stance,
-                                                             v_des = self.vx_des,
-                                                             dt = self.time_step,
-                                                             N = self.num_steps + 1)
+        # update the trajectory based on HLIP 
+        q_nom, v_nom = self.traj_gen_HLIP.get_trajectory(q0 = np.array(q0),
+                                                            v0 = np.array(v0),
+                                                            initial_stance_foot = self.foot_stance,
+                                                            v_des = self.vx_des,
+                                                            dt = self.time_step,
+                                                            N = self.num_steps + 1)
         print("q_nom: ", len(q_nom)) # flat vectors
         # print("v_nom: ", len(v_nom)) # flat vectors
-        
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
-
 
 if __name__=="__main__":
 
@@ -225,7 +215,7 @@ if __name__=="__main__":
     # Kd = 20 * np.ones(plant.num_actuators())
     kp_hip = 750
     kp_knee = 750
-    kp_ankle = 150
+    kp_ankle = 75
     kd_hip = 10
     kd_knee = 10
     kd_ankle = 1
@@ -287,7 +277,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(2.0)
+    simulator.AdvanceTo(15.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")

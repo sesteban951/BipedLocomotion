@@ -359,8 +359,12 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
     def compute_velocity_reference(self, q_ref, v0):
 
         # do finite difference, v_k = (q_k - q_k-1) / dt
-        v_ref = [v0]
-        for i in range(len(q_ref) - 1):
+        # v_ref = [v0]
+        # for i in range(len(q_ref) - 1):
+        #     v_k = (q_ref[i] - q_ref[i-1]) / self.dt
+        #     v_ref.append(v_k)
+        v_ref = []
+        for i in range(len(q_ref)):
             v_k = (q_ref[i] - q_ref[i-1]) / self.dt
             v_ref.append(v_k)
 
@@ -418,6 +422,10 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
         # get the velocity reference
         v_ref = self.compute_velocity_reference(q_ik_sol_list, v0)
+
+        # print("Number of IK solutions: ", len(q_ik_sol_list))
+        # print("Number of velocity references: ", len(v_ref))
+        # exit()
 
         # return the trajectory
         return q_ik_sol_list, v_ref
