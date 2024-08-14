@@ -75,19 +75,19 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 40
+    problem.num_steps = 10
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     problem.Qq = np.diag([
-        50.0, 50.0,               # base position
+        25.0, 15.0,               # base position
         25.0,                     # base orientation
-        5.0, 5.0, 1.0,            # left leg
-        5.0, 5.0, 1.0,            # right leg
+        10.0, 10.0, 1.0,            # left leg
+        10.0, 10.0, 1.0,            # right leg
     ])
-    problem.Qv = 0.2 * np.eye(nv)
+    problem.Qv = 0.1 * np.eye(nv)
     problem.R = 0.01 * np.diag([
-        100.0, 100.0,                  # base position
-        100.0,                         # base orientation
+        200.0, 200.0,                  # base position
+        200.0,                         # base orientation
         0.1, 0.1, 0.1,              # left leg
         0.1, 0.1, 0.1,              # right leg
     ])
@@ -130,8 +130,8 @@ class AchillesPlanarMPC(ModelPredictiveController):
 
         # create an HLIP trajectory generator object
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file)
-        self.traj_gen_HLIP.z_nom = 0.62
-        self.traj_gen_HLIP.z_apex = 0.08
+        self.traj_gen_HLIP.z_nom = 0.65
+        self.traj_gen_HLIP.z_apex = 0.04
         self.traj_gen_HLIP.T_SSP = 0.3
         
         self.foot_stance = "left_foot"
@@ -190,6 +190,11 @@ class AchillesPlanarMPC(ModelPredictiveController):
         print("q_nom: ", len(q_nom)) # flat vectors
         # print("v_nom: ", len(v_nom)) # flat vectors
 
+        dt = self.optimizer.time_step()
+        for i in range(self.num_steps + 1):
+            q_nom[i][0] = q0[0] + self.vx_des * i * dt
+            v_nom[i][0] = self.vx_des
+
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 
 if __name__=="__main__":
@@ -215,7 +220,7 @@ if __name__=="__main__":
     # Kd = 20 * np.ones(plant.num_actuators())
     kp_hip = 750
     kp_knee = 750
-    kp_ankle = 75
+    kp_ankle = 50
     kd_hip = 10
     kd_knee = 10
     kd_ankle = 1
@@ -277,7 +282,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(15.0)
+    simulator.AdvanceTo(10.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
