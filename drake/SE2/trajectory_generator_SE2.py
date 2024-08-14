@@ -476,7 +476,7 @@ if __name__ == "__main__":
     g = HLIPTrajectoryGeneratorSE2(model_file)
 
     # set desired problem parameters
-    v_des = 0.0
+    v_des = 0.1
     z_com_nom = 0.64
     stance_foot = "right_foot"
     q0 = np.array([0, 0.89,             # position (x,z)
@@ -493,7 +493,7 @@ if __name__ == "__main__":
                                     v_des = v_des,
                                     z_nom = z_com_nom,
                                     dt = 0.03,
-                                    N = 150)
+                                    N = 250)
     print("Time to solve the IK problem: ", time.time() - t0)
     print("Average time per IK problem: ", (time.time() - t0) / len(q_ref))
 
