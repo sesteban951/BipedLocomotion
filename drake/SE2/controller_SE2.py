@@ -2,6 +2,7 @@
 from pydrake.all import *
 import numpy as np
 import scipy as sp
+from trajectory_generator_SE2 import HLIPTrajectoryGeneratorSE2
 
 class HLIP(LeafSystem):
 
@@ -34,7 +35,7 @@ class HLIP(LeafSystem):
         self.input_port = self.DeclareVectorInputPort("x_hat", 
                                                       BasicVector(self.plant.num_positions() + self.plant.num_velocities()))
         self.gamepad_port = self.DeclareVectorInputPort("joy_command",
-                                                        BasicVector(4))  # LS_x, LS_y, RS_x, A button (Xbox)
+                                                        BasicVector(5))  # LS_x, LS_y, RS_x, A button (Xbox), RT
         self.DeclareVectorOutputPort("x_des",
                                      BasicVector(2 * self.plant.num_actuators()),
                                      self.CalcOutput)
@@ -148,6 +149,8 @@ class HLIP(LeafSystem):
         # rpy = RollPitchYaw(0, np.pi/2, 0)
         # p = np.array([0, 0, self.z_nom])
         # self.meshcat.SetTransform("z_bar", RigidTransform(rpy,p), self.t_current)
+
+        self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file)
 
     ########################################################################################################
 
@@ -399,33 +402,65 @@ class HLIP(LeafSystem):
         # evaluate the joystick command
         joy_command = self.gamepad_port.Eval(context)
         self.v_des = joy_command[1] * self.v_max
-        
+
         # update everything
         self.update_foot_role()
         self.update_hlip_state_H()
         self.update_hlip_state_R()
 
-        print("self.p_R: ", self.p_R[0][0])
-        print("self.v_R: ", self.v_R[0])
+        print("From main:")
+        # print("p_R: ", self.p_R[0][0])
+        # print("v_R: ", self.v_R[0])
+        # print("p_com_W: ", self.p_com)
+        # print("v_com: ", self.v_com)
 
-        # compute desired foot trajectories
-        p_right, p_left = self.update_foot_traj()
+        q0 = x_hat[:self.plant.num_positions()]
+        v0 = x_hat[self.plant.num_positions():]
 
-        # solve the inverse kinematics problem
-        p_right_des = np.array([p_right[0], [0], p_right[2]])
-        p_left_des = np.array([p_left[0], [0], p_left[2]])
+        # print(self.stance_foot_frame.name())
+        q_ref, v_ref = self.traj_gen_HLIP.get_trajectory(q0 = q0,
+                                                         v0 = v0,
+                                                         initial_stance_foot = self.stance_foot_frame.name(),
+                                                         v_des = self.v_des,
+                                                         z_nom = self.z_nom,
+                                                         T_SSP = self.T_SSP,
+                                                         dt = 0.05,
+                                                         N = 5)
+        q_ik = q_ref[0]
+        # print("q_ik: ", q_ik)
 
-        # solve the IK problem
-        res = self.DoInverseKinematics(p_right_des, 
-                                       p_left_des)
+        # p_stance_current = self.plant.CalcPointsPositions(self.plant_context,
+        #                                                 self.stance_foot_frame,
+        #                                                 [0,0,0],
+        #                                                 self.plant.world_frame())
+        # p_swing_current = self.plant.CalcPointsPositions(self.plant_context,
+        #                                                 self.swing_foot_frame,
+        #                                                 [0,0,0],
+        #                                                 self.plant.world_frame())
+        # print("stance foot frame: ", p_stance_current)
+        # print("swing foot frame: ", p_swing_current.T)
+
+        # print("self.p_R: ", self.p_R[0][0])
+        # print("self.v_R: ", self.v_R[0])
+
+        # # compute desired foot trajectories
+        # p_right, p_left = self.update_foot_traj()
+
+        # # solve the inverse kinematics problem
+        # p_right_des = np.array([p_right[0], [0], p_right[2]])
+        # p_left_des = np.array([p_left[0], [0], p_left[2]])
+
+        # # solve the IK problem
+        # res = self.DoInverseKinematics(p_right_des, 
+        #                                p_left_des)
         
-        # extract the IK solution
-        if res.is_success():
-            q_ik = res.GetSolution(self.ik.q())
-            self.q_ik_sol = q_ik
-        else:
-            q_ik = self.q_ik_sol
-            print("\n ************* IK failed! ************* \n")
+        # # extract the IK solution
+        # if res.is_success():
+        #     q_ik = res.GetSolution(self.ik.q())
+        #     self.q_ik_sol = q_ik
+        # else:
+        #     q_ik = self.q_ik_sol
+        #     print("\n ************* IK failed! ************* \n")
 
         # compute the nominal state
         q_des = np.array([q_ik[3], q_ik[4], q_ik[5],  # left leg: hip_pitch, knee, ankle

@@ -43,7 +43,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
         # swing foot parameters
         self.z_nom = 0.64
-        self.z_apex = 0.05     # height of the apex of the swing foot 
+        self.z_apex = 0.08     # height of the apex of the swing foot 
         self.z_offset = 0.0    # offset of the swing foot from the ground
         self.z0_offset = 0.0
         self.zf_offset = 0.0
@@ -187,7 +187,8 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
                                                     self.stance_foot_frame,
                                                     [0,0,0],
                                                     self.plant.world_frame())
-        self.p_control_stance_W = np.array([p_stance_W[0], p_stance_W[1], [0]])  
+        self.p_control_stance_W = p_stance_W
+        # self.p_control_stance_W = np.array([p_stance_W[0], p_stance_W[1], [0]])  
 
         # set the initial swing foot position in world frame
         self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
@@ -216,7 +217,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
             I.append(time_set)
 
         return I
-    
+
     # compute the continous solution trajectories, C
     def compute_execution_solutions(self, L, I):
 
@@ -236,18 +237,21 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         v_com_W = (J @ v).reshape(3,1)
 
         # compute the intial state of the Robot LIP model
-        p_R = p_com_W[0][0] - self.p_control_stance_W[0][0]
-        v_R = v_com_W[0][0]
+        p_R = p_com_W - self.p_control_stance_W
+        v_R = v_com_W
+        px_R = p_R[0][0]
+        vx_R = v_R[0][0]
 
         # compute the flow of the Robot following LIP dynamics
         stance_name_list = []  # name of the stance foot frame
         p_foot_pos_list = []   # each elemnt is a 3-tuple (p_stance, p_swing_init, p_swing_target)
         C = []                 # list of continuous solutions
         for k in range(len(L)):
-             
+
             # inital condition and time set
-            x0 = np.array([p_R, v_R]).reshape(2,1)
+            x0 = np.array([px_R, vx_R]).reshape(2,1)
             time_set = I[k]
+            print("Time set: ", time_set)
 
             # compute the flow of the LIP model
             xt_list = []
@@ -307,7 +311,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         X = (L, I, C)
 
         return X, p_foot_pos_list, stance_name_list
-    
+
     # -------------------------------------------------------------------------------------------------- #
 
     # solve the inverse kinematics problem
@@ -352,7 +356,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
     # main function that updates the whole problem
     def get_trajectory(self, q0, v0, initial_stance_foot, v_des, z_nom, T_SSP, dt, N):
-        
+
         # setup the problem parameters
         self.set_problem_params(q0, v0, initial_stance_foot, v_des, z_nom, T_SSP, dt, N)
 
@@ -400,10 +404,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         # get the velocity reference
         v_ref = self.compute_velocity_reference(q_ref, v0)
 
-        # print("Number of IK solutions: ", len(q_ref))
-        # print("Number of velocity references: ", len(v_ref))
-        # exit()
-
         # return the trajectory
         return q_ref, v_ref
 
@@ -418,7 +418,7 @@ if __name__ == "__main__":
     g = HLIPTrajectoryGeneratorSE2(model_file)
 
     # set desired problem parameters
-    v_des = 0.1
+    v_des = 0.0
     z_com_nom = 0.64
     stance_foot = "right_foot"
     q0 = np.array([0, 0.89,             # position (x,z)
@@ -435,8 +435,8 @@ if __name__ == "__main__":
                                     v_des = v_des,
                                     z_nom = z_com_nom,
                                     T_SSP = 0.3,
-                                    dt = 0.03,
-                                    N = 250)
+                                    dt = 0.05,
+                                    N = 20)
     print("Time to solve the IK problem: ", time.time() - t0)
     print("Average time per IK problem: ", (time.time() - t0) / len(q_ref))
 

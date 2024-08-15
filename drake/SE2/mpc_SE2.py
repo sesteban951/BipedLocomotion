@@ -328,7 +328,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(20.0)
+    simulator.AdvanceTo(60.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
