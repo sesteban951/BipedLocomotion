@@ -46,19 +46,15 @@ def standing_position():
     """
     Return a reasonable default standing position for the Achilles humanoid. 
     """
-    # no arms (split legs, bent knees)
-    # q_stand = np.array([
-    #     0.0000, 0.9300,          # base position
-    #     0.0000,                  # base orientation
-    #    -0.5515, 1.0239,-0.4725,  # left leg
-    #    -0.3200, 0.9751,-0.6552,  # right leg
-    # ])
-    # no arms (parallel legs, bent knees)
+
+    # with arms (parallel legs, bent knees)
     q_stand = np.array([
-        0.0000, 0.9300,          # base position
+        0.0000, 0.930,          # base position
         0.0000,                  # base orientation
        -0.5515, 1.0239,-0.4725,  # left leg
-       -0.5515, 1.0239,-0.4725,  # left leg
+       -0.0000, -0.0000,         # left arm
+       -0.5515, 1.0239,-0.4725,  # right leg
+       -0.0000, -0.0000,         # right arm
     ])
 
     return q_stand
@@ -87,28 +83,33 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 20
+    problem.num_steps = 25
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
-    
-    # no arms
+
     problem.Qq = np.diag([
-            10.0, 10.0,          # base position
+            10.0, 10.0,           # base position
             10.0,                # base orientation
             0.1, 0.1, 0.1,     # left leg
-            0.1, 0.1, 0.1     # right leg
+            0.01, 0.01,          # left arm
+            0.1, 0.1, 0.1,     # right leg
+            0.1, 0.1          # right arm
     ])
     problem.Qv = np.diag([
             10.0, 10.0,            # base position
             10.0,                 # base orientation
             0.01, 0.01, 0.01,       # left leg
-            0.01, 0.01, 0.01       # right leg
+            0.01, 0.01,          # left arm
+            0.01, 0.01, 0.01,       # right leg
+            0.01, 0.01          # right arm
     ])
     problem.R = 0.01 * np.diag([
         200.0, 200.0,               # base position
         200.0,                      # base orientation
         0.01, 0.01, 0.01,              # left leg
-        0.01, 0.01, 0.01              # right leg
+        0.01, 0.01,                   # left arm
+        0.01, 0.01, 0.01,              # right leg
+        0.01, 0.01,                   # right arm
     ])
 
     problem.Qf_q = 1.0 * np.copy(problem.Qq)
@@ -120,7 +121,7 @@ def create_optimizer(model_file):
 
     # Set the solver parameters
     params = SolverParameters()
-    params.max_iterations = 1
+    params.max_iterations = 2
     params.scaling = True
     params.equality_constraints = False
     params.Delta0 = 1e1
@@ -160,9 +161,10 @@ class AchillesPlanarMPC(ModelPredictiveController):
         self.foot_stance = "left_foot"
         self.S2S_steps = 0
         self.t_phase = 0.0
-        self.v_max = 0.5
+        self.v_max = 0.5 
 
         # indices to replace in the whole body trajectory using the IK trajectory
+        # self.wb_idx = [0,1,2,3,4,5,8,9,10]
         # self.wb_idx = [3,4,5,6,7,8]
         # self.ik_idx = [3,4,5,6,7,8]
 
@@ -181,6 +183,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
         # unpack the joystick commands
         joy_command = self.joystick_port.Eval(context)
         vx_des = joy_command[1] * self.v_max
+        # vx_des = 0.1
 
         # Quit if the robot has fallen down
         base_height = q0[1]
@@ -238,7 +241,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
 if __name__=="__main__":
 
     meshcat = StartMeshcat()
-    model_file = "../../models/achilles_SE2_drake.urdf"
+    model_file = "../../models/achilles_SE2_arms_drake.urdf"
 
     # Set up a Drake diagram for simulation
     builder = DiagramBuilder()
@@ -257,13 +260,15 @@ if __name__=="__main__":
     kp_hip = 750
     kp_knee = 750
     kp_ankle = 150
+    kp_arm = 50
     kd_hip = 10
     kd_knee = 10
     kd_ankle = 1
+    kd_arm = 1
     
-    # no arms
-    Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_hip, kp_knee, kp_ankle])
-    Kd = np.array([kd_hip, kd_knee, kd_ankle, kd_hip, kd_knee, kd_ankle])
+    # with arms
+    Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm, kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm])
+    Kd = np.array([kd_hip, kd_knee, kd_ankle, kd_arm, kd_arm, kd_hip, kd_knee, kd_ankle, kd_arm, kd_arm])
     
     actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
     for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):

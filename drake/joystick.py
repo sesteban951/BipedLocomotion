@@ -16,7 +16,7 @@ class GamepadCommand(LeafSystem):
         LeafSystem.__init__(self)
 
         # set an output port for the gamepad commands
-        self.DeclareVectorOutputPort("gamepad_command", BasicVector(4), self.CalcOutput)
+        self.DeclareVectorOutputPort("gamepad_command", BasicVector(5), self.CalcOutput)
 
         # pygame init
         pygame.init()
@@ -42,19 +42,21 @@ class GamepadCommand(LeafSystem):
         # just set the output to zero if no joystick is detected
         if self.detected_joystick == False:
             # print("Gamepad not connected, sending zero commands.")
-            output.SetFromVector(np.zeros(4))
+            output.SetFromVector(np.zeros(5))
         else:
 
             # Update internal state of Pygame
             pygame.event.pump()  
 
             # map the joystick axes (XBOX One Controller)
-            LS_x =  self.joysticks[0].get_axis(0)  # Left Stick X-direction
-            LS_y = -self.joysticks[0].get_axis(1)  # Left Stick Y-direction
-            RS_x =  self.joysticks[0].get_axis(3)  # Right Stick X-direction
-            A = self.joysticks[0].get_button(0)    # A button
+            LS_x =  self.joysticks[0].get_axis(0)             # Left Stick X-direction  (left = -1, right = 1)
+            LS_y = -self.joysticks[0].get_axis(1)             # Left Stick Y-direction  (up = -1, down = 1)
+            RS_x =  self.joysticks[0].get_axis(3)             # Right Stick X-direction (left = -1, right = 1)
+            A = self.joysticks[0].get_button(0)               # A button (unpressed = 0, pressed = 1)
+            RT = 0.5 * (self.joysticks[0].get_axis(5) + 1.0)  # Right Trigger (unpressed = 0, pressed = 1)
 
             output[0] = LS_x  # x velocity command
             output[1] = LS_y  # y velocity command
             output[2] = RS_x  # z angular velocity command
             output[3] = A     # misc. boolean button command
+            output[4] = RT    # right trigger command
