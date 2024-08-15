@@ -19,7 +19,9 @@ from pydrake.all import (
     Simulator,
     JointActuatorIndex,
     PdControllerGains,
+    BasicVector
 )
+
 import time
 import numpy as np
 
@@ -38,29 +40,38 @@ import sys, os
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 from mpc_utils import Interpolator, ModelPredictiveController
-
+from joystick import GamepadCommand
 
 def standing_position():
     """
     Return a reasonable default standing position for the Achilles humanoid. 
     """
-    # no arms
-    # return np.array([
+    # no arms (split legs, bent knees)
+    # q_stand = np.array([
     #     0.0000, 0.9300,          # base position
     #     0.0000,                  # base orientation
     #    -0.5515, 1.0239,-0.4725,  # left leg
     #    -0.3200, 0.9751,-0.6552,  # right leg
     # ])
-
-    # with arms
-    return np.array([
+    # no arms (parallel legs, bent knees)
+    q_stand = np.array([
         0.0000, 0.9300,          # base position
         0.0000,                  # base orientation
        -0.5515, 1.0239,-0.4725,  # left leg
-       -0.0000, -1.0000,          # left arm
-       -0.3200, 0.9751,-0.6552,  # right leg
-       -0.0000, -1.0000,          # right arm
+       -0.5515, 1.0239,-0.4725,  # left leg
     ])
+
+    # with arms (parallel legs, bent knees)
+    # q_stand = np.array([
+    #     0.0000, 0.930,          # base position
+    #     0.0000,                  # base orientation
+    #    -0.5515, 1.0239,-0.4725,  # left leg
+    #    -0.0000, -0.0000,         # left arm
+    #    -0.5515, 1.0239,-0.4725,  # right leg
+    #    -0.0000, -0.0000,         # right arm
+    # ])
+
+    return q_stand
 
 def create_optimizer(model_file):
     """
@@ -86,55 +97,55 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 10
+    problem.num_steps = 15
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
     # no arms
+    problem.Qq = np.diag([
+            35.0, 35.0,          # base position
+            35.0,                # base orientation
+            35.0, 35.0, 35.0,     # left leg
+            35.0, 35.0, 35.0,     # right leg
+    ])
+    problem.Qv = np.diag([
+            10.0, 10.0,            # base position
+            10.0,                 # base orientation
+            5.0, 5.0, 5.0,       # left leg
+            5.0, 5.0, 5.0,       # right leg
+    ])
+    problem.R = 0.01 * np.diag([
+        200.0, 200.0,               # base position
+        200.0,                      # base orientation
+        0.5, 0.5, 0.5,              # left leg
+        0.5, 0.5, 0.5,              # right leg
+    ])
+
+    # with arms
     # problem.Qq = np.diag([
-    #         35.0, 15.0,          # base position
+    #         35.0, 5.0,           # base position
     #         25.0,                # base orientation
     #         10.0, 10.0, 1.0,     # left leg
+    #         10.0, 10.0,          # left arm
     #         10.0, 10.0, 1.0,     # right leg
+    #         10.0, 10.0,          # right arm
     # ])
     # problem.Qv = np.diag([
     #         5.0, 0.2,            # base position
     #         0.2,                 # base orientation
-    #         0.2, 0.2, 0.2,       # left leg
-    #         0.2, 0.2, 0.2,       # right leg
+    #         0.2, 0.2, 0.01,       # left leg
+    #         0.01, 0.01,          # left arm
+    #         0.2, 0.2, 0.01,       # right leg
+    #         0.01, 0.01,          # right arm
     # ])
     # problem.R = 0.01 * np.diag([
     #     200.0, 200.0,               # base position
     #     200.0,                      # base orientation
     #     0.1, 0.1, 0.1,              # left leg
+    #     0.1, 0.1,                   # left arm
     #     0.1, 0.1, 0.1,              # right leg
+    #     0.1, 0.1,                   # right arm
     # ])
-
-    # with arms
-    problem.Qq = np.diag([
-            35.0, 15.0,          # base position
-            25.0,                # base orientation
-            10.0, 10.0, 1.0,     # left leg
-            1.0, 1.0,            # left arm
-            10.0, 10.0, 1.0,     # right leg
-            1.0, 1.0,            # right
-    ])
-    problem.Qv = np.diag([
-            5.0, 0.2,            # base position
-            0.2,                 # base orientation
-            0.2, 0.2, 0.2,       # left leg
-            0.2, 0.2,            # left arm
-            0.2, 0.2, 0.2,       # right leg
-            0.2, 0.2,            # right arm
-    ])
-    problem.R = 0.01 * np.diag([
-        200.0, 200.0,               # base position
-        200.0,                      # base orientation
-        0.1, 0.1, 0.1,              # left leg
-        0.1, 0.1,                   # left arm
-        0.1, 0.1, 0.1,              # right leg
-        0.1, 0.1,                   # right arm
-    ])
 
     problem.Qf_q = 1.0 * np.copy(problem.Qq)
     problem.Qf_v = 1.0 * np.copy(problem.Qv)
@@ -145,12 +156,12 @@ def create_optimizer(model_file):
 
     # Set the solver parameters
     params = SolverParameters()
-    params.max_iterations = 1
+    params.max_iterations = 2
     params.scaling = True
     params.equality_constraints = False
     params.Delta0 = 1e1
     params.Delta_max = 1e5
-    params.num_threads = 4
+    params.num_threads = 10
     params.contact_stiffness = 10_000
     params.dissipation_velocity = 0.1
     params.smoothing_factor = 0.01
@@ -171,19 +182,26 @@ class AchillesPlanarMPC(ModelPredictiveController):
     A Model Predictive Controller for the Achilles humanoid.
     """
     def __init__(self, optimizer, q_guess, mpc_rate, model_file):
-        # ModelPredictiveController.__init__(self, optimizer, q_guess, 9, 9, mpc_rate)
-        ModelPredictiveController.__init__(self, optimizer, q_guess, 13, 13, mpc_rate)
+        nq = q_guess[0].shape[0]
+        ModelPredictiveController.__init__(self, optimizer, q_guess, nq, nq, mpc_rate)
+
+        self.gamepad_port = self.DeclareVectorInputPort("joy_command",
+                                                        BasicVector(4))  # LS_x, LS_y, RS_x, A button (Xbox)
 
         # create an HLIP trajectory generator object
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file)
-        self.traj_gen_HLIP.z_nom = 0.65
-        self.traj_gen_HLIP.z_apex = 0.04
+        self.traj_gen_HLIP.z_apex = 0.05
         self.traj_gen_HLIP.T_SSP = 0.3
         
         self.foot_stance = "left_foot"
         self.S2S_steps = 0
         self.t_phase = 0.0
         self.vx_des = 0.0
+
+        # indices to replace in the whole body trajectory using the IK trajectory
+        # self.wb_idx = [0,1,2,3,4,5,8,9,10]
+        self.wb_idx = [3,4,5,6,7,8]
+        self.ik_idx = [3,4,5,6,7,8]
 
     def UpdateNominalTrajectory(self, context):
         """
@@ -197,56 +215,66 @@ class AchillesPlanarMPC(ModelPredictiveController):
         # Get the current time
         t_current = context.get_time()
 
+        # unpack the joystick commands
+
         # Quit if the robot has fallen down
         base_height = q0[1]
-        assert base_height > 0.0, "Oh no, the robot fell over!"
+        assert base_height > 0.3, "Oh no, the robot fell over!"
 
         # Get the current nominal trajectory
         prob = self.optimizer.prob()
         q_nom = prob.q_nom
         v_nom = prob.v_nom
 
-        # # Shift the nominal trajectory
-        # dt = self.optimizer.time_step()
-        # for i in range(self.num_steps + 1):
-        #     q_nom[i][0] = q0[0] + self.vx_des * i * dt
-        #     v_nom[i][0] = self.vx_des
-
-        # check stance foot
-        self.t_phase = t_current - self.traj_gen_HLIP.T_SSP * self.S2S_steps
-        if (t_current >= self.traj_gen_HLIP.T_SSP * (self.S2S_steps + 1)):
-            if self.foot_stance == "left_foot":
-                self.foot_stance = "right_foot"
-            else:
-                self.foot_stance = "left_foot"
-            self.t_phase = t_current
-            self.S2S_steps += 1
-
-        print("foot_stance: ", self.foot_stance)
-        print("S2S_steps: ", self.S2S_steps)
-        print("t_phase: ", self.t_phase)
-
-        # update the trajectory based on HLIP 
-        q_nom, v_nom = self.traj_gen_HLIP.get_trajectory(q0 = np.array(q0),
-                                                            v0 = np.array(v0),
-                                                            initial_stance_foot = self.foot_stance,
-                                                            v_des = self.vx_des,
-                                                            dt = self.time_step,
-                                                            N = self.num_steps + 1)
-        # print("q_nom: ", len(q_nom)) # flat vectors
-        # print("v_nom: ", len(v_nom)) # flat vectors
-
+        # Shift the nominal trajectory
+        dt = self.optimizer.time_step()
         for i in range(self.num_steps + 1):
-            q_nom[i][0] = q0[0] + self.vx_des * i * self.time_step
+            q_nom[i][0] = q0[0] + self.vx_des * i * dt
             v_nom[i][0] = self.vx_des
+
+        # # check stance foot
+        # self.t_phase = t_current - self.traj_gen_HLIP.T_SSP * self.S2S_steps
+        # if (t_current >= self.traj_gen_HLIP.T_SSP * (self.S2S_steps + 1)):
+        #     if self.foot_stance == "left_foot":
+        #         self.foot_stance = "right_foot"
+        #     else:
+        #         self.foot_stance = "left_foot"
+        #     self.t_phase = t_current
+        #     self.S2S_steps += 1
+
+        # print("foot_stance: ", self.foot_stance)
+        # print("S2S_steps: ", self.S2S_steps)
+        # print("t_phase: ", self.t_phase)
+
+        # # update the trajectory based on HLIP 
+        # q_legs, v_legs = self.traj_gen_HLIP.get_trajectory(q0 = np.array(q0),
+        #                                                    v0 = np.array(v0),
+        #                                                    initial_stance_foot = self.foot_stance,
+        #                                                    v_des = self.vx_des,
+        #                                                    z_nom = 0.65,
+        #                                                    dt = self.time_step,
+        #                                                    N = self.num_steps + 1)
+
+        # for i in range(len(q_legs)):
+        #     q_ik = q_legs[i]
+        #     v_ik = v_legs[i]
+        #     for wb_idx, ik_idx in zip(self.wb_idx, self.ik_idx):
+        #         q_nom[i][wb_idx] = q_ik[ik_idx]
+        #         v_nom[i][wb_idx] = v_ik[ik_idx]
+
+        # for i in range(self.num_steps + 1):
+        #     q_nom[i][0] = q0[0] + self.vx_des * i * self.time_step
+        #     v_nom[i][0] = self.vx_des
+        #     q_nom[i][2] = 0
+        #     v_nom[i][2] = 0
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 
 if __name__=="__main__":
 
     meshcat = StartMeshcat()
-    # model_file = "../../models/achilles_SE2_drake.urdf"
-    model_file = "../../models/achilles_SE2_arms_drake.urdf"
+    model_file = "../../models/achilles_SE2_drake.urdf"
+    # model_file = "../../models/achilles_SE2_arms_drake.urdf"
 
     # Set up a Drake diagram for simulation
     builder = DiagramBuilder()
@@ -264,7 +292,7 @@ if __name__=="__main__":
     # Add implicit PD controllers (must use kLagged or kSimilar)
     kp_hip = 750
     kp_knee = 750
-    kp_ankle = 50
+    kp_ankle = 150
     kp_arm = 50
     kd_hip = 10
     kd_knee = 10
@@ -272,12 +300,12 @@ if __name__=="__main__":
     kd_arm = 1
     
     # no arms
-    # Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_hip, kp_knee, kp_ankle])
-    # Kd = np.array([kd_hip, kd_knee, kd_ankle, kd_hip, kd_knee, kd_ankle])
+    Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_hip, kp_knee, kp_ankle])
+    Kd = np.array([kd_hip, kd_knee, kd_ankle, kd_hip, kd_knee, kd_ankle])
     
     # with arms
-    Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm, kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm])
-    Kd = np.array([kd_hip, kd_knee, kd_ankle, kd_arm, kd_arm, kd_hip, kd_knee, kd_ankle, kd_arm, kd_arm])
+    # Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm, kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm])
+    # Kd = np.array([kd_hip, kd_knee, kd_ankle, kd_arm, kd_arm, kd_hip, kd_knee, kd_ankle, kd_arm, kd_arm])
     
     actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
     for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):
@@ -293,7 +321,7 @@ if __name__=="__main__":
     q_guess = [standing_position() for _ in range(optimizer.num_steps() + 1)]
 
     # Create the MPC controller and interpolator systems
-    mpc_rate = 50  # Hz
+    mpc_rate = 75  # Hz
     controller = builder.AddSystem(AchillesPlanarMPC(optimizer, q_guess, mpc_rate, model_file))
 
     Bv = plant.MakeActuationMatrix()
