@@ -42,7 +42,7 @@ class HLIP(LeafSystem):
                             BasicVector(self.plant.num_positions() + self.plant.num_velocities()))
         self.gamepad_port = self.DeclareVectorInputPort(
                             "joy_command",
-                            BasicVector(4))  # LS_x, LS_y, RS_x, A button (Xbox)
+                            BasicVector(5))  # LS_x, LS_y, RS_x, A button (Xbox), RT
         self.DeclareVectorOutputPort(
                             "x_des",
                             BasicVector(2 * self.plant.num_actuators()),

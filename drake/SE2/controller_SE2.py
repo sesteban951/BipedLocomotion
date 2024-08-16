@@ -151,6 +151,11 @@ class HLIP(LeafSystem):
         # self.meshcat.SetTransform("z_bar", RigidTransform(rpy,p), self.t_current)
 
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file)
+        self.traj_gen_HLIP.set_parameters(z_nom = self.z_nom,
+                                          z_apex = self.z_apex,
+                                          T_SSP = self.T_SSP,
+                                          dt = 0.01,
+                                          N = 3)
 
     ########################################################################################################
 
@@ -289,7 +294,7 @@ class HLIP(LeafSystem):
         # u = (self.u_ff + self.v_des * self.T_SSP + self.Kp_db * (px) + self.Kd_db * (vx - self.v_des))[0]                          # Raibert              
         # u = self.u_ff + self.v_des * self.T_SSP + self.Kp_db * (px[0] - px_H_minus) + self.Kd_db * (vx - vx_H_minus)               # HLIP, non preimpact
         u = self.u_ff + self.v_des * self.T_SSP + self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)    # HLIP, preimpact
-        
+
         # check if in new step period
         if self.switched_stance_foot == True:
             # reset the filter (blending history)
@@ -302,6 +307,7 @@ class HLIP(LeafSystem):
         return self.u_applied
 
     # ---------------------------------------------------------------------------------------- #
+    
     # update the desired foot trjectories
     def update_foot_traj(self):
 
@@ -321,7 +327,7 @@ class HLIP(LeafSystem):
         # set the primary control points
         ctrl_pts = np.vstack((ctrl_pts_x.T, 
                               ctrl_pts_z.T))
-
+        
         # evaluate bezier at time t
         bezier = BezierCurve(0, self.T_SSP, ctrl_pts)
         b = np.array(bezier.value(self.t_phase))
@@ -370,6 +376,8 @@ class HLIP(LeafSystem):
         self.p_com_cons.evaluator().UpdateLowerBound(p_static_com_target - self.tol_base)
         self.p_com_cons.evaluator().UpdateUpperBound(p_static_com_target + self.tol_base)
 
+        print("M p_com_target: ", p_static_com_target)
+
         # Update constraints on the positions of the feet
         p_left_lb = p_left - self.tol_feet
         p_left_ub = p_left + self.tol_feet
@@ -379,6 +387,9 @@ class HLIP(LeafSystem):
         self.p_left_cons.evaluator().UpdateUpperBound(p_left_ub)
         self.p_right_cons.evaluator().UpdateLowerBound(p_right_lb)
         self.p_right_cons.evaluator().UpdateUpperBound(p_right_ub)
+
+        # print("M p_left_target: ", p_left)
+        # print("M p_right_target: ", p_right)
 
         # solve the IK problem        
         initial_guess = self.plant.GetPositions(self.plant_context)
@@ -393,6 +404,7 @@ class HLIP(LeafSystem):
 
         print("\n *************************************** \n")
         print("time: ", self.t_current) 
+        print("******* From main:")
 
         # set our interal model to match the state estimate
         x_hat = self.EvalVectorInput(context, 0).get_value()
@@ -408,51 +420,43 @@ class HLIP(LeafSystem):
         self.update_hlip_state_H()
         self.update_hlip_state_R()
 
-        print("From main:")
-        # print("p_R: ", self.p_R[0][0])
-        # print("v_R: ", self.v_R[0])
+        # print("stance_foot_W: ", self.p_stance)
         # print("p_com_W: ", self.p_com)
         # print("v_com: ", self.v_com)
+        # print("p_R: ", self.p_R[0])
+        # print("v_R: ", self.v_R[0])
+        # print("px_R_minus: ", self.p_R_minus)
+        # print("px_H_minus: ", self.p_H_minus)
+        # print("vx_R_minus: ", self.v_R_minus)
+        # print("vx_H_minus: ", self.v_H_minus)
+        # print("u_applied: ", self.u_applied)
 
+        # print("swing_init: ", self.p_swing_init)
+        # print("stance: ", self.p_stance)
+
+        # generate trajectory
         q0 = x_hat[:self.plant.num_positions()]
         v0 = x_hat[self.plant.num_positions():]
-
-        # print(self.stance_foot_frame.name())
-        q_ref, v_ref = self.traj_gen_HLIP.get_trajectory(q0 = q0,
-                                                         v0 = v0,
-                                                         initial_stance_foot = self.stance_foot_frame.name(),
-                                                         v_des = self.v_des,
-                                                         z_nom = self.z_nom,
-                                                         T_SSP = self.T_SSP,
-                                                         dt = 0.05,
-                                                         N = 5)
+        q_ref, v_ref = self.traj_gen_HLIP.generate_trajectory(q0 = q0, 
+                                                              v0 = v0, 
+                                                              v_des = self.v_des,
+                                                              t_phase = self.t_phase,
+                                                              initial_swing_foot_pos = self.p_swing_init,
+                                                              stance_foot_pos = self.p_stance,
+                                                              initial_stance_foot_name = self.stance_foot_frame.name())
         q_ik = q_ref[0]
-        # print("q_ik: ", q_ik)
-
-        # p_stance_current = self.plant.CalcPointsPositions(self.plant_context,
-        #                                                 self.stance_foot_frame,
-        #                                                 [0,0,0],
-        #                                                 self.plant.world_frame())
-        # p_swing_current = self.plant.CalcPointsPositions(self.plant_context,
-        #                                                 self.swing_foot_frame,
-        #                                                 [0,0,0],
-        #                                                 self.plant.world_frame())
-        # print("stance foot frame: ", p_stance_current)
-        # print("swing foot frame: ", p_swing_current.T)
-
-        # print("self.p_R: ", self.p_R[0][0])
-        # print("self.v_R: ", self.v_R[0])
+        # v_ik = v_ref[0]
 
         # # compute desired foot trajectories
-        # p_right, p_left = self.update_foot_traj()
+        p_right, p_left = self.update_foot_traj()
 
         # # solve the inverse kinematics problem
-        # p_right_des = np.array([p_right[0], [0], p_right[2]])
-        # p_left_des = np.array([p_left[0], [0], p_left[2]])
+        p_right_des = np.array([p_right[0], [0], p_right[2]])
+        p_left_des = np.array([p_left[0], [0], p_left[2]])
 
         # # solve the IK problem
-        # res = self.DoInverseKinematics(p_right_des, 
-        #                                p_left_des)
+        res = self.DoInverseKinematics(p_right_des, 
+                                       p_left_des)
         
         # # extract the IK solution
         # if res.is_success():
@@ -468,6 +472,9 @@ class HLIP(LeafSystem):
         # q_des = np.array([0, 0, 0,  # left leg: hip_pitch, knee, ankle
         #                   0, 0, 0]) # right leg: hip_pitch, knee, ankle
         v_des = np.zeros(self.plant.num_actuators())
+        # v_des = np.array([v_ik[3], v_ik[4], v_ik[5],  # left leg: hip_pitch, knee, ankle
+        #                   v_ik[6], v_ik[7], v_ik[8]]) # right leg: hip_pitch, knee, ankle
+
         x_des = np.block([q_des, v_des])
 
         output.SetFromVector(x_des)
