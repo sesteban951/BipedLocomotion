@@ -110,6 +110,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         # initial and final positions
         u0_x = swing_foot_pos_init_W[0][0]
         u0_z = swing_foot_pos_init_W[2][0]
+        # u0_z = self.z0_offset
         uf_x = swing_foot_target_W[0][0]
 
         # compute primary bezier curve control points
@@ -129,72 +130,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         b = BezierCurve(0, self.T_SSP, ctrl_pts)
 
         return b
-
-    # -------------------------------------------------------------------------------------------------- #
-
-    # set the trajectory generation problem parameters
-    def set_problem_params(self, q0, v0, initial_stance_foot, v_des, z_nom, T_SSP, dt, N):
-
-        # make sure that N is non-zero
-        assert N > 0, "N must be an integer greater than 0."
-
-        # set time paramters
-        self.T_SSP = T_SSP
-        self.T_DSP = 0.0   # double support phase
-        self.T = self.T_SSP + self.T_DSP
-
-        # check if T_SSP is a multiple of dt (desirable)
-        result = self.T_SSP / dt
-        is_divisible = abs(round(result) - result) < 1e-6
-        msg = "T_SSP must be a multiple of dt. You have T_SSP = {} and dt = {}".format(self.T_SSP, dt)
-        assert is_divisible, msg
-
-        # set the total horizon length
-        self.dt = dt
-        self.N = N
-
-        # set variables that depend on z com nominal
-        self.z_nom = z_nom
-        g = 9.81
-        self.lam = np.sqrt(g/self.z_nom)       # natural frequency
-        self.A = np.array([[0,           1],   # LIP drift matrix
-                           [self.lam**2, 0]])
-        
-        # define the deadbeat gains and orbital slopes
-        self.Kp_db = 1
-        self.Kd_db = self.T_DSP + (1/self.lam) * self.coth(self.lam * self.T_SSP)  # deadbeat gains      
-        self.sigma_P1 = self.lam * self.coth(0.5 * self.lam * self.T_SSP)          # orbital slope (P1)
-
-        # set the robot state
-        self.plant.SetPositions(self.plant_context, q0)
-        self.plant.SetVelocities(self.plant_context, v0)
-
-        # set the desired velocity
-        self.v_des = v_des
-
-        # set the initial stance foot
-        if initial_stance_foot == "left_foot":
-            self.stance_foot_frame = self.left_foot_frame
-            self.swing_foot_frame = self.right_foot_frame
-
-        elif initial_stance_foot == "right_foot":
-            self.stance_foot_frame = self.right_foot_frame
-            self.swing_foot_frame = self.left_foot_frame
-
-        # set the intial stance foot control frame position in world frame
-        # NOTE: projecting the stance down to the ground, could be problematic if foot is still high in the air
-        p_stance_W = self.plant.CalcPointsPositions(self.plant_context,
-                                                    self.stance_foot_frame,
-                                                    [0,0,0],
-                                                    self.plant.world_frame())
-        self.p_control_stance_W = p_stance_W
-        # self.p_control_stance_W = np.array([p_stance_W[0], p_stance_W[1], [0]])  
-
-        # set the initial swing foot position in world frame
-        self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
-                                                             self.swing_foot_frame,
-                                                             [0,0,0],
-                                                             self.plant.world_frame())
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -251,7 +186,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
             # inital condition and time set
             x0 = np.array([px_R, vx_R]).reshape(2,1)
             time_set = I[k]
-            print("Time set: ", time_set)
 
             # compute the flow of the LIP model
             xt_list = []
@@ -287,11 +221,15 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
             # update the feet position info NOTE: I need to reason about the y-direction at some point
             self.switch_foot_roles()
             self.p_control_stance_W = np.array([p_swing_target[0], p_swing_target[1], [0]])
-            self.p_swing_init_W = p_swing_target
             
+            if k == 0:
+                self.p_swing_init_W = p_stance
+            else:
+                self.p_swing_init_W = p_stance_temp
+
             # set the new intial condition
-            p_R = p_R_minus - u
-            v_R = v_R_minus
+            px_R = p_R_minus - u
+            vx_R = v_R_minus
 
         return C, p_foot_pos_list, stance_name_list
 
@@ -354,11 +292,76 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
     # -------------------------------------------------------------------------------------------------- #
 
-    # main function that updates the whole problem
-    def get_trajectory(self, q0, v0, initial_stance_foot, v_des, z_nom, T_SSP, dt, N):
+    # set the trajectory generation problem parameters
+    def set_parameters(self, z_nom, T_SSP, dt, N):
 
-        # setup the problem parameters
-        self.set_problem_params(q0, v0, initial_stance_foot, v_des, z_nom, T_SSP, dt, N)
+        # make sure that N is non-zero
+        assert N > 0, "N must be an integer greater than 0."
+
+        # set time paramters
+        self.T_SSP = T_SSP
+        self.T_DSP = 0.0   # double support phase
+        self.T = self.T_SSP + self.T_DSP
+
+        # check if T_SSP is a multiple of dt (desirable)
+        result = self.T_SSP / dt
+        is_divisible = abs(round(result) - result) < 1e-6
+        msg = "T_SSP must be a multiple of dt. You have T_SSP = {} and dt = {}".format(self.T_SSP, dt)
+        assert is_divisible, msg
+
+        # set the total horizon length
+        self.dt = dt
+        self.N = N
+
+        # set variables that depend on z com nominal
+        self.z_nom = z_nom
+        g = 9.81
+        self.lam = np.sqrt(g/self.z_nom)       # natural frequency
+        self.A = np.array([[0,           1],   # LIP drift matrix
+                           [self.lam**2, 0]])
+        
+        # define the deadbeat gains and orbital slopes
+        self.Kp_db = 1
+        self.Kd_db = self.T_DSP + (1/self.lam) * self.coth(self.lam * self.T_SSP)  # deadbeat gains      
+        self.sigma_P1 = self.lam * self.coth(0.5 * self.lam * self.T_SSP)          # orbital slope (P1)
+
+        return "Parameters set successfully."
+
+    # -------------------------------------------------------------------------------------------------- #
+
+    # main function that updates the whole problem
+    def get_trajectory(self, q0, v0, v_des, t_phase, initial_stance_foot):
+
+        # set the robot state
+        self.plant.SetPositions(self.plant_context, q0)
+        self.plant.SetVelocities(self.plant_context, v0)
+
+        # set the desired velocity
+        self.v_des = v_des
+
+        # set the initial stance foot
+        if initial_stance_foot == "left_foot":
+            self.stance_foot_frame = self.left_foot_frame
+            self.swing_foot_frame = self.right_foot_frame
+
+        elif initial_stance_foot == "right_foot":
+            self.stance_foot_frame = self.right_foot_frame
+            self.swing_foot_frame = self.left_foot_frame
+
+        # set the intial stance foot control frame position in world frame
+        # NOTE: projecting the stance down to the ground, could be problematic if foot is still high in the air
+        p_stance_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                    self.stance_foot_frame,
+                                                    [0,0,0],
+                                                    self.plant.world_frame())
+        # self.p_control_stance_W = p_stance_W
+        self.p_control_stance_W = np.array([p_stance_W[0], p_stance_W[1], [0]])  
+
+        # set the initial swing foot position in world frame
+        self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                             self.swing_foot_frame,
+                                                             [0,0,0],
+                                                             self.plant.world_frame())
 
         # compute the LIP execution in world frame, X = (Lambda, I, C)
         X, p_foot_pos_list, stance_name_list = self.compute_LIP_execution()
@@ -417,26 +420,28 @@ if __name__ == "__main__":
     # create the trajectory generator
     g = HLIPTrajectoryGeneratorSE2(model_file)
 
+    # set the trajectory generator parameters
+    g.set_parameters(z_nom = 0.64,
+                     T_SSP = 0.3,
+                     dt = 0.01,
+                     N = 200)
+
     # set desired problem parameters
-    v_des = 0.0
-    z_com_nom = 0.64
+    v_des = 0.2
     stance_foot = "right_foot"
     q0 = np.array([0, 0.89,             # position (x,z)
                    0.1,                 # theta
                    -0.11, 0.82, -0.82,  # left leg: hip_pitch, knee, ankle 
                    -0.75, 1.18, -0.54]) # right leg: hip_pitch, knee, ankle
     v0 = np.zeros(len(q0))
-    v0[0] = -0.0              # forward x-velocity
+    v0[0] = 0.0              # forward x-velocity
 
     t0 = time.time()
     q_ref, v_ref = g.get_trajectory(q0 = q0, 
                                     v0 = v0,
-                                    initial_stance_foot = stance_foot,
                                     v_des = v_des,
-                                    z_nom = z_com_nom,
-                                    T_SSP = 0.3,
-                                    dt = 0.05,
-                                    N = 20)
+                                    t_phase = 0.0,
+                                    initial_stance_foot = stance_foot)
     print("Time to solve the IK problem: ", time.time() - t0)
     print("Average time per IK problem: ", (time.time() - t0) / len(q_ref))
 
