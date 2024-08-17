@@ -19,7 +19,8 @@ from pydrake.all import (
     Simulator,
     JointActuatorIndex,
     PdControllerGains,
-    BasicVector
+    BasicVector,
+    MultibodyPlant
 )
 
 import time
@@ -46,13 +47,7 @@ def standing_position():
     """
     Return a reasonable default standing position for the Achilles humanoid. 
     """
-    # no arms (split legs, bent knees)
-    # q_stand = np.array([
-    #     0.0000, 0.9300,          # base position
-    #     0.0000,                  # base orientation
-    #    -0.5515, 1.0239,-0.4725,  # left leg
-    #    -0.3200, 0.9751,-0.6552,  # right leg
-    # ])
+
     # no arms (parallel legs, bent knees)
     q_stand = np.array([
         0.0000, 0.9300,          # base position
@@ -76,7 +71,7 @@ def create_optimizer(model_file):
         plant.world_body(), 
         RigidTransform(p=[0, 0, -25]), 
         Box(50, 50, 50), "ground", 
-        CoulombFriction(0.5, 0.5))
+        CoulombFriction(0.7, 0.7))
     plant.Finalize()
     diagram = builder.Build()
 
@@ -87,7 +82,7 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 20
+    problem.num_steps = 30
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
@@ -146,25 +141,89 @@ class AchillesPlanarMPC(ModelPredictiveController):
     A Model Predictive Controller for the Achilles humanoid.
     """
     def __init__(self, optimizer, q_guess, mpc_rate, model_file):
+        
         nq = q_guess[0].shape[0]
+
+        # inherit from the ModelPredictiveController class
         ModelPredictiveController.__init__(self, optimizer, q_guess, nq, nq, mpc_rate)
 
         self.joystick_port = self.DeclareVectorInputPort("joy_command",
                                                          BasicVector(5))  # LS_x, LS_y, RS_x, A button, RT (Xbox)
 
-        # create an HLIP trajectory generator object
+        # create internal model of the robot, TODO: there has to be a better way to do this
+        self.plant = MultibodyPlant(0)
+        Parser(self.plant).AddModels(model_file)
+        self.plant.Finalize()
+        self.plant_context = self.plant.CreateDefaultContext()
+
+        # time parameters
+        self.t_current = 0.0       # current sim time
+        self.t_phase = 0.0         # current phase time
+        self.T_SSP = 0.3           # swing phase duration
+        self.number_of_steps = 0   # number of individual swing foot steps taken
+
+        #  z height parameters
+        z_com_nom = 0.64    # nominal CoM height
+        bezier_order = 7   # 5 or 7
+        z_apex = 0.07      # apex height
+
+        # maximum velocity for the robot
+        self.v_max = 0.2
+
+        # foot info variables
+        self.left_foot_frame = self.plant.GetFrameByName("left_foot")
+        self.right_foot_frame = self.plant.GetFrameByName("right_foot")
+        self.stance_foot_frame = self.right_foot_frame
+        self.swing_foot_frame  = self.left_foot_frame
+        self.p_stance = None
+        self.p_swing_init = None
+
+        # create an HLIP trajectory generator object and set the parameters
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file)
-        self.traj_gen_HLIP.z_apex = 0.05
-        self.traj_gen_HLIP.T_SSP = 0.3
-        
-        self.foot_stance = "left_foot"
-        self.S2S_steps = 0
-        self.t_phase = 0.0
-        self.v_max = 0.5
+        self.traj_gen_HLIP.set_parameters(z_nom = z_com_nom,
+                                          z_apex = z_apex,
+                                          bezier_order = bezier_order,
+                                          T_SSP = self.T_SSP,
+                                          dt = self.optimizer.time_step(),
+                                          N = self.optimizer.num_steps())
+
+        # nominal standing configuration for MPC
+        self.q_stand = standing_position()
 
         # indices to replace in the whole body trajectory using the IK trajectory
         # self.wb_idx = [3,4,5,6,7,8]
         # self.ik_idx = [3,4,5,6,7,8]
+
+    def UpdateFootInfo(self):
+
+        # check if entered new step period
+        if (self.t_phase >= self.T_SSP) or (self.p_stance is None):
+
+            # set the last known swing foot position as the desried stance foot position
+            self.p_stance = self.plant.CalcPointsPositions(self.plant_context,
+                                                            self.swing_foot_frame,
+                                                            [0,0,0],
+                                                            self.plant.world_frame())
+            # set the initial swing foot position
+            self.p_swing_init = self.plant.CalcPointsPositions(self.plant_context,
+                                                                self.stance_foot_frame,
+                                                                [0,0,0],
+                                                                self.plant.world_frame())
+
+            # left foot is swing foot, right foot is stance foot
+            if self.number_of_steps %2 == 0:
+                self.stance_foot_name = self.right_foot_frame
+                self.swing_foot_name = self.left_foot_frame
+
+            # right foot is swing foot, left foot is stance foot
+            else:
+                self.stance_foot_name = self.left_foot_frame
+                self.swing_foot_name = self.right_foot_frame
+
+            self.number_of_steps += 1
+
+        # update the phase time
+        self.t_phase = self.t_current - self.number_of_steps * self.T_SSP
 
     def UpdateNominalTrajectory(self, context):
         """
@@ -176,7 +235,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
         v0 = x0[self.nq:]
 
         # Get the current time
-        t_current = context.get_time()
+        self.t_current = context.get_time()
 
         # unpack the joystick commands
         joy_command = self.joystick_port.Eval(context)
@@ -184,7 +243,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
 
         # Quit if the robot has fallen down
         base_height = q0[1]
-        assert base_height > 0.3, "Oh no, the robot fell over!"
+        assert base_height > 0.4, "Oh no, the robot fell over!"
 
         # Get the current nominal trajectory
         prob = self.optimizer.prob()
@@ -197,41 +256,18 @@ class AchillesPlanarMPC(ModelPredictiveController):
             q_nom[i][0] = q0[0] + vx_des * i * dt
             v_nom[i][0] = vx_des
 
-        # # check stance foot
-        # self.t_phase = t_current - self.traj_gen_HLIP.T_SSP * self.S2S_steps
-        # if (t_current >= self.traj_gen_HLIP.T_SSP * (self.S2S_steps + 1)):
-        #     if self.foot_stance == "left_foot":
-        #         self.foot_stance = "right_foot"
-        #     else:
-        #         self.foot_stance = "left_foot"
-        #     self.t_phase = t_current
-        #     self.S2S_steps += 1
+        # update the foot info 
+        self.UpdateFootInfo()
 
-        # print("foot_stance: ", self.foot_stance)
-        # print("S2S_steps: ", self.S2S_steps)
-        # print("t_phase: ", self.t_phase)
-
-        # # update the trajectory based on HLIP 
-        # q_legs, v_legs = self.traj_gen_HLIP.get_trajectory(q0 = np.array(q0),
-        #                                                    v0 = np.array(v0),
-        #                                                    initial_stance_foot = self.foot_stance,
-        #                                                    v_des = self.vx_des,
-        #                                                    z_nom = 0.65,
-        #                                                    dt = self.time_step,
-        #                                                    N = self.num_steps + 1)
-
-        # for i in range(len(q_legs)):
-        #     q_ik = q_legs[i]
-        #     v_ik = v_legs[i]
-        #     for wb_idx, ik_idx in zip(self.wb_idx, self.ik_idx):
-        #         q_nom[i][wb_idx] = q_ik[ik_idx]
-        #         v_nom[i][wb_idx] = v_ik[ik_idx]
-
-        # for i in range(self.num_steps + 1):
-        #     q_nom[i][0] = q0[0] + self.vx_des * i * self.time_step
-        #     v_nom[i][0] = self.vx_des
-        #     q_nom[i][2] = 0
-        #     v_nom[i][2] = 0
+        # get a new reference trajectory
+        # print(self.t_phase)
+        # q_ref_HLIP, v_ref_HLIP = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
+        #                                                                 v0 = v0,
+        #                                                                 v_des = vx_des,
+        #                                                                 t_phase = self.t_phase,
+        #                                                                 initial_swing_foot_pos = self.p_swing_init,
+        #                                                                 stance_foot_pos = self.p_stance,
+        #                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 
@@ -282,7 +318,7 @@ if __name__=="__main__":
     joystick = builder.AddSystem(GamepadCommand())
 
     # Create the MPC controller and interpolator systems
-    mpc_rate = 75  # Hz
+    mpc_rate = 50  # Hz
     controller = builder.AddSystem(AchillesPlanarMPC(optimizer, q_guess, mpc_rate, model_file))
 
     Bv = plant.MakeActuationMatrix()
@@ -328,7 +364,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(60.0)
+    simulator.AdvanceTo(10.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
