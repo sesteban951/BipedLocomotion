@@ -10,8 +10,8 @@ sys.path.append(parent_dir)
 from joystick import GamepadCommand
 
 # simulation parameters
-sim_time = 3.0
-realtime_rate = 0.03
+sim_time = 30.0
+realtime_rate = 1.0
 
 # load model
 model_file = "../../models/achilles_SE2_drake.urdf"

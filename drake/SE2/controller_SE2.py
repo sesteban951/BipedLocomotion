@@ -143,19 +143,14 @@ class HLIP(LeafSystem):
                                                              self.plant.world_frame(), RotationMatrix(),
                                                              foot_epsilon_orient * (np.pi/180))
 
-        # draw constant center of mass bar
-        # cyl = Cylinder(0.005, 100.0)
-        # self.meshcat.SetObject("z_bar",cyl, Rgba(1, 1, 1, 1))
-        # rpy = RollPitchYaw(0, np.pi/2, 0)
-        # p = np.array([0, 0, self.z_nom])
-        # self.meshcat.SetTransform("z_bar", RigidTransform(rpy,p), self.t_current)
-
+        # instantiate the trajectory generator for HLIP trajectory
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file)
         self.traj_gen_HLIP.set_parameters(z_nom = self.z_nom,
                                           z_apex = self.z_apex,
+                                          bezier_order = 7,
                                           T_SSP = self.T_SSP,
-                                          dt = 0.01,
-                                          N = 3)
+                                          dt = 0.05,
+                                          N = 5)
 
     ########################################################################################################
 
@@ -376,8 +371,6 @@ class HLIP(LeafSystem):
         self.p_com_cons.evaluator().UpdateLowerBound(p_static_com_target - self.tol_base)
         self.p_com_cons.evaluator().UpdateUpperBound(p_static_com_target + self.tol_base)
 
-        print("M p_com_target: ", p_static_com_target)
-
         # Update constraints on the positions of the feet
         p_left_lb = p_left - self.tol_feet
         p_left_ub = p_left + self.tol_feet
@@ -387,9 +380,6 @@ class HLIP(LeafSystem):
         self.p_left_cons.evaluator().UpdateUpperBound(p_left_ub)
         self.p_right_cons.evaluator().UpdateLowerBound(p_right_lb)
         self.p_right_cons.evaluator().UpdateUpperBound(p_right_ub)
-
-        # print("M p_left_target: ", p_left)
-        # print("M p_right_target: ", p_right)
 
         # solve the IK problem        
         initial_guess = self.plant.GetPositions(self.plant_context)
@@ -404,7 +394,6 @@ class HLIP(LeafSystem):
 
         print("\n *************************************** \n")
         print("time: ", self.t_current) 
-        print("******* From main:")
 
         # set our interal model to match the state estimate
         x_hat = self.EvalVectorInput(context, 0).get_value()
@@ -417,22 +406,8 @@ class HLIP(LeafSystem):
 
         # update everything
         self.update_foot_role()
-        self.update_hlip_state_H()
-        self.update_hlip_state_R()
-
-        # print("stance_foot_W: ", self.p_stance)
-        # print("p_com_W: ", self.p_com)
-        # print("v_com: ", self.v_com)
-        # print("p_R: ", self.p_R[0])
-        # print("v_R: ", self.v_R[0])
-        # print("px_R_minus: ", self.p_R_minus)
-        # print("px_H_minus: ", self.p_H_minus)
-        # print("vx_R_minus: ", self.v_R_minus)
-        # print("vx_H_minus: ", self.v_H_minus)
-        # print("u_applied: ", self.u_applied)
-
-        # print("swing_init: ", self.p_swing_init)
-        # print("stance: ", self.p_stance)
+        # self.update_hlip_state_H()
+        # self.update_hlip_state_R()
 
         # generate trajectory
         q0 = x_hat[:self.plant.num_positions()]
@@ -444,19 +419,20 @@ class HLIP(LeafSystem):
                                                               initial_swing_foot_pos = self.p_swing_init,
                                                               stance_foot_pos = self.p_stance,
                                                               initial_stance_foot_name = self.stance_foot_frame.name())
-        q_ik = q_ref[0]
-        # v_ik = v_ref[0]
+        idx = 0
+        q_ik = q_ref[idx]
+        v_ik = v_ref[idx]
 
-        # # compute desired foot trajectories
-        p_right, p_left = self.update_foot_traj()
+        # compute desired foot trajectories
+        # p_right, p_left = self.update_foot_traj()
 
-        # # solve the inverse kinematics problem
-        p_right_des = np.array([p_right[0], [0], p_right[2]])
-        p_left_des = np.array([p_left[0], [0], p_left[2]])
+        # # # # solve the inverse kinematics problem
+        # p_right_des = np.array([p_right[0], [0], p_right[2]])
+        # p_left_des = np.array([p_left[0], [0], p_left[2]])
 
-        # # solve the IK problem
-        res = self.DoInverseKinematics(p_right_des, 
-                                       p_left_des)
+        # # # # solve the IK problem
+        # res = self.DoInverseKinematics(p_right_des, 
+        #                                p_left_des)
         
         # # extract the IK solution
         # if res.is_success():
@@ -469,8 +445,7 @@ class HLIP(LeafSystem):
         # compute the nominal state
         q_des = np.array([q_ik[3], q_ik[4], q_ik[5],  # left leg: hip_pitch, knee, ankle
                           q_ik[6], q_ik[7], q_ik[8]]) # right leg: hip_pitch, knee, ankle
-        # q_des = np.array([0, 0, 0,  # left leg: hip_pitch, knee, ankle
-        #                   0, 0, 0]) # right leg: hip_pitch, knee, ankle
+        # q_des = np.zeros(self.plant.num_actuators())
         v_des = np.zeros(self.plant.num_actuators())
         # v_des = np.array([v_ik[3], v_ik[4], v_ik[5],  # left leg: hip_pitch, knee, ankle
         #                   v_ik[6], v_ik[7], v_ik[8]]) # right leg: hip_pitch, knee, ankle
