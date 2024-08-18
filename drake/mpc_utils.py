@@ -185,7 +185,7 @@ class ModelPredictiveController(LeafSystem):
         Resolve the MPC problem and store the optimal trajectory in the abstract
         state.
         """
-        print(f"Resolving at t={context.get_time()}")
+        #print(f"Resolving at t={context.get_time()}")
 
         # Get the current state
         x0 = self.state_input_port.Eval(context)

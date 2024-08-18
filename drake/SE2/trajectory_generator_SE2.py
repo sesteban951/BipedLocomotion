@@ -49,7 +49,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.zf_offset = 0.0
 
         # clip the swing foot target position
-        self.ux_max = 0.4
+        self.ux_max = 50
 
         # bezier curve
         self.bez_order = 7  # 5 or 7
