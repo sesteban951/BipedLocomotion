@@ -3,7 +3,6 @@
 from pydrake.all import *
 import numpy as np
 import scipy as sp
-import time
 
 class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
@@ -49,7 +48,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.zf_offset = 0.0
 
         # clip the swing foot target position
-        self.ux_max = 50
+        self.ux_max = 1.0
 
         # bezier curve
         self.bez_order = 7  # 5 or 7
@@ -113,7 +112,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         u0_x = swing_foot_pos_init_W[0][0]
         uf_x = swing_foot_target_W[0][0]
 
-        # TODO: must incorporate the inital swing foot position
         # compute primary bezier curve control points
         if self.bez_order == 7:
             ctrl_pts_x = np.array([u0_x, u0_x, u0_x, (u0_x+uf_x)/2, uf_x, uf_x, uf_x])
@@ -248,8 +246,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
         # compute the execution time intervals, I
         I = self.compute_execution_intervals()
-
-        # print(I)
 
         # compute the execution index, Lambda
         L = np.arange(0, len(I))

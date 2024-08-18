@@ -25,6 +25,7 @@ from pydrake.all import (
 
 import time
 import numpy as np
+import csv
 
 from pyidto import (
     TrajectoryOptimizer,
@@ -42,6 +43,8 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 from mpc_utils import Interpolator, ModelPredictiveController
 from joystick import GamepadCommand
+
+#--------------------------------------------------------------------------------------------------------------------------#
 
 def standing_position():
     """
@@ -134,6 +137,7 @@ def create_optimizer(model_file):
     # stay in scope along with the optimizer
     return optimizer, diagram, plant
 
+#--------------------------------------------------------------------------------------------------------------------------#
 
 class AchillesPlanarMPC(ModelPredictiveController):
     """
@@ -192,6 +196,11 @@ class AchillesPlanarMPC(ModelPredictiveController):
         # computeing the alpha value based on speed
         p = 1.0
         self.alpha = lambda v: ((1/self.v_max) * abs(v)) ** p
+
+        # file handle for writing to CSV file
+        self.file_name = "./data/data.csv"
+        csv_file = open(self.file_name, mode='w', newline='')
+        self.csv_writer = csv.writer(csv_file)
 
     def UpdateFootInfo(self):
 
@@ -279,7 +288,13 @@ class AchillesPlanarMPC(ModelPredictiveController):
             # q_nom[i] = (1 - a) * q_HLIP[i] + a * q_stand[i]
             # v_nom[i] = (1 - a) * v_HLIP[i] + a * v_stand[i]
 
+        # log some data
+        data = [self.t_current] + q0.tolist() + v0.tolist()
+        self.csv_writer.writerow(data)
+
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
+
+############################################################################################################################
 
 if __name__=="__main__":
 
@@ -328,7 +343,7 @@ if __name__=="__main__":
     joystick = builder.AddSystem(GamepadCommand())
 
     # Create the MPC controller and interpolator systems
-    mpc_rate = 50  # Hz
+    mpc_rate = 75  # Hz
     controller = builder.AddSystem(AchillesPlanarMPC(optimizer, q_guess, mpc_rate, model_file))
 
     Bv = plant.MakeActuationMatrix()
@@ -374,7 +389,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(10.0)
+    simulator.AdvanceTo(20.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
