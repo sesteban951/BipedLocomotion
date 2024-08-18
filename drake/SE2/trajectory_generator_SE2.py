@@ -48,6 +48,9 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.z0_offset = 0.0
         self.zf_offset = 0.0
 
+        # clip the swing foot target position
+        self.ux_max = 0.4
+
         # bezier curve
         self.bez_order = 7  # 5 or 7
 
@@ -205,6 +208,12 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
             # compute the swing foot target position relative to control frame
             ux = self.v_des * self.T_SSP + self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)
             
+            # clip the swing foot target position
+            if ux > self.ux_max:
+                ux = self.ux_max
+            elif ux < -self.ux_max:
+                ux = -self.ux_max
+
             # populate foot position information
             if k == 0:
                 p_stance = self.p_control_stance_W
@@ -239,6 +248,8 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
         # compute the execution time intervals, I
         I = self.compute_execution_intervals()
+
+        # print(I)
 
         # compute the execution index, Lambda
         L = np.arange(0, len(I))
