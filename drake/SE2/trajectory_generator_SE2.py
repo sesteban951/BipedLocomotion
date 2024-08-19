@@ -48,7 +48,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.zf_offset = 0.0
 
         # clip the swing foot target position
-        self.ux_max = 1.0
+        self.ux_max = 0.5
 
         # bezier curve
         self.bez_order = 7  # 5 or 7
@@ -152,8 +152,6 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         
         if len(time_set) > 0:
             I.append(time_set)
-
-        print(I)
 
         return I
 
@@ -290,7 +288,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
     # -------------------------------------------------------------------------------------------------- #
 
     # compute the velocity reference
-    def compute_velocity_reference(self, q_ref, v0):
+    def compute_velocity_reference(self, q_ref):
 
         # do finite difference, v_k = (q_k - q_k-1) / dt
         v_ref = []
@@ -377,7 +375,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
 
         # for every swing foot configuration solve the IK problem
         q_ref = []
-        q_ik_sol = q0
+        q_ik_sol = np.array(q0)
         for i in L:
 
             # unpack the foot position information tuple
@@ -413,7 +411,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
                     print("IK problem failed at time: {}, index {}".format(t, i))
 
         # get the velocity reference
-        v_ref = self.compute_velocity_reference(q_ref, v0)
+        v_ref = self.compute_velocity_reference(q_ref)
 
         # return the trajectory
         return q_ref, v_ref

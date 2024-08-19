@@ -65,7 +65,7 @@ plant.Finalize()
 controller = builder.AddSystem(HLIP(model_file, meshcat))
 
 # add the joystick
-gamepad = builder.AddSystem(GamepadCommand())
+gamepad = builder.AddSystem(GamepadCommand(deadzone=0.05))
 
 # build the diagram 
 builder.Connect(plant.get_state_output_port(), 

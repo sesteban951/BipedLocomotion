@@ -4,19 +4,19 @@ from pydrake.all import LeafSystem, BasicVector
 
 class GamepadCommand(LeafSystem):
     """
-    A system that reads commands from a gamepad controller conencted to meshcat.
+    Args:
+        - deadzone: float in [0,1], deadzone for the joystick axes
     """
-    def __init__(self):
-        """
-        Construct the gamepad command system.
-
-        Args:
-            meshcat: The meshcat visualizer object.
-        """
+    def __init__(self, deadzone):
+        
         LeafSystem.__init__(self)
 
         # set an output port for the gamepad commands
         self.DeclareVectorOutputPort("gamepad_command", BasicVector(5), self.CalcOutput)
+
+        # set the deadzone value
+        self.deadzone = deadzone
+        assert 0 <= self.deadzone <= 1, "Deadzone must be in [0,1]"
 
         # pygame init
         pygame.init()
@@ -54,6 +54,16 @@ class GamepadCommand(LeafSystem):
             RS_x =  self.joysticks[0].get_axis(3)             # Right Stick X-direction (left = -1, right = 1)
             A = self.joysticks[0].get_button(0)               # A button (unpressed = 0, pressed = 1)
             RT = 0.5 * (self.joysticks[0].get_axis(5) + 1.0)  # Right Trigger (unpressed = 0, pressed = 1)
+
+            # set deadzone to combat the stick drift
+            if abs(LS_x) < self.deadzone:
+                LS_x = 0.0
+            if abs(LS_y) < self.deadzone:
+                LS_y = 0.0
+            if abs(RS_x) < self.deadzone:
+                RS_x = 0.0
+            if abs(RT) < self.deadzone:
+                RT = 0.0
 
             output[0] = LS_x  # x velocity command
             output[1] = LS_y  # y velocity command

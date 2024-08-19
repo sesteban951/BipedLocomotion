@@ -340,7 +340,7 @@ if __name__=="__main__":
     q_guess = [standing_position() for _ in range(optimizer.num_steps() + 1)]
 
     # add the joystick
-    joystick = builder.AddSystem(GamepadCommand())
+    joystick = builder.AddSystem(GamepadCommand(deadzone=0.05))
 
     # Create the MPC controller and interpolator systems
     mpc_rate = 75  # Hz

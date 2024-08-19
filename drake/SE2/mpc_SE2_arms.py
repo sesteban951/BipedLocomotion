@@ -87,7 +87,7 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 20
+    problem.num_steps = 10
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
@@ -113,7 +113,7 @@ def create_optimizer(model_file):
         200.0,                    # base orientation
         0.01, 0.01, 0.01,         # left leg
         0.01, 0.01,               # left arm
-        0.01, 0.01, 0.01,          # right leg
+        0.01, 0.01, 0.01,         # right leg
         0.01, 0.01                # right arm
     ])
     problem.Qf_q = 1.0 * np.copy(problem.Qq)
@@ -176,7 +176,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
         #  z height parameters
         z_com_nom = 0.64    # nominal CoM height
         bezier_order = 7   # 5 or 7
-        z_apex = 0.08      # apex height
+        z_apex = 0.1      # apex height
 
         # maximum velocity for the robot
         self.v_max = 0.3
@@ -288,7 +288,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
             v_HLIP[i][0] = vx_des
 
         # compute alpha
-        a = self.alpha(vx_des)
+        a = self.alpha(v0[0])
 
         # convex combination of the standing position and the nominal trajectory
         q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
@@ -347,7 +347,7 @@ if __name__=="__main__":
     q_guess = [standing_position() for _ in range(optimizer.num_steps() + 1)]
 
     # add the joystick
-    joystick = builder.AddSystem(GamepadCommand())
+    joystick = builder.AddSystem(GamepadCommand(deadzone=0.05))
 
     # Create the MPC controller and interpolator systems
     mpc_rate = 50  # Hz
