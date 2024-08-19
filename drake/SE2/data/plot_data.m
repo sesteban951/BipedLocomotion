@@ -4,7 +4,7 @@
 clear all; close all; clc;
 
 % Load the csv data
-data = csvread('data.csv');
+data = csvread('data_SE2.csv');
 
 % Extract the data
 t_data = data(:,1);
@@ -55,7 +55,7 @@ joint_titles = {"Hip Left Pitch", "Knee Left Pitch", "Foot Left Pitch", "Hip Rig
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% create the figure
+% % create the figure
 % figure('Name', 'Phase Plot Movie');
 
 % % Set the renderer to 'painters'
@@ -85,7 +85,8 @@ joint_titles = {"Hip Left Pitch", "Knee Left Pitch", "Foot Left Pitch", "Hip Rig
 %     % Create subplots for each joint
 %     for i = 1:6
 %         subplot(2, 3, i);
-%         plot([q_data(idx-1, i+3) q_data(idx, i+3)], [v_data(idx-1, i+3) v_data(idx, i+3)], 'b-', 'LineWidth', 1.5);
+%         line = plot([q_data(idx-1, i+3) q_data(idx, i+3)], [v_data(idx-1, i+3) v_data(idx, i+3)], 'b-', 'LineWidth', 1.5);
+%         dot = plot(q_data(idx, i+3), v_data(idx, i+3), 'ro', 'MarkerSize', 2, 'MarkerFaceColor', 'r');
 %         xlabel("$q$", 'interpreter', 'latex');
 %         ylabel("$\dot{q}$", 'interpreter', 'latex');
 %         title(joint_titles{i});
@@ -98,6 +99,12 @@ joint_titles = {"Hip Left Pitch", "Knee Left Pitch", "Foot Left Pitch", "Hip Rig
 %         % wait until the next time step
 %     end
 
+%     % remove the dot
+%     for i = 1:6
+%         subplot(2, 3, i);
+%         delete(dot);
+%     end
+
 %     % increment the index
 %     idx = idx + 1;
 % end
@@ -106,14 +113,16 @@ joint_titles = {"Hip Left Pitch", "Knee Left Pitch", "Foot Left Pitch", "Hip Rig
 
 % plot individual phase plots
 figure('Name', 'Phase Plots');
-joint_idx = 5;
-q_data = q_data(:, joint_idx + 3);
-v_data = v_data(:, joint_idx + 3);
+joint_idx = 5;  % Left Hip Pitch (3), Left Knee Pitch (4), Left Foot Pitch (5), 
+                % Right Hip Pitch (6), Right Knee Pitch (7), Right Foot Pitch (8)
+q_data = q_data(:, joint_idx);
+v_data = v_data(:, joint_idx);
 
 % make a movie
 xlims = [min(q_data) - 0.1, max(q_data) + 0.1];
 ylims = [min(v_data) - 0.1, max(v_data) + 0.1];
 xlim(xlims); ylim(ylims);  
+yline(0);
 grid on; hold on;
 plot(nan, nan);
 
@@ -128,7 +137,8 @@ while idx <= length(t_data)
     sgtitle(msg);
 
     % plot the data now
-    plot([q_data(idx-1) q_data(idx)], [v_data(idx-1) v_data(idx)], 'b-', 'LineWidth', 1.5);
+    line = plot([q_data(idx-1) q_data(idx)], [v_data(idx-1) v_data(idx)], 'b-', 'LineWidth', 1.5);
+    dot = plot(q_data(idx), v_data(idx), 'ro', 'MarkerSize', 5, 'MarkerFaceColor', 'r');
     xlabel("$q$", 'interpreter', 'latex');
     ylabel("$\dot{q}$", 'interpreter', 'latex');
 
@@ -138,6 +148,9 @@ while idx <= length(t_data)
     while toc < t_data(idx)
         % wait until the next time step
     end
+
+    % remove the dot
+    delete(dot);
 
     % increment the index
     idx = idx + 1;
