@@ -399,40 +399,32 @@ class HLIP(LeafSystem):
     def update_foot_placement(self):
 
         # x-direction [p, v] in world frame
-        px = self.p_R[0][0]
-        vx = self.v_R[0][0]
+        # px = self.p_R[0][0]
+        # vx = self.v_R[0][0]
         px_R_minus = self.p_R_minus_x
         vx_R_minus = self.v_R_minus_x
         px_H_minus = self.p_H_minus_x
         vx_H_minus = self.v_H_minus_x
 
         # y-direction [p, v] in world frame
-        py = self.p_R[1][0]
-        vy = self.v_R[1][0]
+        # py = self.p_R[1][0]
+        # vy = self.v_R[1][0]
         py_R_minus = self.p_R_minus_y
         vy_R_minus = self.v_R_minus_y
         py_H_minus = self.p_H_minus_y
         vy_H_minus = self.v_H_minus_y
+
+        # TODO: there's seems to be a flipped sign on the y-direction that causes bad tracking. 
 
         # compute foot placement in x-direction (local stance foot frame)
         # u_x = self.u_ff_x + self.v_des_x * self.T_SSP + self.Kp_db * (px - 0) + self.Kd_db * (vx - 0)
         # u_x = self.u_ff_x + self.v_des_x * self.T_SSP + self.Kp_db * (px - px_H_minus) + self.Kd_db * (vx - vx_H_minus)
         u_x = self.u_ff_x + self.v_des_x * self.T_SSP + self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)
 
-        # TODO: fix the weird y-velocity flipped sign and the hip offset not being respected.
         # compute foot placement in y-direction (local stance foot frame)
         # u_y = self.u_ff_y + self.v_des_y * self.T_SSP + self.Kp_db * (py - 0) + self.Kd_db * (vy - 0)
         # u_y = self.u_ff_y + self.v_des_y * self.T_SSP + self.Kp_db * (py - py_H_minus) + self.Kd_db * (vy - vy_H_minus)
         u_y = self.u_ff_y + self.v_des_y * self.T_SSP + self.Kp_db * (py_R_minus - py_H_minus) + self.Kd_db * (vy_R_minus - vy_H_minus)
-
-        # print(f"py_R_minus: {py_R_minus:.3f}")
-        # print(f"py_H_minus: {py_H_minus:.3f}")
-        print(f"vy_R_minus: {vy_R_minus:.3f}")
-        print(f"vy_H_minus: {vy_H_minus:.3f}")
-
-        # print(f"v_des offset: {self.v_des_y * self.T_SSP:.3f}")
-        # print(f"p offset: {self.Kp_db * (py_R_minus - py_H_minus):.3f}")
-        # print(f"v offset: {self.Kd_db * (vy_R_minus - vy_H_minus):.3f}")
 
         if self.swing_foot_frame == self.left_foot_frame:
             u_y += self.u_L
@@ -559,16 +551,11 @@ class HLIP(LeafSystem):
         joy_command = self.gamepad_port.Eval(context)
         self.v_des_x = joy_command[1] * self.v_max
         self.v_des_y = joy_command[0] * self.v_max
-        print("{}".format(self.v_des_x))
-        print("{}".format(self.v_des_y))
 
         # update everything
         self.update_foot_role()
         self.update_hlip_state_H()
         self.update_hlip_state_R()
-
-        # print("p_R: ", self.p_R)
-        # print("v_R: ", self.v_R)
 
         # compute desired swing foot trajectory
         p_swing_W = self.update_foot_traj()

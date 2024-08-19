@@ -44,8 +44,8 @@ plant.RegisterCollisionGeometry(
 plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 
 # add low level PD controllers
-kp_hip = 750
-kp_knee = 750
+kp_hip = 900
+kp_knee = 1000
 kp_ankle = 150
 kd_hip = 10
 kd_knee = 10
