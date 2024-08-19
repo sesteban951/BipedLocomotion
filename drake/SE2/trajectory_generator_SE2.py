@@ -153,6 +153,8 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         if len(time_set) > 0:
             I.append(time_set)
 
+        print(I)
+
         return I
 
     # compute the continous solution trajectories, C

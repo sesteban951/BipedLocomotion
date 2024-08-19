@@ -171,7 +171,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
         z_apex = 0.08      # apex height
 
         # maximum velocity for the robot
-        self.v_max = 0.4
+        self.v_max = 0.3
 
         # foot info variables
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
@@ -193,12 +193,12 @@ class AchillesPlanarMPC(ModelPredictiveController):
         # nominal standing configuration for MPC
         self.q_stand = standing_position()
 
-        # computeing the alpha value based on speed
-        p = 1.0
+        # computing the alpha value based on speed
+        p = 2.0
         self.alpha = lambda v: ((1/self.v_max) * abs(v)) ** p
 
         # file handle for writing to CSV file
-        self.file_name = "./data/data.csv"
+        self.file_name = "./data/data_SE2.csv"
         csv_file = open(self.file_name, mode='w', newline='')
         self.csv_writer = csv.writer(csv_file)
 

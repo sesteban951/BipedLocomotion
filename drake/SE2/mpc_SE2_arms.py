@@ -19,11 +19,13 @@ from pydrake.all import (
     Simulator,
     JointActuatorIndex,
     PdControllerGains,
-    BasicVector
+    BasicVector,
+    MultibodyPlant
 )
 
 import time
 import numpy as np
+import csv
 
 from pyidto import (
     TrajectoryOptimizer,
@@ -42,19 +44,21 @@ sys.path.append(parent_dir)
 from mpc_utils import Interpolator, ModelPredictiveController
 from joystick import GamepadCommand
 
+#--------------------------------------------------------------------------------------------------------------------------#
+
 def standing_position():
     """
     Return a reasonable default standing position for the Achilles humanoid. 
     """
 
-    # with arms (parallel legs, bent knees)
+    # no arms (parallel legs, bent knees)
     q_stand = np.array([
-        0.0000, 0.930,          # base position
+        0.0000, 0.9300,          # base position
         0.0000,                  # base orientation
        -0.5515, 1.0239,-0.4725,  # left leg
-       -0.0000, -0.0000,         # left arm
-       -0.5515, 1.0239,-0.4725,  # right leg
-       -0.0000, -0.0000,         # right arm
+        0.0000, 0.0000,          # left arm
+       -0.5515, 1.0239,-0.4725,  # left leg
+        0.0000, 0.0000           # left arm
     ])
 
     return q_stand
@@ -72,7 +76,7 @@ def create_optimizer(model_file):
         plant.world_body(), 
         RigidTransform(p=[0, 0, -25]), 
         Box(50, 50, 50), "ground", 
-        CoulombFriction(0.5, 0.5))
+        CoulombFriction(0.7, 0.7))
     plant.Finalize()
     diagram = builder.Build()
 
@@ -83,35 +87,35 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 25
+    problem.num_steps = 20
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
-
+    
+    # no arms
     problem.Qq = np.diag([
-            10.0, 10.0,           # base position
-            10.0,                # base orientation
-            0.1, 0.1, 0.1,     # left leg
-            0.01, 0.01,          # left arm
-            0.1, 0.1, 0.1,     # right leg
-            0.1, 0.1          # right arm
+            10.0, 10.0,       # base position
+            10.0,             # base orientation
+            0.1, 0.1, 0.1,    # left leg
+            0.01, 0.01,       # left arm
+            0.1, 0.1, 0.1,    # right leg
+            0.01, 0.01        # right
     ])
     problem.Qv = np.diag([
-            10.0, 10.0,            # base position
+            10.0, 10.0,           # base position
             10.0,                 # base orientation
-            0.01, 0.01, 0.01,       # left leg
-            0.01, 0.01,          # left arm
-            0.01, 0.01, 0.01,       # right leg
-            0.01, 0.01          # right arm
+            0.01, 0.01, 0.01,     # left leg
+            0.01, 0.01,           # left arm
+            0.01, 0.01, 0.01,     # right leg
+            0.01, 0.01            # right arm
     ])
     problem.R = 0.01 * np.diag([
-        200.0, 200.0,               # base position
-        200.0,                      # base orientation
-        0.01, 0.01, 0.01,              # left leg
-        0.01, 0.01,                   # left arm
-        0.01, 0.01, 0.01,              # right leg
-        0.01, 0.01,                   # right arm
+        200.0, 200.0,             # base position
+        200.0,                    # base orientation
+        0.01, 0.01, 0.01,         # left leg
+        0.01, 0.01,               # left arm
+        0.01, 0.01, 0.01,          # right leg
+        0.01, 0.01                # right arm
     ])
-
     problem.Qf_q = 1.0 * np.copy(problem.Qq)
     problem.Qf_v = 1.0 * np.copy(problem.Qv)
 
@@ -121,7 +125,7 @@ def create_optimizer(model_file):
 
     # Set the solver parameters
     params = SolverParameters()
-    params.max_iterations = 2
+    params.max_iterations = 1
     params.scaling = True
     params.equality_constraints = False
     params.Delta0 = 1e1
@@ -132,7 +136,7 @@ def create_optimizer(model_file):
     params.smoothing_factor = 0.01
     params.friction_coefficient = 0.5
     params.stiction_velocity = 0.2
-    params.verbose = True
+    params.verbose = False
 
     # Create the optimizer
     optimizer = TrajectoryOptimizer(diagram, plant, problem, params)
@@ -141,32 +145,100 @@ def create_optimizer(model_file):
     # stay in scope along with the optimizer
     return optimizer, diagram, plant
 
+#--------------------------------------------------------------------------------------------------------------------------#
 
 class AchillesPlanarMPC(ModelPredictiveController):
     """
     A Model Predictive Controller for the Achilles humanoid.
     """
-    def __init__(self, optimizer, q_guess, mpc_rate, model_file):
+    def __init__(self, optimizer, q_guess, mpc_rate, model_file_arms):
+        
         nq = q_guess[0].shape[0]
+
+        # inherit from the ModelPredictiveController class
         ModelPredictiveController.__init__(self, optimizer, q_guess, nq, nq, mpc_rate)
 
         self.joystick_port = self.DeclareVectorInputPort("joy_command",
                                                          BasicVector(5))  # LS_x, LS_y, RS_x, A button, RT (Xbox)
 
-        # create an HLIP trajectory generator object
-        self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file)
-        self.traj_gen_HLIP.z_apex = 0.05
-        self.traj_gen_HLIP.T_SSP = 0.3
-        
-        self.foot_stance = "left_foot"
-        self.S2S_steps = 0
-        self.t_phase = 0.0
-        self.v_max = 0.5 
+        # create internal model of the robot, TODO: there has to be a better way to do this
+        self.plant = MultibodyPlant(0)
+        Parser(self.plant).AddModels(model_file_arms)
+        self.plant.Finalize()
+        self.plant_context = self.plant.CreateDefaultContext()
 
-        # indices to replace in the whole body trajectory using the IK trajectory
-        # self.wb_idx = [0,1,2,3,4,5,8,9,10]
-        # self.wb_idx = [3,4,5,6,7,8]
-        # self.ik_idx = [3,4,5,6,7,8]
+        # time parameters
+        self.t_current = 0.0       # current sim time
+        self.t_phase = 0.0         # current phase time
+        self.T_SSP = 0.3           # swing phase duration
+        self.number_of_steps = -1   # number of individual swing foot steps taken
+
+        #  z height parameters
+        z_com_nom = 0.64    # nominal CoM height
+        bezier_order = 7   # 5 or 7
+        z_apex = 0.08      # apex height
+
+        # maximum velocity for the robot
+        self.v_max = 0.3
+
+        # foot info variables
+        self.left_foot_frame = self.plant.GetFrameByName("left_foot")
+        self.right_foot_frame = self.plant.GetFrameByName("right_foot")
+        self.stance_foot_frame = self.right_foot_frame
+        self.swing_foot_frame  = self.left_foot_frame
+        self.p_stance = None
+        self.p_swing_init = None
+
+        # create an HLIP trajectory generator object and set the parameters
+        model_file_no_arms = "../../models/achilles_SE2_drake.urdf"
+        self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file_no_arms)
+        self.traj_gen_HLIP.set_parameters(z_nom = z_com_nom,
+                                          z_apex = z_apex,
+                                          bezier_order = bezier_order,
+                                          T_SSP = self.T_SSP,
+                                          dt = self.optimizer.time_step(),
+                                          N = self.optimizer.num_steps() + 1)
+
+        # nominal standing configuration for MPC
+        self.q_stand = standing_position()
+
+        # computing the alpha value based on speed
+        p = 1.0
+        self.alpha = lambda v: ((1/self.v_max) * abs(v)) ** p
+
+        # index of w/ arm leg config and w/o arm leg config
+        self.idx_no_arms = [0,1,2,3,4,5,8,9,10]
+
+    def UpdateFootInfo(self):
+
+        # check if entered new step period
+        if (self.t_phase >= self.T_SSP) or (self.p_stance is None):
+
+            # set the last known swing foot position as the desried stance foot position
+            self.p_stance = self.plant.CalcPointsPositions(self.plant_context,
+                                                            self.swing_foot_frame,
+                                                            [0,0,0],
+                                                            self.plant.world_frame())
+            # set the initial swing foot position
+            self.p_swing_init = self.plant.CalcPointsPositions(self.plant_context,
+                                                                self.stance_foot_frame,
+                                                                [0,0,0],
+                                                                self.plant.world_frame())
+
+            # left foot is swing foot, right foot is stance foot
+            if self.number_of_steps % 2 == 0:
+                self.stance_foot_frame = self.right_foot_frame
+                self.swing_foot_frme = self.left_foot_frame
+
+            # right foot is swing foot, left foot is stance foot
+            else:
+                self.stance_foot_frame = self.left_foot_frame
+                self.swing_foot_frame = self.right_foot_frame
+
+            self.number_of_steps += 1
+
+        # update the phase time
+        self.t_phase = self.t_current - self.number_of_steps * self.T_SSP
 
     def UpdateNominalTrajectory(self, context):
         """
@@ -174,69 +246,61 @@ class AchillesPlanarMPC(ModelPredictiveController):
         """
         # Get the current state
         x0 = self.state_input_port.Eval(context)
+        self.plant.SetPositionsAndVelocities(self.plant_context, x0)
         q0 = x0[:self.nq]
         v0 = x0[self.nq:]
 
+        # Quit if the robot has fallen down
+        base_height = q0[1]
+        assert base_height > 0.4, "Oh no, the robot fell over!"
+
         # Get the current time
-        t_current = context.get_time()
+        self.t_current = context.get_time()
 
         # unpack the joystick commands
         joy_command = self.joystick_port.Eval(context)
         vx_des = joy_command[1] * self.v_max
-        # vx_des = 0.1
 
-        # Quit if the robot has fallen down
-        base_height = q0[1]
-        assert base_height > 0.3, "Oh no, the robot fell over!"
-
-        # Get the current nominal trajectory
-        prob = self.optimizer.prob()
-        q_nom = prob.q_nom
-        v_nom = prob.v_nom
-
-        # Shift the nominal trajectory
-        dt = self.optimizer.time_step()
+        # Get the desired MPC standing trajectory
+        q_stand = [np.copy(self.q_stand) for i in range(self.optimizer.num_steps() + 1)]
+        v_stand = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
         for i in range(self.num_steps + 1):
-            q_nom[i][0] = q0[0] + vx_des * i * dt
-            v_nom[i][0] = vx_des
+            q_stand[i][0] = q0[0] + vx_des * i * self.optimizer.time_step()
+            v_stand[i][0] = vx_des
 
-        # # check stance foot
-        # self.t_phase = t_current - self.traj_gen_HLIP.T_SSP * self.S2S_steps
-        # if (t_current >= self.traj_gen_HLIP.T_SSP * (self.S2S_steps + 1)):
-        #     if self.foot_stance == "left_foot":
-        #         self.foot_stance = "right_foot"
-        #     else:
-        #         self.foot_stance = "left_foot"
-        #     self.t_phase = t_current
-        #     self.S2S_steps += 1
+        # update the foot info 
+        self.UpdateFootInfo()
 
-        # print("foot_stance: ", self.foot_stance)
-        # print("S2S_steps: ", self.S2S_steps)
-        # print("t_phase: ", self.t_phase)
+        # map the wholebody model to the model with no arms
+        q0_no_arms = [q0[i] for i in self.idx_no_arms]
+        v0_no_arms = [q0[i] for i in self.idx_no_arms]
 
-        # # update the trajectory based on HLIP 
-        # q_legs, v_legs = self.traj_gen_HLIP.get_trajectory(q0 = np.array(q0),
-        #                                                    v0 = np.array(v0),
-        #                                                    initial_stance_foot = self.foot_stance,
-        #                                                    v_des = self.vx_des,
-        #                                                    z_nom = 0.65,
-        #                                                    dt = self.time_step,
-        #                                                    N = self.num_steps + 1)
+        # get a new reference trajectory
+        q_HLIP, v_HLIP = self.traj_gen_HLIP.generate_trajectory(q0 = q0_no_arms,
+                                                                v0 = v0_no_arms,
+                                                                v_des = vx_des,
+                                                                t_phase = self.t_phase,
+                                                                initial_swing_foot_pos = self.p_swing_init,
+                                                                stance_foot_pos = self.p_stance,
+                                                                initial_stance_foot_name = self.stance_foot_frame.name())
+        for i in range(self.num_steps + 1):
+            q_HLIP[i][0] = q0[0] + vx_des * i * self.optimizer.time_step()
+            v_HLIP[i][0] = vx_des
 
-        # for i in range(len(q_legs)):
-        #     q_ik = q_legs[i]
-        #     v_ik = v_legs[i]
-        #     for wb_idx, ik_idx in zip(self.wb_idx, self.ik_idx):
-        #         q_nom[i][wb_idx] = q_ik[ik_idx]
-        #         v_nom[i][wb_idx] = v_ik[ik_idx]
+        # compute alpha
+        a = self.alpha(vx_des)
 
-        # for i in range(self.num_steps + 1):
-        #     q_nom[i][0] = q0[0] + self.vx_des * i * self.time_step
-        #     v_nom[i][0] = self.vx_des
-        #     q_nom[i][2] = 0
-        #     v_nom[i][2] = 0
+        # convex combination of the standing position and the nominal trajectory
+        q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
+        v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
+        
+        for i in range(self.optimizer.num_steps() + 1):
+            q_nom[i][self.idx_no_arms] = (1 - a) * q_stand[i][self.idx_no_arms] + a * q_HLIP[i]
+            v_nom[i][self.idx_no_arms] = (1 - a) * v_stand[i][self.idx_no_arms] + a * v_HLIP[i]
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
+
+############################################################################################################################
 
 if __name__=="__main__":
 
@@ -266,7 +330,6 @@ if __name__=="__main__":
     kd_ankle = 1
     kd_arm = 1
     
-    # with arms
     Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm, kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm])
     Kd = np.array([kd_hip, kd_knee, kd_ankle, kd_arm, kd_arm, kd_hip, kd_knee, kd_ankle, kd_arm, kd_arm])
     
@@ -287,14 +350,14 @@ if __name__=="__main__":
     joystick = builder.AddSystem(GamepadCommand())
 
     # Create the MPC controller and interpolator systems
-    mpc_rate = 75  # Hz
+    mpc_rate = 50  # Hz
     controller = builder.AddSystem(AchillesPlanarMPC(optimizer, q_guess, mpc_rate, model_file))
 
     Bv = plant.MakeActuationMatrix()
     N = plant.MakeVelocityToQDotMap(plant.CreateDefaultContext())
     Bq = N@Bv
     interpolator = builder.AddSystem(Interpolator(Bq.T, Bv.T))
-    
+
     # Wire the systems together
     builder.Connect(
         plant.get_state_output_port(), 
