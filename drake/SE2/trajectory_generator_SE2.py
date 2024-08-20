@@ -48,7 +48,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.zf_offset = 0.0
 
         # clip the swing foot target position
-        self.ux_max = 0.5
+        self.ux_max = 0.3
 
         # bezier curve
         self.bez_order = 7  # 5 or 7
@@ -140,7 +140,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         time_set = []
         t = self.t_phase
 
-        for k in range(self.N):
+        for _ in range(self.N):
         
             time_set.append(t)
             if round(t + self.dt, 5) < self.T_SSP:
@@ -207,10 +207,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
             ux = self.v_des * self.T_SSP + self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)
             
             # clip the swing foot target position
-            if ux > self.ux_max:
-                ux = self.ux_max
-            elif ux < -self.ux_max:
-                ux = -self.ux_max
+            ux = max(-self.ux_max, min(ux, self.ux_max))
 
             # populate foot position information
             if k == 0:
@@ -328,14 +325,14 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
         self.z_apex = z_apex
         self.z_nom = z_nom
         g = 9.81
-        self.lam = np.sqrt(g/self.z_nom)       # natural frequency
+        lam = np.sqrt(g/self.z_nom)       # natural frequency
         self.A = np.array([[0,           1],   # LIP drift matrix
-                           [self.lam**2, 0]])
+                           [lam**2, 0]])
         
         # define the deadbeat gains and orbital slopes
         self.Kp_db = 1
-        self.Kd_db = self.T_DSP + (1/self.lam) * self.coth(self.lam * self.T_SSP)  # deadbeat gains      
-        self.sigma_P1 = self.lam * self.coth(0.5 * self.lam * self.T_SSP)          # orbital slope (P1)
+        self.Kd_db = self.T_DSP + (1/lam) * self.coth(lam * self.T_SSP)  # deadbeat gains      
+        self.sigma_P1 = lam * self.coth(0.5 * lam * self.T_SSP)          # orbital slope (P1)
 
         return "Parameters set successfully."
 

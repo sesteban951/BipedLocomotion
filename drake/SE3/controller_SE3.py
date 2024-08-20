@@ -251,8 +251,6 @@ class HLIP(LeafSystem):
                 # switch the roles of the feet
                 self.stance_foot_frame = self.right_foot_frame
                 self.swing_foot_frame = self.left_foot_frame
-
-                # draw the stance foot frame in meshcat
             
             # right foot is swing foot
             else:

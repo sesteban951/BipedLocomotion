@@ -91,7 +91,7 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 50
+    problem.num_steps = 25
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
@@ -152,7 +152,7 @@ class AchillesMPC(ModelPredictiveController):
         self.joystick_port = self.DeclareVectorInputPort("joy_command",
                                                          BasicVector(5))  # LS_x, LS_y, RS_x, A button, RT (Xbox)
         
-        self.v_max = 0.2
+        self.v_max = 0.1
         self.q_stand = standing_position()
 
     def UpdateNominalTrajectory(self, context):
