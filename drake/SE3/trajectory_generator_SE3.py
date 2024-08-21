@@ -49,22 +49,22 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
 
         # swing foot parameters
         self.z_nom = 0.64
-        self.z_apex = 0.08     # height of the apex of the swing foot 
+        self.z_apex = 0.03     # height of the apex of the swing foot 
         self.z_offset = 0.0    # offset of the swing foot from the ground
         self.z0_offset = 0.0
         self.zf_offset = 0.0
 
         # clip the swing foot target position
-        self.ux_max = 0.3
-        self.uy_max = 0.3
+        self.ux_max = 0.4
+        self.uy_max = 0.4
 
         # maximum velocity
         self.vx_des = None
         self.vy_des = None
 
         # period 2 feedforward foot placements
-        self.u_L_bias = 0.28   # left is swing foot, add this to the feedforward foot placement
-        self.u_R_bias = -0.28  # right is swing foot, add this to the feedforward foot placement
+        self.u_L_bias = 0.2   # left is swing foot, add this to the feedforward foot placement
+        self.u_R_bias = -0.2  # right is swing foot, add this to the feedforward foot placement
         self.u_L = None
         self.u_R = None
         
@@ -78,10 +78,10 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
         self.ik = InverseKinematics(self.plant)
 
         # inverse kinematics solver settings
-        epsilon_feet = 0.001         # foot position tolerance      [m]
-        epsilon_base = 0.001         # base position tolerance      [m]
-        self.foot_epsilon_orient = 0.5   # foot orientation tolerance   [deg]
-        self.base_epsilon_orient = 0.5   # torso orientation tolerance  [deg]
+        epsilon_feet = 0.00         # foot position tolerance      [m]
+        epsilon_base = 0.00         # base position tolerance      [m]
+        self.foot_epsilon_orient = 0.0   # foot orientation tolerance   [deg]
+        self.base_epsilon_orient = 0.0   # torso orientation tolerance  [deg]
         self.tol_base = np.array([[epsilon_base], [epsilon_base], [epsilon_base]])
         self.tol_feet = np.array([[epsilon_feet], [epsilon_feet], [epsilon_feet]]) 
 
@@ -112,16 +112,16 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
     # -------------------------------------------------------------------------------------------------- #
 
     # rotate local stance foot control frame step increment to increment in world frame
-    def RotateStepToWorld(self, ux_local, uy_local):
+    def RotateVectorToWorld(self, vx_local, vy_local):
 
         # rotate the step increment to world frame
         R_z = np.array([[np.cos(self.control_stance_yaw), -np.sin(self.control_stance_yaw)],
                         [np.sin(self.control_stance_yaw), np.cos(self.control_stance_yaw)]])
-        u_world = R_z @ np.array([[ux_local], [uy_local]])
-        ux_world = u_world[0][0]
-        uy_world = u_world[1][0]
+        v_world = R_z @ np.array([[vx_local], [vy_local]])
+        vx_world = v_world[0][0]
+        vy_world = v_world[1][0]
 
-        return ux_world, uy_world
+        return vx_world, vy_world
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -186,7 +186,7 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
             else:
                 I.append(time_set)
                 time_set = []
-                t = 0.0
+                t = round(t + self.dt, 5) - self.T_SSP
         
         if len(time_set) > 0:
             I.append(time_set)
@@ -268,7 +268,7 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
             # clip the swing foot target position
             ux = max(-self.ux_max, min(ux, self.ux_max))
             uy = max(-self.uy_max, min(uy, self.uy_max))
-            ux_W, uy_W = self.RotateStepToWorld(ux, uy)
+            ux_W, uy_W = self.RotateVectorToWorld(ux, uy)
 
             # populate foot position information
             if k == 0:
@@ -286,18 +286,33 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
 
             # update the feet position info NOTE: I need to reason about the y-direction at some point
             self.switch_foot_roles()
-            self.p_control_stance_W = np.array([p_swing_target[0], p_swing_target[1], [0]])  # TODO: what to do about y-direction here!
+            self.p_control_stance_W = np.array([p_swing_target[0], p_swing_target[1], [0]])
             
             if k == 0:
                 self.p_swing_init_W = p_stance
             else:
                 self.p_swing_init_W = p_stance_temp
 
-            # set the new intial condition
-            px_R = px_R_minus - ux
-            py_R = py_R_minus - uy
-            vx_R = vx_R_minus
-            vy_R = vy_R_minus
+            # prepare for the intial condition of the next time step
+            if k < len(L) - 1:
+
+                # compute the postimpact state of the Robot LIP model
+                px_R = px_R_minus - ux
+                vx_R = vx_R_minus
+                
+                py_R = py_R_minus - uy
+                vy_R = vy_R_minus
+
+                # forward prop up to the first time in the next time set
+                x0 = np.array([px_R, vx_R]).reshape(2,1)
+                xt = sp.linalg.expm(self.A * (I[k+1][0])) @ x0
+                px_R = xt[0][0]
+                vx_R = xt[1][0]
+                
+                y0 = np.array([py_R, vy_R]).reshape(2,1)
+                yt = sp.linalg.expm(self.A * (I[k+1][0])) @ y0
+                py_R = yt[0][0]
+                vy_R = yt[1][0]
 
         return C, p_foot_pos_list, stance_name_list
 
@@ -346,17 +361,20 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
 
         return res
 
-    # -------------------------------------------------------------------------------------------------- #
+    # -------------------------------------------------------------------------------------------------- #        
 
     # compute the velocity reference
     def compute_velocity_reference(self, q_ref, v0):
 
-        # TODO: figure out how to do finite difference with quaternions!!!!!!!!!!!!!!!
+        # TODO: must handle quaternions correctly, I worked out the required Lie Algebra math -- need to implement!!!!!
         # do finite difference, v_k = (q_k - q_k-1) / dt
         v_ref = []
-        for i in range(len(q_ref)):
-            v_k = (q_ref[i] - q_ref[i-1]) / self.dt
-            v_ref.append(v_k)
+        for k in range(len(q_ref)):
+            if k == 0:
+                v_ref.append(np.array(v0))
+            else:
+                v_k = (q_ref[k] - q_ref[k-1]) / self.dt
+                v_ref.append(v_k)
 
         return v_ref
 
@@ -366,18 +384,12 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
     def set_parameters(self, z_nom, z_apex, bezier_order, T_SSP, dt, N):
 
         # make sure that N is non-zero
-        assert N > 1, "N must be an integer greater than 1."
+        assert N > 2, "N must be an integer greater than 2."
 
         # set time paramters
         self.T_SSP = T_SSP
         self.T_DSP = 0.0   # double support phase
         self.T = self.T_SSP + self.T_DSP
-
-        # check if T_SSP is a multiple of dt (desirable)
-        result = self.T_SSP / dt
-        is_divisible = abs(round(result) - result) < 1e-6
-        msg = "T_SSP must be a multiple of dt. You have T_SSP = {} and dt = {}".format(self.T_SSP, dt)
-        assert is_divisible, msg
 
         # set the total horizon length
         self.dt = dt
@@ -434,7 +446,7 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
             self.stance_foot_frame = self.right_foot_frame
             self.swing_foot_frame = self.left_foot_frame
 
-        # set the intial stance foot control frame position in world frame
+        # set the initial stance foot control frame position in world frame
         self.control_stance_yaw = stance_foot_yaw
         self.p_control_stance_W = np.array([stance_foot_pos[0], stance_foot_pos[1], [0]])
         self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0, stance_foot_yaw))
@@ -472,7 +484,7 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
             # unpack the foot position information tuple
             p_stance, p_swing_init, p_swing_target = p_foot_pos_list[i]
             stance_foot_name = stance_name_list[i]
-            
+
             # unpack the time_set
             time_set = I[i]
 
@@ -487,11 +499,13 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
                 
                 # compute the swing foot target
                 b_t = b_swing.value(t)
-                p_swing_target_W = np.array([b_t[0], [0], b_t[1]]) # NOTE: y-direction does not matter here
+                p_swing_target_W = np.array([b_t[0], b_t[1], b_t[2]]) # NOTE: y-direction does not matter here
 
                 # compute the COM position target
-                p_R = xt_R[k][0][0]
-                p_com_pos =  p_stance + np.array([p_R, 0, self.z_nom]).reshape(3,1)
+                px_R = xt_R[k][0][0]
+                py_R = xt_R[k][2][0]
+                px_R_W, py_R_W = self.RotateVectorToWorld(px_R, py_R)
+                p_com_pos =  p_stance + np.array([px_R_W, py_R_W, self.z_nom]).reshape(3,1)
 
                 res = self.solve_ik(p_com_pos, p_stance, p_swing_target_W, stance_foot_name, q_ik_sol)
                 if res.is_success():
@@ -525,11 +539,11 @@ if __name__ == "__main__":
 
     # set the parameters
     traj_gen.set_parameters(z_nom=0.64, 
-                            z_apex=0.08, 
+                            z_apex=0.03, 
                             bezier_order=7, 
                             T_SSP=0.3, 
                             dt=0.01, 
-                            N=40)
+                            N=400)
 
     # initial condition 
     q0 = np.array([
@@ -557,7 +571,7 @@ if __name__ == "__main__":
     yaw = RollPitchYaw(R_stance).yaw_angle()
 
     # generate a trajectory
-    v_des = np.array([[0.0], [0.0]])
+    v_des = np.array([[-0.2], [-0.3]])
     t_phase = 0.0
     q_HLIP, v_HLIP = traj_gen.generate_trajectory(q0=q0,
                                                   v0=v0,
@@ -567,6 +581,53 @@ if __name__ == "__main__":
                                                   stance_foot_pos=p_stance,
                                                   stance_foot_yaw=yaw,
                                                   initial_stance_foot_name="right_foot")
+    
+    # visualize the solution
+    model_path = "../../models/achilles_SE3_drake.urdf"
+
+    # start meshcat
+    meshcat = StartMeshcat()
+
+    # Set up a system diagram that includes a plant, scene graph, and meshcat
+    builder = DiagramBuilder()
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.0)
+    models = Parser(plant).AddModels(model_file)
+    plant.Finalize()
+
+    AddDefaultVisualization(builder, meshcat)
+
+    diagram = builder.Build()
+    diagram_context = diagram.CreateDefaultContext()
+    plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
+
+    # Start meshcat recording
+    meshcat.StartRecording()
+
+    time_elapsed = 0.0
+    tot_time_des = 5.0
+    configs_per_sec = len(q_HLIP) / tot_time_des
+    dt = 1.0 / configs_per_sec
+    for i in range(len(q_HLIP)):
+
+        # Wait for the next state estimate        
+        time.sleep(dt)
+
+        # Set the Drake model to have this state
+        q0 = q_HLIP[i]
+        plant.SetPositions(plant_context, q0)
+
+        # Set the time in the Drake diagram. This will allow meshcat playback to work.
+        time_elapsed += dt
+        diagram_context.SetTime(time_elapsed)
+
+        # Perform a forced publish event. This will propagate the plant's state to 
+        # meshcat, without doing any physics simulation.
+        diagram.ForcedPublish(diagram_context)
+
+    # Publish the meshcat recording
+    meshcat.StopRecording()
+    meshcat.PublishRecording()
+
 
 
 

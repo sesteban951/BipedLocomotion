@@ -312,18 +312,12 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
     def set_parameters(self, z_nom, z_apex, bezier_order, T_SSP, dt, N):
 
         # make sure that N is non-zero
-        assert N > 1, "N must be an integer greater than 1."
+        assert N > 2, "N must be an integer greater than 2."
 
         # set time paramters
         self.T_SSP = T_SSP
         self.T_DSP = 0.0   # double support phase
         self.T = self.T_SSP + self.T_DSP
-
-        # check if T_SSP is a multiple of dt (desirable)
-        result = self.T_SSP / dt
-        is_divisible = abs(round(result) - result) < 1e-6
-        msg = "T_SSP must be a multiple of dt. You have T_SSP = {} and dt = {}".format(self.T_SSP, dt)
-        assert is_divisible, msg
 
         # set the total horizon length
         self.dt = dt
