@@ -87,7 +87,7 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 20
+    problem.num_steps = 15
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
@@ -203,7 +203,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
         self.q_stand = standing_position()
 
         # computing the alpha value based on speed
-        p = 1.0
+        p = 0.8
         self.alpha = lambda v: ((1/self.v_max) * abs(v)) ** p
 
         # index of w/ arm leg config and w/o arm leg config
@@ -288,7 +288,8 @@ class AchillesPlanarMPC(ModelPredictiveController):
             v_HLIP[i][0] = vx_des
 
         # compute alpha
-        a = self.alpha(v0[0])
+        # a = self.alpha(v0[0])
+        a = self.alpha(vx_des)
 
         # convex combination of the standing position and the nominal trajectory
         q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
@@ -396,7 +397,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(20.0)
+    simulator.AdvanceTo(10.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")

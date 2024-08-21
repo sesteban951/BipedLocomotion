@@ -148,7 +148,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
             else:
                 I.append(time_set)
                 time_set = []
-                t = 0.0
+                t = round(t + self.dt, 5) - self.T_SSP
         
         if len(time_set) > 0:
             I.append(time_set)
@@ -223,7 +223,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
             p_foot_pos_list.append(p_foot_pos_info)
             stance_name_list.append(self.stance_foot_frame.name())
 
-            # update the feet position info NOTE: I need to reason about the y-direction at some point
+            # update the feet position info
             self.switch_foot_roles()
             self.p_control_stance_W = np.array([p_swing_target[0], p_swing_target[1], [0]])
             
@@ -232,9 +232,17 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
             else:
                 self.p_swing_init_W = p_stance_temp
 
-            # set the new intial condition
-            px_R = px_R_minus - ux
-            vx_R = vx_R_minus
+            # prepare for the intial condition of the next time step
+            if k < len(L) - 1:
+                # compute the postimpact state of the Robot LIP model
+                px_R = px_R_minus - ux
+                vx_R = vx_R_minus
+                x0 = np.array([px_R, vx_R]).reshape(2,1)
+
+                # forward prop up to the first time in the next time step
+                xt = sp.linalg.expm(self.A * (I[k+1][0])) @ x0
+                px_R = xt[0][0]
+                vx_R = xt[1][0]
 
         return C, p_foot_pos_list, stance_name_list
 
@@ -285,13 +293,16 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
     # -------------------------------------------------------------------------------------------------- #
 
     # compute the velocity reference
-    def compute_velocity_reference(self, q_ref):
+    def compute_velocity_reference(self, q_ref, v0):
 
         # do finite difference, v_k = (q_k - q_k-1) / dt
         v_ref = []
-        for i in range(len(q_ref)):
-            v_k = (q_ref[i] - q_ref[i-1]) / self.dt
-            v_ref.append(v_k)
+        for k in range(len(q_ref)):
+            if k == 0:
+                v_ref.append(np.array(v0))
+            else:
+                v_k = (q_ref[k] - q_ref[k-1]) / self.dt
+                v_ref.append(v_k)
 
         return v_ref
 
@@ -408,7 +419,7 @@ class HLIPTrajectoryGeneratorSE2(LeafSystem):
                     print("IK problem failed at time: {}, index {}".format(t, i))
 
         # get the velocity reference
-        v_ref = self.compute_velocity_reference(q_ref)
+        v_ref = self.compute_velocity_reference(q_ref, v0)
 
         # return the trajectory
         return q_ref, v_ref

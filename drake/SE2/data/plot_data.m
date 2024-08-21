@@ -113,7 +113,7 @@ joint_titles = {"Hip Left Pitch", "Knee Left Pitch", "Foot Left Pitch", "Hip Rig
 
 % plot individual phase plots
 figure('Name', 'Phase Plots');
-joint_idx = 5;  % Left Hip Pitch (3), Left Knee Pitch (4), Left Foot Pitch (5), 
+joint_idx = 4;  % Left Hip Pitch (3), Left Knee Pitch (4), Left Foot Pitch (5), 
                 % Right Hip Pitch (6), Right Knee Pitch (7), Right Foot Pitch (8)
 q_data = q_data(:, joint_idx);
 v_data = v_data(:, joint_idx);
