@@ -20,7 +20,8 @@ from pydrake.all import (
     JointActuatorIndex,
     PdControllerGains,
     BasicVector,
-    MultibodyPlant
+    MultibodyPlant,
+    VectorLogSink
 )
 
 import time
@@ -152,11 +153,9 @@ class AchillesPlanarMPC(ModelPredictiveController):
     A Model Predictive Controller for the Achilles humanoid.
     """
     def __init__(self, optimizer, q_guess, mpc_rate, model_file_arms):
-        
-        nq = q_guess[0].shape[0]
 
         # inherit from the ModelPredictiveController class
-        ModelPredictiveController.__init__(self, optimizer, q_guess, nq, nq, mpc_rate)
+        ModelPredictiveController.__init__(self, optimizer, q_guess, 9, 9, mpc_rate)
 
         self.joystick_port = self.DeclareVectorInputPort("joy_command",
                                                          BasicVector(5))  # LS_x, LS_y, RS_x, A button, RT (Xbox)
@@ -359,6 +358,12 @@ if __name__=="__main__":
     Bq = N@Bv
     interpolator = builder.AddSystem(Interpolator(Bq.T, Bv.T))
 
+    # Logger to record the robot state
+    logger = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
+    builder.Connect(
+            plant.get_state_output_port(), 
+            logger.get_input_port())
+
     # Wire the systems together
     builder.Connect(
         plant.get_state_output_port(), 
@@ -403,3 +408,17 @@ if __name__=="__main__":
            f"wall time: {wall_time:.4f}")
     meshcat.StopRecording()
     meshcat.PublishRecording()
+
+    # unpack recorded data from the logger
+    log = logger.FindLog(diagram_context)
+    times = log.sample_times()
+    states = log.data().T
+
+    print(times.shape)
+    print(states.shape)
+
+    # save the data to a CSV file
+    with open('./data/data_SE2_arms.csv', mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(times)):
+            writer.writerow([times[i]] + list(states[i]))

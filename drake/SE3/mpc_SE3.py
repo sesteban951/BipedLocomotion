@@ -20,7 +20,8 @@ from pydrake.all import (
     JointActuatorIndex,
     PdControllerGains,
     BasicVector,
-    MultibodyPlant
+    MultibodyPlant,
+    VectorLogSink
 )
 
 import time
@@ -35,6 +36,8 @@ from pyidto import (
     ProblemDefinition,
     FindIdtoResource,
 )
+
+from trajectory_generator_SE3 import HLIPTrajectoryGeneratorSE3
 
 import sys, os
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -242,6 +245,12 @@ if __name__=="__main__":
     N = plant.MakeVelocityToQDotMap(plant.CreateDefaultContext())
     Bq = N@Bv
     interpolator = builder.AddSystem(Interpolator(Bq.T, Bv.T))
+
+    # Logger to record the robot state
+    logger = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
+    builder.Connect(
+            plant.get_state_output_port(), 
+            logger.get_input_port())
     
     # Wire the systems together
     builder.Connect(
@@ -287,3 +296,14 @@ if __name__=="__main__":
            f"wall time: {wall_time:.4f}")
     meshcat.StopRecording()
     meshcat.PublishRecording()
+
+    # unpack recorded data from the logger
+    log = logger.FindLog(diagram_context)
+    times = log.sample_times()
+    states = log.data().T
+
+    # save the data to a CSV file
+    with open('./data/data_SE3.csv', mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(times)):
+            writer.writerow([times[i]] + list(states[i]))

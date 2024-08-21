@@ -63,8 +63,8 @@ class HLIPTrajectoryGeneratorSE3(LeafSystem):
         self.vy_des = None
 
         # period 2 feedforward foot placements
-        self.u_L_bias = 0.2   # left is swing foot, add this to the feedforward foot placement
-        self.u_R_bias = -0.2  # right is swing foot, add this to the feedforward foot placement
+        self.u_L_bias = 0.18   # left is swing foot, add this to the feedforward foot placement
+        self.u_R_bias = -0.18  # right is swing foot, add this to the feedforward foot placement
         self.u_L = None
         self.u_R = None
         
@@ -539,7 +539,7 @@ if __name__ == "__main__":
 
     # set the parameters
     traj_gen.set_parameters(z_nom=0.64, 
-                            z_apex=0.03, 
+                            z_apex=0.05, 
                             bezier_order=7, 
                             T_SSP=0.3, 
                             dt=0.01, 
@@ -571,7 +571,7 @@ if __name__ == "__main__":
     yaw = RollPitchYaw(R_stance).yaw_angle()
 
     # generate a trajectory
-    v_des = np.array([[-0.2], [-0.3]])
+    v_des = np.array([[0.], [-0.2]])
     t_phase = 0.0
     q_HLIP, v_HLIP = traj_gen.generate_trajectory(q0=q0,
                                                   v0=v0,

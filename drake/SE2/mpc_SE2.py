@@ -20,7 +20,8 @@ from pydrake.all import (
     JointActuatorIndex,
     PdControllerGains,
     BasicVector,
-    MultibodyPlant
+    MultibodyPlant,
+    VectorLogSink
 )
 
 import time
@@ -144,11 +145,9 @@ class AchillesPlanarMPC(ModelPredictiveController):
     A Model Predictive Controller for the Achilles humanoid.
     """
     def __init__(self, optimizer, q_guess, mpc_rate, model_file):
-        
-        nq = q_guess[0].shape[0]
 
         # inherit from the ModelPredictiveController class
-        ModelPredictiveController.__init__(self, optimizer, q_guess, nq, nq, mpc_rate)
+        ModelPredictiveController.__init__(self, optimizer, q_guess, 9, 9, mpc_rate)
 
         self.joystick_port = self.DeclareVectorInputPort("joy_command",
                                                          BasicVector(5))  # LS_x, LS_y, RS_x, A button, RT (Xbox)
@@ -196,11 +195,6 @@ class AchillesPlanarMPC(ModelPredictiveController):
         # computing the alpha value based on speed
         p = 2.0
         self.alpha = lambda v: ((1/self.v_max) * abs(v)) ** p
-
-        # file handle for writing to CSV file
-        self.file_name = "./data/data_SE2.csv"
-        csv_file = open(self.file_name, mode='w', newline='')
-        self.csv_writer = csv.writer(csv_file)
 
     def UpdateFootInfo(self):
 
@@ -288,10 +282,6 @@ class AchillesPlanarMPC(ModelPredictiveController):
             # q_nom[i] = (1 - a) * q_HLIP[i] + a * q_stand[i]
             # v_nom[i] = (1 - a) * v_HLIP[i] + a * v_stand[i]
 
-        # log some data
-        data = [self.t_current] + q0.tolist() + v0.tolist()
-        self.csv_writer.writerow(data)
-
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 
 ############################################################################################################################
@@ -350,7 +340,13 @@ if __name__=="__main__":
     N = plant.MakeVelocityToQDotMap(plant.CreateDefaultContext())
     Bq = N@Bv
     interpolator = builder.AddSystem(Interpolator(Bq.T, Bv.T))
-    
+
+    # Logger to record the robot state
+    logger = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
+    builder.Connect(
+            plant.get_state_output_port(), 
+            logger.get_input_port())
+
     # Wire the systems together
     builder.Connect(
         plant.get_state_output_port(), 
@@ -395,3 +391,14 @@ if __name__=="__main__":
            f"wall time: {wall_time:.4f}")
     meshcat.StopRecording()
     meshcat.PublishRecording()
+
+    # unpack recorded data from the logger
+    log = logger.FindLog(diagram_context)
+    times = log.sample_times()
+    states = log.data().T
+
+    # save the data to a CSV file
+    with open('./data/data_SE2.csv', mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(times)):
+            writer.writerow([times[i]] + list(states[i]))
