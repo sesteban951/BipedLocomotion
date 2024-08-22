@@ -196,6 +196,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
         p = 2.0
         self.alpha = lambda v: ((1/self.v_max) * abs(v)) ** p
 
+    # update the foot info for the HLIP traj gen
     def UpdateFootInfo(self):
 
         # check if entered new step period
@@ -239,7 +240,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
 
         # Quit if the robot has fallen down
         base_height = q0[1]
-        assert base_height > 0.4, "Oh no, the robot fell over!"
+        assert base_height > 0.2, "Oh no, the robot fell over!"
 
         # Get the current time
         self.t_current = context.get_time()
