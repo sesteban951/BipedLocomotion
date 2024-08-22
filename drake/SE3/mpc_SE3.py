@@ -171,7 +171,8 @@ class AchillesMPC(ModelPredictiveController):
         z_apex = 0.08      # apex height
 
         # maximum velocity for the robot
-        self.v_max = 0.1
+        self.vx_max = 0.2
+        self.vy_max = 0.2
 
         # foot info variables
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
@@ -209,7 +210,6 @@ class AchillesMPC(ModelPredictiveController):
                                                            self.swing_foot_frame,
                                                            [0,0,0],
                                                            self.plant.world_frame())
-            
             # get the current stance yaw position of the robot
             R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
                                                              self.plant.world_frame(),
@@ -243,6 +243,7 @@ class AchillesMPC(ModelPredictiveController):
         """
         # Get the current state
         x0 = self.state_input_port.Eval(context)
+        self.plant.SetPositionsAndVelocities(self.plant_context, x0)
         q0 = x0[:self.nq]
         v0 = x0[self.nq:]
 
@@ -255,13 +256,9 @@ class AchillesMPC(ModelPredictiveController):
 
         # unpack the joystick commands
         joy_command = self.joystick_port.Eval(context)
-        vx_des =  joy_command[1] * self.v_max
-        vy_des =  -joy_command[0] * self.v_max
-        v_des = np.array([[vx_des], [vy_des]])
-        # v_des = np.array([[0], [0]])
-
-        # Update the foot info
-        self.UpdateFootInfo()
+        vx_des =  joy_command[1] * self.vx_max
+        vy_des =  -joy_command[0] * self.vy_max
+        v_des = np.array([[vx_des], [-vy_des]])
 
         # Get the desired MPC standing trajectory
         q_stand = [np.copy(self.q_stand) for i in range(self.optimizer.num_steps() + 1)]
@@ -272,33 +269,48 @@ class AchillesMPC(ModelPredictiveController):
             v_stand[i][3] = vx_des
             v_stand[i][4] = vy_des
 
-        # get a new reference trajectory
-        q_HLIP, v_HLIP = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
-                                                                v0 = v0,
-                                                                v_des = v_des,
-                                                                t_phase = self.t_phase,
-                                                                initial_swing_foot_pos = self.p_swing_init,
-                                                                stance_foot_pos = self.p_stance,
-                                                                stance_foot_yaw = self.control_stance_yaw,
-                                                                initial_stance_foot_name = self.stance_foot_frame.name())
-        for i in range(self.num_steps + 1):
-            q_HLIP[i][4] = q0[4] + vx_des * i * self.optimizer.time_step()
-            q_HLIP[i][5] = q0[5] + vy_des * i * self.optimizer.time_step()
-            v_HLIP[i][3] = vx_des
-            v_HLIP[i][4] = vy_des
+        # Update the foot info
+        self.UpdateFootInfo()
 
-        # compute alpha
-        v_norm = np.linalg.norm(v_des)
-        a = self.alpha(v_norm)
+        print("------------------------------------------------------------")
 
-        print(a)
+        print(self.t_phase)
+        print(self.stance_foot_frame.name())
+        # print(self.number_of_steps)
+        # print(self.control_stance_yaw)
+        print(self.p_stance)
+        # print(self.p_swing_init)
 
-        # convex combination of the standing position and the nominal trajectory
-        q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
-        v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
-        for i in range(self.optimizer.num_steps() + 1):
-            q_nom[i] = (1 - a) * q_stand[i] + a * q_HLIP[i]
-            v_nom[i] = (1 - a) * v_stand[i] + a * v_HLIP[i]
+        # # get a new reference trajectory
+        # q_HLIP, v_HLIP = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
+        #                                                         v0 = v0,
+        #                                                         v_des = v_des,
+        #                                                         t_phase = self.t_phase,
+        #                                                         initial_swing_foot_pos = self.p_swing_init,
+        #                                                         stance_foot_pos = self.p_stance,
+        #                                                         stance_foot_yaw = self.control_stance_yaw,
+        #                                                         initial_stance_foot_name = self.stance_foot_frame.name())
+        # for i in range(self.num_steps + 1):
+        #     q_HLIP[i][4] = q0[4] + vx_des * i * self.optimizer.time_step()
+        #     q_HLIP[i][5] = q0[5] + vy_des * i * self.optimizer.time_step()
+        #     v_HLIP[i][3] = vx_des
+        #     v_HLIP[i][4] = vy_des
+
+        # # compute alpha
+        # v_norm = np.linalg.norm(v_des)
+        # a = self.alpha(v_norm)
+
+        # # convex combination of the standing position and the nominal trajectory
+        # q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
+        # v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
+        # for i in range(self.optimizer.num_steps() + 1):
+        #     # q_nom[i] = (1 - a) * q_stand[i] + a * q_HLIP[i]
+        #     # v_nom[i] = (1 - a) * v_stand[i] + a * v_HLIP[i]
+        #     q_nom[i] = (1 - a) * q_HLIP[i] + a * q_stand[i]
+        #     v_nom[i] = (1 - a) * v_HLIP[i] + a * v_stand[i]
+
+        q_nom = q_stand
+        v_nom = v_stand
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 
@@ -400,7 +412,7 @@ if __name__=="__main__":
     meshcat.StartRecording()
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
-    simulator.set_target_realtime_rate(1.0)
+    simulator.set_target_realtime_rate(0.1)
     simulator.AdvanceTo(5.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
