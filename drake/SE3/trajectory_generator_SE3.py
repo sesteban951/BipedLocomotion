@@ -479,8 +479,8 @@ class HLIPTrajectoryGeneratorSE3():
         self.plant.SetVelocities(self.plant_context, v0)
 
         # set the desired velocity
-        self.vx_des = v_des[0][0]
-        self.vy_des = v_des[1][0]
+        self.vx_des =  v_des[0][0]
+        self.vy_des = -v_des[1][0] # TODO: why do I need the sign flip?
 
         # set the P2 orbit bias
         self.u_L = self.u_L_bias + self.vy_des * (self.T_SSP + self.T_DSP)
