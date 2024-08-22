@@ -301,9 +301,13 @@ class HLIPTrajectoryGeneratorSE2():
         # do finite difference, v_k = (q_k - q_k-1) / dt
         v_ref = []
         for k in range(len(q_ref)):
+
+            # finite difference
             if k < len(q_ref) - 1:
                 v_k = (q_ref[k+1] - q_ref[k]) / self.dt
                 v_ref.append(v_k)
+            
+            # last velocity is the same as the previous one
             else:
                 v_ref.append(v_k)
 

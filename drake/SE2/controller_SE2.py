@@ -150,7 +150,7 @@ class HLIP(LeafSystem):
                                           bezier_order = 7,
                                           T_SSP = self.T_SSP,
                                           dt = 0.05,
-                                          N = 5)
+                                          N = 2)
 
     ########################################################################################################
 
@@ -446,9 +446,9 @@ class HLIP(LeafSystem):
         q_des = np.array([q_ik[3], q_ik[4], q_ik[5],  # left leg: hip_pitch, knee, ankle
                           q_ik[6], q_ik[7], q_ik[8]]) # right leg: hip_pitch, knee, ankle
         # q_des = np.zeros(self.plant.num_actuators())
-        v_des = np.zeros(self.plant.num_actuators())
-        # v_des = np.array([v_ik[3], v_ik[4], v_ik[5],  # left leg: hip_pitch, knee, ankle
-        #                   v_ik[6], v_ik[7], v_ik[8]]) # right leg: hip_pitch, knee, ankle
+        # v_des = np.zeros(self.plant.num_actuators())
+        v_des = np.array([v_ik[3], v_ik[4], v_ik[5],  # left leg: hip_pitch, knee, ankle
+                          v_ik[6], v_ik[7], v_ik[8]]) # right leg: hip_pitch, knee, ankle
 
         x_des = np.block([q_des, v_des])
 
