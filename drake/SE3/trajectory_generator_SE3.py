@@ -558,7 +558,7 @@ class HLIPTrajectoryGeneratorSE3():
                 
                 # compute the swing foot target
                 b_t = b_swing.value(t)
-                p_swing_target_W = np.array([b_t[0], b_t[1], b_t[2]]) # NOTE: y-direction does not matter here
+                p_swing_target_W = np.array([b_t[0], b_t[1], b_t[2]]) 
 
                 # compute the COM position target
                 px_R = xt_R[k][0][0]
