@@ -301,10 +301,10 @@ class HLIPTrajectoryGeneratorSE2():
         # do finite difference, v_k = (q_k - q_k-1) / dt
         v_ref = []
         for k in range(len(q_ref)):
-            if k == 0:
-                v_ref.append(np.array(v0))
+            if k < len(q_ref) - 1:
+                v_k = (q_ref[k+1] - q_ref[k]) / self.dt
+                v_ref.append(v_k)
             else:
-                v_k = (q_ref[k] - q_ref[k-1]) / self.dt
                 v_ref.append(v_k)
 
         return v_ref
@@ -315,7 +315,7 @@ class HLIPTrajectoryGeneratorSE2():
     def set_parameters(self, z_nom, z_apex, bezier_order, T_SSP, dt, N):
 
         # make sure that N is non-zero
-        assert N > 2, "N must be an integer greater than 2."
+        assert N >= 1, "N must be an integer >= 1."
 
         # set time paramters
         self.T_SSP = T_SSP

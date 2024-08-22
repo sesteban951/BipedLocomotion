@@ -2,6 +2,7 @@
 from pydrake.all import *
 import numpy as np
 import scipy as sp
+from trajectory_generator_SE3 import HLIPTrajectoryGeneratorSE3
 
 class HLIP(LeafSystem):
 
@@ -159,6 +160,15 @@ class HLIP(LeafSystem):
         self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
                                                                     self.plant.world_frame(), [1, 0, 0],
                                                                     0, 0)
+        
+        # instantiate the trajectory generator for HLIP trajectory
+        self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE3(model_file)
+        self.traj_gen_HLIP.set_parameters(z_nom = self.z_nom,
+                                          z_apex = self.z_apex,
+                                          bezier_order = 7,
+                                          T_SSP = self.T_SSP,
+                                          dt = 0.05,
+                                          N = 2)
 
     ########################################################################################################
 
@@ -552,29 +562,45 @@ class HLIP(LeafSystem):
 
         # update everything
         self.update_foot_role()
-        self.update_hlip_state_H()
-        self.update_hlip_state_R()
+        # self.update_hlip_state_H()
+        # self.update_hlip_state_R()
 
-        # compute desired swing foot trajectory
-        p_swing_W = self.update_foot_traj()
+        # generate trajectory
+        q0 = x_hat[:self.plant.num_positions()]
+        v0 = x_hat[self.plant.num_positions():]
+        q_ref, v_ref = self.traj_gen_HLIP.generate_trajectory(q0=q0,
+                                                              v0=v0,
+                                                              v_des = np.array([[self.v_des_x], [self.v_des_y]]),
+                                                              t_phase = self.t_phase,
+                                                              initial_swing_foot_pos=self.p_swing_init_W,
+                                                              stance_foot_pos=self.p_control_stance_W,
+                                                              stance_foot_yaw=self.control_stance_yaw,
+                                                              initial_stance_foot_name=self.stance_foot_frame.name())
+        q_ik = q_ref[0]                                                                            
+        v_ik = v_ref[0]
 
-        # solve the IK problem
-        res = self.DoInverseKinematics(p_swing_W)
+        # # compute desired swing foot trajectory
+        # p_swing_W = self.update_foot_traj()
 
-        # extract the IK solution
-        if res.is_success():
-            q_ik = res.GetSolution(self.ik.q())
-            self.q_ik_sol = q_ik
-        else:
-            q_ik = self.plant.GetPositions(self.plant_context)
-            print("\n ************* IK failed! ************* \n")
+        # # solve the IK problem
+        # res = self.DoInverseKinematics(p_swing_W)
 
-        # compute the nominal state
+        # # extract the IK solution
+        # if res.is_success():
+        #     q_ik = res.GetSolution(self.ik.q())
+        #     self.q_ik_sol = q_ik
+        # else:
+        #     q_ik = self.plant.GetPositions(self.plant_context)
+        #     print("\n ************* IK failed! ************* \n")
+
+        # # compute the nominal state
         q_des = np.array([q_ik[7],  q_ik[8],  q_ik[9],  q_ik[10], q_ik[11],  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle 
                           q_ik[12], q_ik[13], q_ik[14], q_ik[15], q_ik[16]]) # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
         # q_des = np.array([0, 0, 0, 0, 0, 
         #                   0, 0, 0, 0, 0])
-        v_des = np.zeros(self.plant.num_actuators())
+        # v_des = np.zeros(self.plant.num_actuators())
+        v_des = np.array([v_ik[6],  v_ik[7],  v_ik[8],  v_ik[9], v_ik[10],  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle 
+                          v_ik[11], v_ik[12], v_ik[13], v_ik[14], v_ik[15]]) # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
         x_des = np.block([q_des, v_des])
 
         output.SetFromVector(x_des)

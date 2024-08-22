@@ -60,8 +60,8 @@ class HLIPTrajectoryGeneratorSE3():
         self.vy_des = None
 
         # period 2 feedforward foot placements
-        self.u_L_bias = 0.18   # left is swing foot, add this to the feedforward foot placement
-        self.u_R_bias = -0.18  # right is swing foot, add this to the feedforward foot placement
+        self.u_L_bias = 0.28   # left is swing foot, add this to the feedforward foot placement
+        self.u_R_bias = -0.28  # right is swing foot, add this to the feedforward foot placement
         self.u_L = None
         self.u_R = None
         
@@ -409,24 +409,26 @@ class HLIPTrajectoryGeneratorSE3():
     # compute the velocity reference
     def compute_velocity_reference(self, q_ref, v0):
 
-        # TODO: must handle quaternions correctly, I worked out the required Lie Algebra math -- need to implement!!!!!
         # do finite difference, v_k = (q_k - q_k-1) / dt
         v_ref = []
         for k in range(len(q_ref)):
-            if k == 0:
-                v_ref.append(np.array(v0))
-            else:
-                
+            
+            # finite difference
+            if k < len(q_ref) - 1:
                 # handle the quaternion velocities
-                quat1 = q_ref[k-1][:4]
-                quat2 = q_ref[k][:4]
+                quat1 = q_ref[k][:4]
+                quat2 = q_ref[k+1][:4]
                 omega_k = self.compute_omega(quat1, quat2)
 
                 # handel all other euclidean velocities
-                vel_k = (q_ref[k][4:] - q_ref[k-1][4:]) / self.dt
+                vel_k = (q_ref[k+1][4:] - q_ref[k][4:]) / self.dt
 
                 # combine them and add to list
                 v_k = np.concatenate((omega_k, vel_k))
+                v_ref.append(v_k)
+            
+            # last velocity is the same as the previous one
+            else:
                 v_ref.append(v_k)
 
         return v_ref
@@ -437,7 +439,7 @@ class HLIPTrajectoryGeneratorSE3():
     def set_parameters(self, z_nom, z_apex, bezier_order, T_SSP, dt, N):
 
         # make sure that N is non-zero
-        assert N > 2, "N must be an integer greater than 2."
+        assert N >= 1, "N must be an integer >= 1."
 
         # set time paramters
         self.T_SSP = T_SSP
