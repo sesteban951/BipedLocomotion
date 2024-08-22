@@ -60,8 +60,8 @@ class HLIPTrajectoryGeneratorSE3():
         self.vy_des = None
 
         # period 2 feedforward foot placements
-        self.u_L_bias = 0.28   # left is swing foot, add this to the feedforward foot placement
-        self.u_R_bias = -0.28  # right is swing foot, add this to the feedforward foot placement
+        self.u_L_bias = 0.2   # left is swing foot, add this to the feedforward foot placement
+        self.u_R_bias = -0.2  # right is swing foot, add this to the feedforward foot placement
         self.u_L = None
         self.u_R = None
         
@@ -480,7 +480,7 @@ class HLIPTrajectoryGeneratorSE3():
 
         # set the desired velocity
         self.vx_des =  v_des[0][0]
-        self.vy_des = -v_des[1][0] # TODO: why do I need the sign flip?
+        self.vy_des = -v_des[1][0] # TODO: why do I need the sign flip?!!!!!!!!!!!!!!!!!
 
         # set the P2 orbit bias
         self.u_L = self.u_L_bias + self.vy_des * (self.T_SSP + self.T_DSP)

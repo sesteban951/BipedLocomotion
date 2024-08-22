@@ -155,7 +155,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
     def __init__(self, optimizer, q_guess, mpc_rate, model_file_arms):
 
         # inherit from the ModelPredictiveController class
-        ModelPredictiveController.__init__(self, optimizer, q_guess, 9, 9, mpc_rate)
+        ModelPredictiveController.__init__(self, optimizer, q_guess, 13, 13, mpc_rate)
 
         self.joystick_port = self.DeclareVectorInputPort("joy_command",
                                                          BasicVector(5))  # LS_x, LS_y, RS_x, A button, RT (Xbox)

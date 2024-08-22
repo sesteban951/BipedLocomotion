@@ -191,7 +191,6 @@ class HLIP(LeafSystem):
         self.meshcat.SetTransform("stance_y", RigidTransform(Ry, p + py), self.t_current)
         self.meshcat.SetTransform("stance_z", RigidTransform(Rz, p + pz), self.t_current)
 
-
     # ---------------------------------------------------------------------------------------- #
     # update which foot should be swing and which one is stance
     def update_foot_role(self):
