@@ -87,7 +87,7 @@ t_end = t_data(end);
 idx = 2;
 
 % num_points_to_keep = length(t_data);
-num_points_to_keep = 50;
+num_points_to_keep = 75;
 line_objects = []; % Initialize an empty list to store line objects
 
 while idx <= length(t_data)

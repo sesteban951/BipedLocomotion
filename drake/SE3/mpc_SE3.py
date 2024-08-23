@@ -94,14 +94,14 @@ def create_optimizer(model_file):
     
     # no arms
     problem.Qq = np.diag([
-        10.0, 10.0, 10.0, 10.0,   # base orientation
-        10.0, 10.0, 20.0,         # base position
-        8.1, 8.1, 8.1, 8.1, 8.1,  # left leg
-        8.1, 8.1, 8.1, 8.1, 8.1   # left leg
+        17.0, 17.0, 17.0, 17.0,   # base orientation
+        17.0, 17.0, 17.0,         # base position
+        9.0, 9.0, 9.0, 9.0, 9.0,  # left leg
+        9.0, 9.0, 9.0, 9.0, 9.0   # left leg
     ])
     problem.Qv = np.diag([
         10.0, 10.0, 10.0,         # base orientation
-        10.0, 10.0, 1.0,         # base position
+        10.0, 10.0, 1.0,          # base position
         3.1, 3.1, 3.1, 3.1, 1.1,  # left leg
         3.1, 3.1, 3.1, 3.1, 1.1   # right leg
     ])
@@ -163,7 +163,7 @@ class AchillesMPC(ModelPredictiveController):
         # time parameters
         self.t_current = 0.0       # current sim time
         self.t_phase = 0.0         # current phase time
-        self.T_SSP = 0.3           # swing phase duration
+        self.T_SSP = 0.35           # swing phase duration
         self.number_of_steps = -1   # number of individual swing foot steps taken
 
         # z height parameters
@@ -200,7 +200,7 @@ class AchillesMPC(ModelPredictiveController):
         self.q_stand = standing_position()
 
         # computing the alpha value based on speed
-        p = 3.0
+        p = 1.0
         self.alpha = lambda v_des: ((1/self.v_max) * v_des) ** p
 
     # update the foot info for the HLIP traj gen
@@ -289,10 +289,10 @@ class AchillesMPC(ModelPredictiveController):
 
         # unpack the joystick commands
         joy_command = self.joystick_port.Eval(context)
-        vx_des =  joy_command[1] * self.v_max
-        vy_des = -joy_command[0] * self.v_max
+        vx_des =  joy_command[1] * self.v_max  # (+) ^ up and down v (-)
+        vy_des = -joy_command[0] * self.v_max  # (+) <---- left and right ----> (-)
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
-        v_des = np.array([[0.0], [0.0]]) # in local stance foot frame
+        # v_des = np.array([[0.0], [0.0]]) # in local stance foot frame
 
         # Get the desired MPC standing trajectory
         q_stand = [np.copy(self.q_stand) for i in range(self.optimizer.num_steps() + 1)]
@@ -322,36 +322,36 @@ class AchillesMPC(ModelPredictiveController):
                                                                 stance_foot_pos = self.p_stance,
                                                                 stance_foot_yaw = self.control_stance_yaw,
                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
-        # for i in range(self.num_steps + 1):
-        #     q_HLIP[i][0] = self.quat_stance.w()
-        #     q_HLIP[i][1] = self.quat_stance.x()
-        #     q_HLIP[i][2] = self.quat_stance.y()
-        #     q_HLIP[i][3] = self.quat_stance.z()
+        for i in range(self.num_steps + 1):
+            q_HLIP[i][0] = self.quat_stance.w()
+            q_HLIP[i][1] = self.quat_stance.x()
+            q_HLIP[i][2] = self.quat_stance.y()
+            q_HLIP[i][3] = self.quat_stance.z()
             
-        #     p_increment = self.R_stance_2D @ (v_des * i * self.optimizer.time_step())
-        #     q_HLIP[i][4] = q0[4] + p_increment[0][0]
-        #     q_HLIP[i][5] = q0[5] + p_increment[1][0]
-        #     v_HLIP[i][3] = v_des_W[0][0]
-        #     v_HLIP[i][4] = v_des_W[1][0]
+            p_increment = self.R_stance_2D @ (v_des * i * self.optimizer.time_step())
+            q_HLIP[i][4] = q0[4] + p_increment[0][0]
+            q_HLIP[i][5] = q0[5] + p_increment[1][0]
+            v_HLIP[i][3] = v_des_W[0][0]
+            v_HLIP[i][4] = v_des_W[1][0]
 
         # compute alpha
-        # v_norm = np.linalg.norm(v_des)
-        # a = self.alpha(v_norm)
-        # print(f"alpha: {a}")
+        v_norm = np.linalg.norm(v_des)
+        a = self.alpha(v_norm)
+        print(f"alpha: {a}")
 
         # # convex combination of the standing position and the nominal trajectory
-        # q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
-        # v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
-        # for i in range(self.optimizer.num_steps() + 1):
-        #     # q_nom[i] = (1 - a) * q_stand[i] + a * q_HLIP[i]
-        #     # v_nom[i] = (1 - a) * v_stand[i] + a * v_HLIP[i]
-        #     q_nom[i] = (1 - a) * q_HLIP[i] + a * q_stand[i]
-        #     v_nom[i] = (1 - a) * v_HLIP[i] + a * v_stand[i]
+        q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
+        v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
+        for i in range(self.optimizer.num_steps() + 1):
+            q_nom[i] = (1 - a) * q_stand[i] + a * q_HLIP[i]
+            v_nom[i] = (1 - a) * v_stand[i] + a * v_HLIP[i]
+            # q_nom[i] = (1 - a) * q_HLIP[i] + a * q_stand[i]
+            # v_nom[i] = (1 - a) * v_HLIP[i] + a * v_stand[i]
 
         # q_nom = q_stand
         # v_nom = v_stand
-        q_nom = q_HLIP
-        v_nom = v_HLIP
+        # q_nom = q_HLIP
+        # v_nom = v_HLIP
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 
