@@ -52,16 +52,16 @@ class HLIPTrajectoryGeneratorSE3():
         self.zf_offset = 0.0
 
         # clip the swing foot target position
-        self.ux_max = 0.4
-        self.uy_max = 0.4
+        self.ux_max = 0.5
+        self.uy_max = 0.5
 
         # maximum velocity
         self.vx_des = None
         self.vy_des = None
 
         # period 2 feedforward foot placements
-        self.u_L_bias = 0.2   # left is swing foot, add this to the feedforward foot placement
-        self.u_R_bias = -0.2  # right is swing foot, add this to the feedforward foot placement
+        self.u_L_bias = 0.22   # left is swing foot, add this to the feedforward foot placement
+        self.u_R_bias = -0.22  # right is swing foot, add this to the feedforward foot placement
         self.u_L = None
         self.u_R = None
         
@@ -478,7 +478,7 @@ class HLIPTrajectoryGeneratorSE3():
         self.plant.SetPositions(self.plant_context, q0)
         self.plant.SetVelocities(self.plant_context, v0)
 
-        # set the desired velocity
+        # set the desired velocity (this is the desired velocity in body frame)
         self.vx_des =  v_des[0][0]
         self.vy_des = -v_des[1][0] # TODO: why do I need the sign flip?!!!!!!!!!!!!!!!!!
 
@@ -605,12 +605,17 @@ if __name__ == "__main__":
                             z_apex=0.05, 
                             bezier_order=7, 
                             T_SSP=0.3, 
-                            dt=0.02, 
+                            dt=0.05, 
                             N=400)
+
+    deg = 45
+    orient = RollPitchYaw(0, 0, deg * np.pi / 180)
+    quat = orient.ToQuaternion()
+    print(quat)
 
     # initial condition 
     q0 = np.array([
-        1.0000, 0.0000, 0.0000, 0.0000,            # base orientation, (w, x, y, z)
+        quat.w(), quat.x(), quat.y(), quat.z(),            # base orientation, (w, x, y, z)
         0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
         0.0000,  0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
         0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
@@ -636,7 +641,7 @@ if __name__ == "__main__":
     yaw = RollPitchYaw(R_stance).yaw_angle()
 
     # generate a trajectory
-    v_des = np.array([[0.], [-0.2]])
+    v_des = np.array([[0], [-0.2]])
     t_phase = 0.0
 
     t0 = time.time()
