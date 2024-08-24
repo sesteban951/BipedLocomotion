@@ -71,13 +71,13 @@ def create_optimizer(model_file):
 
     # Create the system diagram that the optimizer uses
     builder = DiagramBuilder()
-    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.05)
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.01)
     Parser(plant).AddModels(model_file)
     plant.RegisterCollisionGeometry(
         plant.world_body(), 
         RigidTransform(p=[0, 0, -25]), 
         Box(50, 50, 50), "ground", 
-        CoulombFriction(0.7, 0.7))
+        CoulombFriction(0.5, 0.5))
     plant.Finalize()
     diagram = builder.Build()
 
@@ -94,8 +94,8 @@ def create_optimizer(model_file):
     
     # no arms
     problem.Qq = np.diag([
-        17.0, 17.0, 17.0, 17.0,   # base orientation
-        17.0, 17.0, 17.0,         # base position
+        18.0, 18.0, 18.0, 18.0,   # base orientation
+        18.0, 18.0, 18.0,         # base position
         9.0, 9.0, 9.0, 9.0, 9.0,  # left leg
         9.0, 9.0, 9.0, 9.0, 9.0   # left leg
     ])
@@ -163,13 +163,13 @@ class AchillesMPC(ModelPredictiveController):
         # time parameters
         self.t_current = 0.0       # current sim time
         self.t_phase = 0.0         # current phase time
-        self.T_SSP = 0.35           # swing phase duration
+        self.T_SSP = 0.3           # swing phase duration
         self.number_of_steps = -1   # number of individual swing foot steps taken
 
         # z height parameters
-        z_com_nom = 0.62   # nominal CoM height
+        z_com_nom = 0.64   # nominal CoM height
         bezier_order = 7   # 5 or 7
-        z_apex = 0.05      # apex height
+        z_apex = 0.08      # apex height
 
         # maximum velocity for the robot
         self.v_max = 0.2
@@ -373,7 +373,7 @@ if __name__=="__main__":
         plant.world_body(), 
         RigidTransform(p=[0, 0, -25]), 
         Box(50, 50, 50), "ground", 
-        CoulombFriction(0.5, 0.5))
+        CoulombFriction(0.9, 0.9))
 
     # Add implicit PD controllers (must use kLagged or kSimilar)
     kp_hip = 850

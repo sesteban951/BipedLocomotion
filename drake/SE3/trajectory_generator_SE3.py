@@ -602,11 +602,11 @@ if __name__ == "__main__":
 
     # set the parameters
     traj_gen.set_parameters(z_nom=0.64, 
-                            z_apex=0.05, 
+                            z_apex=0.07, 
                             bezier_order=7, 
                             T_SSP=0.3, 
                             dt=0.05, 
-                            N=400)
+                            N=200)
 
     deg = 45
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
@@ -641,7 +641,7 @@ if __name__ == "__main__":
     yaw = RollPitchYaw(R_stance).yaw_angle()
 
     # generate a trajectory
-    v_des = np.array([[0], [-0.2]])
+    v_des = np.array([[0.2], [-0.2]])
     t_phase = 0.0
 
     t0 = time.time()

@@ -38,7 +38,7 @@ class HLIP(LeafSystem):
         self.DeclareVectorOutputPort("x_des",
                                      BasicVector(2 * self.plant.num_actuators()),
                                      self.CalcOutput)
-    
+
         # relevant frames
         self.static_com_frame = self.plant.GetFrameByName("static_com") # nominal is 0.734 z in world frame
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
@@ -50,7 +50,7 @@ class HLIP(LeafSystem):
         self.p_stance = np.zeros(3)
         self.p_swing_init = np.zeros(3)
 
-        # for updating number of steps amd switching foot stance/swing
+        # for updating number of steps and switching foot stance/swing
         self.update_foot_role_flag = True
         self.num_steps = 0
 
@@ -78,8 +78,8 @@ class HLIP(LeafSystem):
         self.v_R_minus = 0
 
         # y-direction foot palcement offsets
-        self.u_L_bias =  0.28   # left is swing foot, add this to feedforawrd footplacement term
-        self.u_R_bias = -0.28   # right is swing foot, add this to feedforawrd footplacement term
+        self.u_L_bias =  0.2   # left is swing foot, add this to feedforawrd footplacement term
+        self.u_R_bias = -0.2   # right is swing foot, add this to feedforawrd footplacement term
 
         # swing foot parameters
         self.z_apex = 0.08    # NOTE: this is affected by bezier curve swing belnding
@@ -100,9 +100,7 @@ class HLIP(LeafSystem):
         self.v_max = 0.3
 
         # blending foot placement
-        self.alpha = 1.0
-        self.u_applied = 0
-        self.bez_order = 7
+        self.bez_order = 5
         self.switched_stance_foot = False
 
         # timing variables
@@ -114,12 +112,12 @@ class HLIP(LeafSystem):
         self.q_ik_sol = np.zeros(self.plant.num_positions())
 
         # inverse kinematics solver settings
-        epsilon_feet = 0.00     # foot position tolerance     [m]
-        epsilon_base = 0.00     # torso position tolerance    [m]
-        foot_epsilon_orient = 0.   # foot orientation tolerance  [deg]
-        base_epsilon_orient = 0.   # torso orientation tolerance [deg]
-        self.tol_base = np.array([[np.inf], [epsilon_base], [epsilon_base]])  # y-z only
-        self.tol_feet = np.array([[epsilon_feet], [epsilon_feet], [epsilon_feet]])  # y-z only
+        epsilon_feet = 0.005     # foot position tolerance     [m]
+        epsilon_base = 0.005     # torso position tolerance    [m]
+        foot_epsilon_orient = 5.0   # foot orientation tolerance  [deg]
+        base_epsilon_orient = 5.0   # torso orientation tolerance [deg]
+        self.tol_base = np.array([[np.inf], [epsilon_base], [epsilon_base]])        # y-z only
+        self.tol_feet = np.array([[np.inf], [epsilon_feet], [epsilon_feet]])  # y-z only
 
         # Add com position constraint
         self.p_com_cons = self.ik.AddPositionConstraint(self.static_com_frame, [0, 0, 0], 
@@ -281,8 +279,6 @@ class HLIP(LeafSystem):
     def update_foot_placement(self):
 
         # x-direction [p, v]
-        px = self.p_R[1]
-        vx = self.v_R[1]
         px_R_minus = self.p_R_minus
         vx_R_minus = self.v_R_minus
         px_H_minus = self.p_H_minus
@@ -295,15 +291,6 @@ class HLIP(LeafSystem):
             u += self.u_L
         elif self.swing_foot_frame == self.right_foot_frame:
             u += self.u_R
-
-        # # check if in new step period
-        # if self.switched_stance_foot == True:
-        #     # reset the filter (blending history)
-        #     self.u_applied = u
-        #     self.switched_stance_foot = False
-        # else:
-        #     # compute the blended foot placement
-        #     self.u_applied = self.alpha * u + (1 - self.alpha) * self.u_applied
 
         return u
 
@@ -328,7 +315,7 @@ class HLIP(LeafSystem):
         # set the primary control points
         ctrl_pts = np.vstack((ctrl_pts_y.T, 
                               ctrl_pts_z.T))
-        
+
         # evaluate bezier at time t
         bezier = BezierCurve(0, self.T_SSP, ctrl_pts)
         b = np.array(bezier.value(self.t_phase))
@@ -340,14 +327,6 @@ class HLIP(LeafSystem):
         stance_target = np.array([0.0, 
                                   self.p_stance[1][0], 
                                   self.z_offset])[None].T
-        
-        # linearly interpolate the current swnig foot position with the primary target
-        # alpha = self.t_phase / self.T_SSP
-        # p_swing_current = self.plant.CalcPointsPositions(self.plant_context,
-        #                                                  self.swing_foot_frame,
-        #                                                  [0,0,0],
-        #                                                  self.plant.world_frame())
-        # swing_target = (1 - alpha) * p_swing_current + (alpha) * primary_swing_target
         swing_target = primary_swing_target
 
         # left foot in swing
@@ -359,8 +338,8 @@ class HLIP(LeafSystem):
             p_right = swing_target
             p_left = stance_target
 
-        self.meshcat.SetTransform("p_right", RigidTransform([0.0, p_right[1][0], p_right[2][0]]), self.t_current)        
-        self.meshcat.SetTransform("p_left", RigidTransform([0.0, p_left[1][0], p_left[2][0]]), self.t_current)
+        self.meshcat.SetTransform("p_right", RigidTransform([p_right[0][0], p_right[1][0], p_right[2][0]]), self.t_current)        
+        self.meshcat.SetTransform("p_left", RigidTransform([p_left[0][0], p_left[1][0], p_left[2][0]]), self.t_current)
 
         return p_right, p_left
     
@@ -373,13 +352,21 @@ class HLIP(LeafSystem):
                                                         self.static_com_frame,
                                                         [0,0,0],
                                                         self.plant.world_frame())
-        p_static_com_target = np.array([[0], p_static_com_W[1], [self.z_nom]])
+        # p_static_com_target = np.array([p_static_com_W[0], p_static_com_W[1], [self.z_nom]])
+        p_static_com_target = p_static_com_W
+
         self.p_com_cons.evaluator().UpdateLowerBound(p_static_com_target - self.tol_base)
         self.p_com_cons.evaluator().UpdateUpperBound(p_static_com_target + self.tol_base)
 
-        print("p_static_com_target: ", p_static_com_target)
-
         # Update constraints on the positions of the feet
+        # p_left = self.plant.CalcPointsPositions(self.plant_context,
+        #                                         self.left_foot_frame,
+        #                                         [0,0,0],
+        #                                         self.plant.world_frame())
+        # p_right = self.plant.CalcPointsPositions(self.plant_context,
+        #                                          self.right_foot_frame,
+        #                                          [0,0,0],
+        #                                          self.plant.world_frame())
         p_left_lb = p_left - self.tol_feet
         p_left_ub = p_left + self.tol_feet
         p_right_lb = p_right - self.tol_feet
@@ -389,12 +376,13 @@ class HLIP(LeafSystem):
         self.p_right_cons.evaluator().UpdateLowerBound(p_right_lb)
         self.p_right_cons.evaluator().UpdateUpperBound(p_right_ub)
 
-        print("p_left: ", p_left)
-        print("p_right: ", p_right)
+        # print("p_left: ", p_left)
+        # print("p_right: ", p_right)
 
         # solve the IK problem        
-        initial_guess = self.plant.GetPositions(self.plant_context)
+        # initial_guess = self.plant.GetPositions(self.plant_context)
         # initial_guess = self.q_ik_sol
+        initial_guess = np.zeros(self.plant.num_positions())
         self.ik.prog().SetInitialGuess(self.ik.q(), initial_guess)
         res = SnoptSolver().Solve(self.ik.prog())
         
@@ -437,12 +425,22 @@ class HLIP(LeafSystem):
             self.q_ik_sol = q_ik
         else:
             q_ik = self.q_ik_sol
+            a = res.GetInfeasibleConstraints(self.ik.prog())
+            n = res.GetInfeasibleConstraintNames(self.ik.prog())
             print("\n ************* IK failed! ************* \n")
+            # print("Infeasible constraints: ", a)
+            print("Infeasible constraint names: ", n)
+
+        f = 1
+        w = 2 * np.pi * f
+        p = np.sin(self.t_current * w)
 
         # compute the nominal state
-        q_des = np.array([q_ik[3], q_ik[4], q_ik[5], q_ik[6],    # left leg: hip_pitch, knee, ankle
-                          q_ik[7], q_ik[8], q_ik[9], q_ik[10]]) # right leg: hip_pitch, knee, ankle
-        # q_des = np.zeros(self.plant.num_actuators())
+        # q_des = np.array([q_ik[3], q_ik[4], q_ik[5], q_ik[6],    # left leg: hip_roll, hip_pitch, knee, ankle
+        #                   q_ik[7], q_ik[8], q_ik[9], q_ik[10]]) # right leg: hip_roll, hip_pitch, knee, ankle
+        # q_des = np.array([0.0, 0.0, 0.0, 0.0,    # left leg: hip_roll, hip_pitch, knee, ankle
+        #                   0.0, 0.0, 0.0, 0.0]) # right leg: hip_roll, hip_pitch, knee, ankle
+        q_des = np.ones(self.plant.num_actuators()) * p
         v_des = np.zeros(self.plant.num_actuators())
         x_des = np.block([q_des, v_des])
 
