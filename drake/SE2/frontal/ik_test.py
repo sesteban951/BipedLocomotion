@@ -108,9 +108,9 @@ if res.is_success():
     meshcat.StartRecording()
 
     # plot the desired target positions
-    meshcat.SetObject("target/com", Sphere(0.05), Rgba(0, 1, 0,1))
-    meshcat.SetObject("target/left", Sphere(0.05), Rgba(0, 0, 1,1))
-    meshcat.SetObject("target/right", Sphere(0.05), Rgba(1, 0, 0,1))
+    meshcat.SetObject("target/com", Sphere(0.025), Rgba(0, 1, 0,1))
+    meshcat.SetObject("target/left", Sphere(0.025), Rgba(0, 0, 1,1))
+    meshcat.SetObject("target/right", Sphere(0.025), Rgba(1, 0, 0,1))
 
     meshcat.SetTransform("target/com", RigidTransform(p_com_target))
     meshcat.SetTransform("target/left", RigidTransform(p_left_target))
@@ -133,6 +133,28 @@ if res.is_success():
 
 else: 
     print("Bad.")
+
+    # start meshcat
+    meshcat = StartMeshcat()
+
+    # Start meshcat recording
+    meshcat.StartRecording()
+
+    # plot the desired target positions
+    meshcat.SetObject("target/com", Sphere(0.025), Rgba(0, 1, 0,1))
+    meshcat.SetObject("target/left", Sphere(0.025), Rgba(0, 0, 1,1))
+    meshcat.SetObject("target/right", Sphere(0.025), Rgba(1, 0, 0,1))
+
+    meshcat.SetTransform("target/com", RigidTransform(p_com_target))
+    meshcat.SetTransform("target/left", RigidTransform(p_left_target))
+    meshcat.SetTransform("target/right", RigidTransform(p_right_target))
+
+    time.sleep(5)
+
+    # Publish the meshcat recording
+    meshcat.StopRecording()
+    meshcat.PublishRecording()
+
 
 
 
