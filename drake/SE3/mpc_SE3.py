@@ -214,7 +214,7 @@ class AchillesMPC(ModelPredictiveController):
 
                 # switch the foot roles
                 self.stance_foot_frame = self.right_foot_frame
-                self.swing_foot_frme = self.left_foot_frame
+                self.swing_foot_frame = self.left_foot_frame
 
                 # set the initial swing foot position
                 self.p_swing_init = self.plant.CalcPointsPositions(self.plant_context,

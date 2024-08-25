@@ -10,7 +10,7 @@ sys.path.append(grandparent_dir)
 from joystick import GamepadCommand
 
 # simulation parameters
-sim_time = 10.0
+sim_time = 30.0
 realtime_rate = 1.0
 
 # load model
@@ -20,7 +20,7 @@ model_file = "../../../models/achilles_SE2_drake_frontal.urdf"
 meshcat = StartMeshcat()
 
 # simulation parameters
-sim_hz = 750
+sim_hz = 1000
 sim_config = MultibodyPlantConfig()
 sim_config.time_step = 1 / sim_hz 
 sim_config.discrete_contact_approximation = "lagged"
@@ -86,12 +86,12 @@ diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
 # configuration 
-q0 = np.array([0, 1.0,      # position (y,z)
+q0 = np.array([0, 0.96,      # position (y,z)
                0,           # theta
                0, 0, 0, 0,  # left leg:  hip_roll, hip_pitch, knee, ankle 
                0, 0, 0, 0]) # right leg: hip_roll, hip_pitch, knee, ankle
 v0 = np.zeros(plant.num_velocities())
-v0[0] = 2.0 # forward velocity
+v0[0] = 0.0 # forward velocity
 plant.SetPositions(plant_context, q0)
 plant.SetVelocities(plant_context, v0)
 
