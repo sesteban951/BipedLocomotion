@@ -20,7 +20,7 @@ model_file = "../../../models/achilles_SE2_drake_frontal.urdf"
 meshcat = StartMeshcat()
 
 # simulation parameters
-sim_hz = 1000
+sim_hz = 500
 sim_config = MultibodyPlantConfig()
 sim_config.time_step = 1 / sim_hz 
 sim_config.discrete_contact_approximation = "lagged"

@@ -2,6 +2,7 @@
 from pydrake.all import *
 import numpy as np
 import scipy as sp
+import time
 
 class HLIP(LeafSystem):
 
@@ -97,7 +98,7 @@ class HLIP(LeafSystem):
         self.Kd_db = self. T_DSP + (1/self.lam) * coth(self.lam * self.T_SSP) # deadbeat gains      
         self.sigma_P2 = self.lam * tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
         self.v_des = 0.0
-        self.v_max = 0.2
+        self.v_max = 0.15
 
         # blending foot placement
         self.bez_order = 5
@@ -118,7 +119,7 @@ class HLIP(LeafSystem):
             0, -0.5515, 1.0239,-0.4725, # left leg
             0, -0.5515, 1.0239,-0.4725, # left leg
         ])
-        w_y, w_z, w_theta = 0.0, 1.0, 100.0
+        w_y, w_z, w_theta = 0.0, 1.0, 1.0
         w_hip, w_knee, w_ankle = 1.0, 1.0, 1.0
         Qq = np.diag([w_y, w_z, w_theta, 
                       w_hip, w_hip, w_knee, w_ankle, 
@@ -421,7 +422,10 @@ class HLIP(LeafSystem):
 
         # evaluate the joystick command
         joy_command = self.gamepad_port.Eval(context)
-        self.v_des = joy_command[0] * self.v_max
+        self.v_des = -joy_command[0] * self.v_max
+
+        print("v_des: ", self.v_des)
+        print("velocity error: ", self.v_com[1] - self.v_des)
 
         # update everything
         self.update_foot_role()
@@ -436,8 +440,11 @@ class HLIP(LeafSystem):
         p_left_des = np.array([[0], p_left[1], p_left[2]])
 
         # solve the IK problem
+        t0 = time.time()
         res = self.DoInverseKinematics(p_right_des, 
                                        p_left_des)
+        tf = time.time()
+        print("IK solve time: ", tf - t0)
         
         # extract the IK solution
         if res.is_success():
