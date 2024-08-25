@@ -56,7 +56,7 @@ class HLIP(LeafSystem):
         self.num_steps = -1
 
         # walking parameters
-        self.z_nom = 0.64
+        self.z_nom = 0.65
         self.T_SSP = 0.3   # single support phase
         self.T_DSP = 0.0   # double support phase
 
@@ -79,8 +79,8 @@ class HLIP(LeafSystem):
         self.v_R_minus = 0
 
         # y-direction foot palcement offsets
-        self.u_L_bias =  0.05   # left is swing foot, add this to feedforawrd footplacement term
-        self.u_R_bias = -0.05   # right is swing foot, add this to feedforawrd footplacement term
+        self.u_L_bias =  0.18   # left is swing foot, add this to feedforawrd footplacement term
+        self.u_R_bias = -0.18   # right is swing foot, add this to feedforawrd footplacement term
 
         # swing foot parameters
         self.z_apex = 0.06    # NOTE: this is affected by bezier curve swing belnding
@@ -99,9 +99,10 @@ class HLIP(LeafSystem):
         self.sigma_P2 = self.lam * tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
         self.v_des = 0.0
         self.v_max = 0.15
+        self.u_y = None
 
         # blending foot placement
-        self.bez_order = 7
+        self.bez_order = 5
         self.switched_stance_foot = False
 
         # timing variables
@@ -167,6 +168,37 @@ class HLIP(LeafSystem):
     ########################################################################################################
 
     # ---------------------------------------------------------------------------------------- #
+
+    # visualize some stuff in meshcat
+    def plot_meshcat(self):
+        
+        # visualize the CoM velocity
+        v_norm = abs(self.v_com[1])
+        rpy = RollPitchYaw(np.pi/2, 0, 0)
+
+        if v_norm <= 0.001:
+            cyl = Cylinder(0.005, 0.001)
+            self.meshcat.SetObject("com_vel",cyl, self.green_color)
+            self.meshcat.SetTransform("com_vel", RigidTransform(RotationMatrix(), self.p_com), self.t_current)
+        else:
+            cyl = Cylinder(0.005, abs(self.v_com[1]))
+            self.meshcat.SetObject("com_vel",cyl, self.green_color)
+            p = np.array([self.p_com[0], self.p_com[1] + 0.5*self.v_com[1], self.p_com[2]])
+            self.meshcat.SetTransform("com_vel", RigidTransform(rpy,p), self.t_current)
+
+        # visualize the desored velocity
+        if abs(self.v_des) <= 0.0:
+            cyl = Cylinder(0.005, 0.001)
+            self.meshcat.SetObject("com_vel_des",cyl, self.red_color)
+            p = np.array([0, self.p_com[1], 0])
+            self.meshcat.SetTransform("com_vel_des", RigidTransform(rpy,p), self.t_current)
+        else:
+            cyl = Cylinder(0.005, abs(self.v_des))
+            self.meshcat.SetObject("com_vel_des",cyl, self.red_color)
+            p = np.array([0, self.p_com[1] + 0.5*self.v_des, 0.])
+            self.meshcat.SetTransform("com_vel_des", RigidTransform(rpy,p), self.t_current)
+
+    # ---------------------------------------------------------------------------------------- #
     # update which foot should be swing and which one is stance
     def update_foot_role(self):
         
@@ -199,7 +231,7 @@ class HLIP(LeafSystem):
                                                                         self.stance_foot_frame, [0,0,0],
                                                                         self.plant.world_frame())
 
-                # set the current stance foot position
+                # set the current stance foot control frame position
                 self.p_stance = np.array([p_stance[0], p_stance[1], [self.z_offset]])   
 
                 # switch the foot roles
@@ -225,12 +257,15 @@ class HLIP(LeafSystem):
                                                                         self.stance_foot_frame, [0,0,0],
                                                                         self.plant.world_frame())
                     
-                # set the current stance foot position
+                # set the current stance foot control frame position
                 self.p_stance = np.array([p_stance[0], p_stance[1], [self.z_offset]])
 
                 # switch the foot roles
                 self.stance_foot_frame = self.left_foot_frame
                 self.swing_foot_frame = self.right_foot_frame
+
+            # update HLIP state for the robot
+            self.update_hlip_state_H()
 
         # update the phase time
         self.t_phase = self.t_current - self.num_steps * self.T_SSP
@@ -278,6 +313,8 @@ class HLIP(LeafSystem):
         self.v_com = self.v_com.T
         self.p_com = self.p_com.T
 
+        print("vy_actual: ", self.v_com[1])
+
         # update HLIP state for the robot
         self.p_R = (self.p_com - self.p_stance.T).T
         self.v_R = self.v_com
@@ -291,32 +328,6 @@ class HLIP(LeafSystem):
         # visualize the CoM position
         self.meshcat.SetTransform("com_pos", RigidTransform(self.p_com), self.t_current)
 
-        # visualize the CoM velocity
-        v_norm = abs(self.v_com[1])
-        rpy = RollPitchYaw(np.pi/2, 0, 0)
-
-        if v_norm <= 0.001:
-            cyl = Cylinder(0.005, 0.001)
-            self.meshcat.SetObject("com_vel",cyl, self.green_color)
-            self.meshcat.SetTransform("com_vel", RigidTransform(RotationMatrix(), self.p_com), self.t_current)
-        else:
-            cyl = Cylinder(0.005, abs(self.v_com[1]))
-            self.meshcat.SetObject("com_vel",cyl, self.green_color)
-            p = np.array([self.p_com[0], self.p_com[1] + 0.5*self.v_com[1], self.p_com[2]])
-            self.meshcat.SetTransform("com_vel", RigidTransform(rpy,p), self.t_current)
-
-        # visualize the desored velocity
-        if abs(self.v_des) <= 0.0:
-            cyl = Cylinder(0.005, 0.001)
-            self.meshcat.SetObject("com_vel_des",cyl, self.red_color)
-            p = np.array([0, self.p_com[1], 0])
-            self.meshcat.SetTransform("com_vel_des", RigidTransform(rpy,p), self.t_current)
-        else:
-            cyl = Cylinder(0.005, abs(self.v_des))
-            self.meshcat.SetObject("com_vel_des",cyl, self.red_color)
-            p = np.array([0, self.p_com[1] + 0.5*self.v_des, 0.])
-            self.meshcat.SetTransform("com_vel_des", RigidTransform(rpy,p), self.t_current)
-
     # ---------------------------------------------------------------------------------------- #
     # update where to place the foot, (i.e., apply discrete control to the HLIP model)
     def update_foot_placement(self):
@@ -326,17 +337,29 @@ class HLIP(LeafSystem):
         vx_R = self.v_R[1]
         px_R_minus = self.p_R_minus
         vx_R_minus = self.v_R_minus
-        px_H_minus = self.p_H_minus
-        vx_H_minus = self.v_H_minus
+        px_H_minus = self.p_H_minus_y
+        vx_H_minus = self.v_H_minus_y
 
         # compute foot placement
-        u = self.v_des * self.T_SSP + self.Kp_db * (px_R - px_H_minus) + self.Kd_db * (vx_R - vx_H_minus)    # HLIP, preimpact
-        u = self.v_des * self.T_SSP + self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)    # HLIP, preimpact
+        # u = self.v_des * self.T_SSP + self.Kp_db * (px_R - px_H_minus) + self.Kd_db * (vx_R - vx_H_minus)    # HLIP, preimpact
+        uy_nom = self.v_des * self.T_SSP
+        uy_fb = self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)    # HLIP, preimpact
 
         if self.swing_foot_frame == self.left_foot_frame:
-            u += self.u_L
+            uy_nom += self.u_L_bias
         elif self.swing_foot_frame == self.right_foot_frame:
-            u += self.u_R
+            uy_nom += self.u_R_bias
+
+        u = uy_nom + uy_fb
+
+        print("Kp :", self.Kp_db)
+        print("Kd :", self.Kd_db)
+        print("py_R_minus:", px_R_minus)
+        print("vy_R_minus:", vx_R_minus)
+        print("py_H_minus:", self.p_H_minus_y)
+        print("vy_H_minus:", self.v_H_minus_y)
+        print("uy_nom: ", uy_nom)
+        print("uy_applied: ", u)
 
         return u
 
@@ -432,14 +455,21 @@ class HLIP(LeafSystem):
 
         # evaluate the joystick command
         joy_command = self.gamepad_port.Eval(context)
-        self.v_des = -joy_command[0] * self.v_max
-
-        print("velocity error: ", self.v_com[1] + self.v_des)
+        self.v_des = joy_command[0] * self.v_max
+        # self.v_des = 0.1
 
         # update everything
         self.update_foot_role()
-        self.update_hlip_state_H()
+        # self.update_hlip_state_H()
         self.update_hlip_state_R()
+        self.plot_meshcat()
+
+        # print(self.p_R[2][0])
+        p_com_stance = self.plant.CalcPointsPositions(self.plant_context,
+                                                        self.static_com_frame, [0,0,0],
+                                                        self.left_foot_frame)
+        
+        print("p_com_stance: ", p_com_stance)
 
         # compute desired foot trajectories
         p_right, p_left = self.update_foot_traj()
@@ -447,6 +477,8 @@ class HLIP(LeafSystem):
         # solve the inverse kinematics problem
         p_right_des = np.array([[0], p_right[1], p_right[2]])
         p_left_des = np.array([[0], p_left[1], p_left[2]])
+
+        # exit(0)
 
         # solve the IK problem
         # t0 = time.time()

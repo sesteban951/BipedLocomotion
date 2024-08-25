@@ -66,7 +66,7 @@
     <axis xyz="0 0 1"/>
     <limit effort="35.0" lower="-1" upper="1" velocity="20"/>
     <dynamics damping="0.01"/>
-    <origin rpy="0 0 0" xyz="0 0.090 -0.334"/>
+    <origin rpy="0 0 0" xyz="0 0.090 -0.048"/>
     <parent link="torso"/>
     <child link="left_hip_yaw"/>
   </joint>
@@ -257,7 +257,7 @@
     <axis xyz="0 1 0"/>
     <limit effort="35" lower="-1.58" upper="1.58" velocity="20"/>
     <dynamics damping="0.01"/>
-    <origin rpy="0 0 0" xyz="0 0.159 0"/>
+    <origin rpy="0 0 0" xyz="0 0.159 0.286"/>
     <parent link="torso"/>
     <child link="left_shoulder_pitch"/>
   </joint>
@@ -355,7 +355,6 @@
   </joint>
 
 
-
   <!-- Right Leg -->
   <link name="right_hip_yaw">
     <inertial>
@@ -374,7 +373,7 @@
     <axis xyz="0 0 1"/>
     <limit effort="35.0" lower="-1" upper="1" velocity="20"/>
     <dynamics damping="0.01"/>
-    <origin rpy="0 0 0" xyz="0 -0.090 -0.334"/>
+    <origin rpy="0 0 0" xyz="0 -0.090 -0.048"/>
     <parent link="torso"/>
     <child link="right_hip_yaw"/>
   </joint>
@@ -563,7 +562,7 @@
     <axis xyz="0 1 0"/>
     <limit effort="35" lower="-1.58" upper="1.58" velocity="20"/>
     <dynamics damping="0.01"/>
-    <origin rpy="0 0 0" xyz="0 -0.159 0"/>
+    <origin rpy="0 0 0" xyz="0 -0.159 0.286"/>
     <parent link="torso"/>
     <child link="right_shoulder_pitch"/>
   </joint>
@@ -668,7 +667,7 @@
     </inertial>
   </link>
   <joint name="static_com_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="-0.0019 0 -0.286"/>
+    <origin rpy="0 0 0" xyz="-0.05 0 -0.0"/>
     <parent link="torso"/>
     <child link="static_com"/>
   </joint>
