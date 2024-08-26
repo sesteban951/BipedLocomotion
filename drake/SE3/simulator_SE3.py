@@ -10,7 +10,7 @@ sys.path.append(parent_dir)
 from joystick import GamepadCommand
 
 # simulation parameters
-sim_time = 10.0
+sim_time = 15.0
 realtime_rate = 1.0
 
 # load model

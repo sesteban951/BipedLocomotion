@@ -71,7 +71,7 @@ def create_optimizer(model_file):
 
     # Create the system diagram that the optimizer uses
     builder = DiagramBuilder()
-    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.01)
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.005)
     Parser(plant).AddModels(model_file)
     plant.RegisterCollisionGeometry(
         plant.world_body(), 
@@ -454,7 +454,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(8.0)
+    simulator.AdvanceTo(5.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
