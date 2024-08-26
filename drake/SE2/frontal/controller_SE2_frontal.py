@@ -79,8 +79,8 @@ class HLIP(LeafSystem):
         self.v_R_minus = 0
 
         # y-direction foot palcement offsets
-        self.u_L_bias =  0.18   # left is swing foot, add this to feedforawrd footplacement term
-        self.u_R_bias = -0.18   # right is swing foot, add this to feedforawrd footplacement term
+        self.u_L_bias =  0.2   # left is swing foot, add this to feedforawrd footplacement term
+        self.u_R_bias = -0.2   # right is swing foot, add this to feedforawrd footplacement term
 
         # swing foot parameters
         self.z_apex = 0.06    # NOTE: this is affected by bezier curve swing belnding
@@ -102,7 +102,7 @@ class HLIP(LeafSystem):
         self.u_y = None
 
         # blending foot placement
-        self.bez_order = 5
+        self.bez_order = 7
         self.switched_stance_foot = False
 
         # timing variables
@@ -313,8 +313,6 @@ class HLIP(LeafSystem):
         self.v_com = self.v_com.T
         self.p_com = self.p_com.T
 
-        print("vy_actual: ", self.v_com[1])
-
         # update HLIP state for the robot
         self.p_R = (self.p_com - self.p_stance.T).T
         self.v_R = self.v_com
@@ -351,15 +349,6 @@ class HLIP(LeafSystem):
             uy_nom += self.u_R_bias
 
         u = uy_nom + uy_fb
-
-        print("Kp :", self.Kp_db)
-        print("Kd :", self.Kd_db)
-        print("py_R_minus:", px_R_minus)
-        print("vy_R_minus:", vx_R_minus)
-        print("py_H_minus:", self.p_H_minus_y)
-        print("vy_H_minus:", self.v_H_minus_y)
-        print("uy_nom: ", uy_nom)
-        print("uy_applied: ", u)
 
         return u
 
@@ -456,20 +445,12 @@ class HLIP(LeafSystem):
         # evaluate the joystick command
         joy_command = self.gamepad_port.Eval(context)
         self.v_des = joy_command[0] * self.v_max
-        # self.v_des = 0.1
 
         # update everything
         self.update_foot_role()
-        # self.update_hlip_state_H()
+        # self.update_hlip_state_H()  # if I do this continuously, I get slightly more robustness 
         self.update_hlip_state_R()
         self.plot_meshcat()
-
-        # print(self.p_R[2][0])
-        p_com_stance = self.plant.CalcPointsPositions(self.plant_context,
-                                                        self.static_com_frame, [0,0,0],
-                                                        self.left_foot_frame)
-        
-        print("p_com_stance: ", p_com_stance)
 
         # compute desired foot trajectories
         p_right, p_left = self.update_foot_traj()
@@ -478,14 +459,9 @@ class HLIP(LeafSystem):
         p_right_des = np.array([[0], p_right[1], p_right[2]])
         p_left_des = np.array([[0], p_left[1], p_left[2]])
 
-        # exit(0)
-
         # solve the IK problem
-        # t0 = time.time()
         res = self.DoInverseKinematics(p_right_des, 
                                        p_left_des)
-        # tf = time.time()
-        # print("IK solve time: ", tf - t0)
         
         # extract the IK solution
         if res.is_success():
@@ -493,17 +469,11 @@ class HLIP(LeafSystem):
             self.ik_guess = q_ik
         else:
             q_ik = self.ik_guess
-            a = res.GetInfeasibleConstraints(self.ik.prog())
-            n = res.GetInfeasibleConstraintNames(self.ik.prog())
             print("\n ************* IK failed! ************* \n")
-            # print("Infeasible constraints: ", a)
-            print("Infeasible constraint names: ", n)
 
         # compute the nominal state
         q_des = np.array([q_ik[3], q_ik[4], q_ik[5], q_ik[6],    # left leg: hip_roll, hip_pitch, knee, ankle
                           q_ik[7], q_ik[8], q_ik[9], q_ik[10]]) # right leg: hip_roll, hip_pitch, knee, ankle
-        # q_des = np.array([0.0, 0.0, 0.0, 0.0,    # left leg: hip_roll, hip_pitch, knee, ankle
-        #                   0.0, 0.0, 0.0, 0.0]) # right leg: hip_roll, hip_pitch, knee, ankle
         v_des = np.zeros(self.plant.num_actuators())
         x_des = np.block([q_des, v_des])
 

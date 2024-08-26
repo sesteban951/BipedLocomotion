@@ -10,7 +10,7 @@ sys.path.append(grandparent_dir)
 from joystick import GamepadCommand
 
 # simulation parameters
-sim_time = 15.0
+sim_time = 5.0
 realtime_rate = 1.0
 
 # load model
@@ -44,8 +44,8 @@ plant.RegisterCollisionGeometry(
 plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 
 # add low level PD controllers
-kp_hip = 750
-kp_knee = 750
+kp_hip = 850
+kp_knee = 950
 kp_ankle = 150
 kd_hip = 10
 kd_knee = 10
@@ -86,11 +86,7 @@ diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
 # configuration 
-# q0 = np.array([0, 0.96,      # position (y,z)
-#                0,           # theta
-#                0, 0, 0, 0,  # left leg:  hip_roll, hip_pitch, knee, ankle 
-#                0, 0, 0, 0]) # right leg: hip_roll, hip_pitch, knee, ankle
-q0 = np.array([0, 0.69,      # position (y,z)
+q0 = np.array([0, 0.98,      # position (y,z)
                0,           # theta
                -0.019265, -0.148381,  0.602583, -0.454202, 
                0.096043, -0.261451,  0.637849, -0.376398]) # right leg: hip_roll, hip_pitch, knee, ankle
