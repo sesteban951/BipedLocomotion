@@ -53,7 +53,7 @@ class HLIPTrajectoryGeneratorSE3():
 
         # clip the swing foot target position
         self.ux_max = 0.5
-        self.uy_max = 0.5
+        self.uy_max = 0.4
 
         # maximum velocity
         self.vx_des = None
@@ -74,8 +74,8 @@ class HLIPTrajectoryGeneratorSE3():
         # create a solver and configure the options
         self.solver = SnoptSolver()
         self.solver_options = SolverOptions()
-        self.solver_options.SetOption(self.solver.solver_id(), "Major feasibility tolerance", 1e-3)
-        self.solver_options.SetOption(self.solver.solver_id(), "Major optimality tolerance", 1e-3)
+        self.solver_options.SetOption(self.solver.solver_id(), "Major feasibility tolerance", 1e-6)
+        self.solver_options.SetOption(self.solver.solver_id(), "Major optimality tolerance", 1e-6)
         # self.solver_options.SetOption(self.solver.solver_id(), "Iterations limit", 10000)
         # self.solver_options.SetOption(self.solver.solver_id(), "Objective tolerance", 1e-5)
         # self.solver_options.SetOption(self.solver.solver_id(), "Constraint tolerance", 1e-5)
@@ -116,6 +116,10 @@ class HLIPTrajectoryGeneratorSE3():
         self.p_com_cons = self.ik.AddPositionConstraint(self.static_com_frame, [0, 0, 0], 
                                                         self.plant.world_frame(), 
                                                         [0, 0, 0], [0, 0, 0])
+        # self.C = np.diag([1, 1, 1]) * 100
+        # self.p_com_cons = self.ik.AddPositionCost(self.static_com_frame, [0,0,0],
+        #                                           self.plant.world_frame(), [0,0,0],
+        #                                           self.C)
 
         # Add foot position constraints (continuously update the lower and upper bounds)
         self.p_left_cons =  self.ik.AddPositionConstraint(self.left_foot_frame, [0, 0, 0],
@@ -124,6 +128,12 @@ class HLIPTrajectoryGeneratorSE3():
         self.p_right_cons = self.ik.AddPositionConstraint(self.right_foot_frame, [0, 0, 0],
                                                           self.plant.world_frame(), 
                                                           [0, 0, 0], [0, 0, 0]) 
+        # self.p_left_cons = self.ik.AddPositionCost(self.left_foot_frame, [0,0,0],
+        #                                             self.plant.world_frame(), [0,0,0],
+        #                                             self.C)
+        # self.p_right_cons = self.ik.AddPositionCost(self.right_foot_frame, [0,0,0],
+        #                                             self.plant.world_frame(), [0,0,0],
+        #                                             self.C)
         
         # Add foot and com orientation constraints, aligns toe directions (updated once at every trajectory gen query)
         self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(), 
@@ -135,6 +145,16 @@ class HLIPTrajectoryGeneratorSE3():
         self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
                                                                     self.plant.world_frame(), [1, 0, 0],
                                                                     0, 0)
+        # self.c = 1 * 50
+        # self.r_com_cons = self.ik.AddOrientationCost(self.static_com_frame, RotationMatrix(),
+        #                                              self.plant.world_frame(), RotationMatrix(),
+        #                                              self.c)
+        # self.r_left_cons = self.ik.AddAngleBetweenVectorsCost(self.left_foot_frame, [1, 0, 0],
+        #                                                       self.plant.world_frame(), [1, 0, 0],
+        #                                                       self.c)
+        # self.r_right_cons = self.ik.AddAngleBetweenVectorsCost(self.right_foot_frame, [1, 0, 0],
+        #                                                       self.plant.world_frame(), [1, 0, 0],
+        #                                                       self.c)
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -373,17 +393,36 @@ class HLIPTrajectoryGeneratorSE3():
 
         # update the COM target position
         self.p_com_cons.evaluator().set_bounds(p_com_pos - self.tol_base, p_com_pos + self.tol_base)
+        # self.ik.prog().RemoveCost(self.p_com_cons)
+        # self.p_com_cons = self.ik.AddPositionCost(self.static_com_frame, [0,0,0],
+        #                                           self.plant.world_frame(), p_com_pos,
+        #                                           self.C)
 
+        # self.ik.prog().RemoveCost(self.p_left_cons)
+        # self.ik.prog().RemoveCost(self.p_right_cons)
+        
         if stance_name == "left_foot":
             self.p_left_cons.evaluator().set_bounds(p_stance - self.tol_feet, p_stance + self.tol_feet)
             self.p_right_cons.evaluator().set_bounds(p_swing - self.tol_feet, p_swing + self.tol_feet)
+            # self.p_left_cons = self.ik.AddPositionCost(self.left_foot_frame, [0,0,0],
+            #                                            self.plant.world_frame(), p_stance,
+            #                                            self.C)
+            # self.p_right_cons = self.ik.AddPositionCost(self.right_foot_frame, [0,0,0],
+            #                                             self.plant.world_frame(), p_swing,
+            #                                             self.C)
 
         elif stance_name == "right_foot":
             self.p_right_cons.evaluator().set_bounds(p_stance - self.tol_feet, p_stance + self.tol_feet)
             self.p_left_cons.evaluator().set_bounds(p_swing - self.tol_feet, p_swing + self.tol_feet)
+            # self.p_right_cons = self.ik.AddPositionCost(self.right_foot_frame, [0,0,0],
+            #                                             self.plant.world_frame(), p_stance,
+            #                                             self.C)
+            # self.p_left_cons = self.ik.AddPositionCost(self.left_foot_frame, [0,0,0],
+            #                                              self.plant.world_frame(), p_swing,
+            #                                              self.C)
 
         # solve the IK problem
-        # self.ik.prog().SetInitialGuess(self.ik.q(), initial_guess)
+        self.ik.prog().SetInitialGuess(self.ik.q(), initial_guess)
         # res = SnoptSolver().Solve(self.ik.prog())
         res = self.solver.Solve(self.ik.prog(), initial_guess, self.solver_options)
 
@@ -563,6 +602,18 @@ class HLIPTrajectoryGeneratorSE3():
         self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
                                                                     self.plant.world_frame(), self.R_control_stance_W_mat @ [1, 0, 0],
                                                                     0, self.foot_epsilon_orient * np.pi / 180)
+        # self.ik.prog().RemoveCost(self.r_com_cons)
+        # self.ik.prog().RemoveCost(self.r_left_cons)
+        # self.ik.prog().RemoveCost(self.r_right_cons)
+        # self.r_com_cons = self.ik.AddOrientationCost(self.static_com_frame, RotationMatrix(),
+        #                                              self.plant.world_frame(), self.R_control_stance_W,
+        #                                              self.c)
+        # self.r_left_cons = self.ik.AddAngleBetweenVectorsCost(self.left_foot_frame, [1, 0, 0],
+        #                                                       self.plant.world_frame(), self.R_control_stance_W_mat @ [1, 0, 0],
+        #                                                       self.c)
+        # self.r_right_cons = self.ik.AddAngleBetweenVectorsCost(self.right_foot_frame, [1, 0, 0],
+        #                                                        self.plant.world_frame(), self.R_control_stance_W_mat @ [1, 0, 0],
+        #                                                        self.c)
 
         # compute the LIP execution in world frame, X = (Lambda, I, C)
         t0 = time.time()

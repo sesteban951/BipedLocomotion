@@ -66,27 +66,47 @@ class HLIPTrajectoryGeneratorSE2():
         self.p_com_cons = self.ik.AddPositionConstraint(self.static_com_frame, [0, 0, 0], 
                                                         self.plant.world_frame(), 
                                                         [0, 0, 0], [0, 0, 0])
+        # self.Cp = np.diag([1, 1, 1])
+        # self.p_com_cons = self.ik.AddPositionCost(self.static_com_frame, [0,0,0],
+        #                                           self.plant.world_frame(), [0,0,0], 
+        #                                           self.Cp)
 
-        # Add com orientation constraint (fixed constraint)
+        # # Add com orientation constraint (fixed constraint)
         self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(),
                                                            self.plant.world_frame(), RotationMatrix(),
                                                            base_epsilon_orient * (np.pi/180))
+        # self.c = 1
+        # self.r_com_cons = self.ik.AddOrientationCost(self.static_com_frame, RotationMatrix(),
+        #                                             self.plant.world_frame(), RotationMatrix(),
+        #                                             self.c)
 
-        # Add foot position constraints (continuously update the lower and upper bounds)
+        # # Add foot position constraints (continuously update the lower and upper bounds)
         self.p_left_cons =  self.ik.AddPositionConstraint(self.left_foot_frame, [0, 0, 0],
                                                           self.plant.world_frame(), 
                                                           [0, 0, 0], [0, 0, 0])
         self.p_right_cons = self.ik.AddPositionConstraint(self.right_foot_frame, [0, 0, 0],
                                                           self.plant.world_frame(), 
                                                           [0, 0, 0], [0, 0, 0]) 
+        # self.p_left_cons = self.ik.AddPositionCost(self.left_foot_frame, [0, 0, 0],
+        #                                           self.plant.world_frame(), [0, 0, 0],
+        #                                           self.Cp)
+        # self.p_right_cons = self.ik.AddPositionCost(self.right_foot_frame, [0, 0, 0],
+        #                                             self.plant.world_frame(), [0, 0, 0],
+        #                                             self.Cp)
         
-        # Add foot orientation constraints (fixed constraint)
+        # # Add foot orientation constraints (fixed constraint)
         self.r_left_cons =  self.ik.AddOrientationConstraint(self.left_foot_frame, RotationMatrix(),
                                                              self.plant.world_frame(), RotationMatrix(),
                                                              foot_epsilon_orient * (np.pi/180))
         self.r_right_cons = self.ik.AddOrientationConstraint(self.right_foot_frame, RotationMatrix(),
                                                              self.plant.world_frame(), RotationMatrix(),
                                                              foot_epsilon_orient * (np.pi/180))
+        # self.r_left_cons = self.ik.AddOrientationCost(self.left_foot_frame, RotationMatrix(),
+        #                                                 self.plant.world_frame(), RotationMatrix(),
+        #                                                 self.c)
+        # self.r_right_cons = self.ik.AddOrientationCost(self.right_foot_frame, RotationMatrix(),
+        #                                                 self.plant.world_frame(), RotationMatrix(),
+        #                                                 self.c)
 
     # -------------------------------------------------------------------------------------------------- #
 
