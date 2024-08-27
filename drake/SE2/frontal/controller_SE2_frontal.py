@@ -56,7 +56,7 @@ class HLIP(LeafSystem):
         self.num_steps = -1
 
         # walking parameters
-        self.z_nom = 0.65
+        self.z_nom = 0.64
         self.T_SSP = 0.3   # single support phase
         self.T_DSP = 0.0   # double support phase
 
@@ -98,14 +98,15 @@ class HLIP(LeafSystem):
         self.Kd_db = self. T_DSP + (1/self.lam) * coth(self.lam * self.T_SSP) # deadbeat gains      
         self.sigma_P2 = self.lam * tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
         self.v_des = 0.0
-        self.v_max = 0.15
-        self.u_y = None
+        self.v_max = 0.2
+        self.a_max = 0.05  # m/s^2
+        self.uy_max = 0.3
 
         # blending foot placement
         self.bez_order = 7
-        self.switched_stance_foot = False
 
         # timing variables
+        self.t_last = 0
         self.t_current = 0
         self.t_phase = 0
 
@@ -205,9 +206,6 @@ class HLIP(LeafSystem):
         # check if entered new step period
         if (self.t_phase >= self.T_SSP) or (self.p_stance is None):
 
-            # for the blended foot placement resetting
-            self.switched_stance_foot = True
-
             # update the number of steps
             self.num_steps += 1
 
@@ -285,17 +283,11 @@ class HLIP(LeafSystem):
         elif self.swing_foot_frame == self.right_foot_frame:
             u_star = self.u_R  
         self.d2 = self.lam**2 * (self.sech(0.5 * self.lam * self.T_SSP))**2 * (T * self.v_des) / (self.lam**2 * self.T_DSP + 2 * self.sigma_P2)
-        self.p_H_minus_y = (u_star - self.T_DSP * self.d2) / (2 + self.T_DSP * self.sigma_P2)
-        self.v_H_minus_y = self.sigma_P2 * self.p_H_minus_y + self.d2
+        self.p_H_minus = (u_star - self.T_DSP * self.d2) / (2 + self.T_DSP * self.sigma_P2)
+        self.v_H_minus = self.sigma_P2 * self.p_H_minus + self.d2
 
     # update the COM state of the Robot
     def update_hlip_state_R(self):
-        
-        # compute the static p_com in world frame
-        self.p_static_com = self.plant.CalcPointsPositions(self.plant_context,
-                                                           self.static_com_frame,
-                                                           [0,0,0],
-                                                           self.plant.world_frame()).flatten()
 
         # compute the dynamic p_com in world frame
         self.p_com = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context)
@@ -331,24 +323,25 @@ class HLIP(LeafSystem):
     def update_foot_placement(self):
 
         # x-direction [p, v]
-        px_R = self.p_R[1][0]
-        vx_R = self.v_R[1]
-        px_R_minus = self.p_R_minus
-        vx_R_minus = self.v_R_minus
-        px_H_minus = self.p_H_minus_y
-        vx_H_minus = self.v_H_minus_y
+        py_R_minus = self.p_R_minus
+        vy_R_minus = self.v_R_minus
+        py_H_minus = self.p_H_minus
+        vy_H_minus = self.v_H_minus
 
         # compute foot placement
-        # u = self.v_des * self.T_SSP + self.Kp_db * (px_R - px_H_minus) + self.Kd_db * (vx_R - vx_H_minus)    # HLIP, preimpact
         uy_nom = self.v_des * self.T_SSP
-        uy_fb = self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)    # HLIP, preimpact
+        uy_fb = self.Kp_db * (py_R_minus - py_H_minus) + self.Kd_db * (vy_R_minus - vy_H_minus)    # HLIP, preimpact
 
         if self.swing_foot_frame == self.left_foot_frame:
             uy_nom += self.u_L_bias
         elif self.swing_foot_frame == self.right_foot_frame:
             uy_nom += self.u_R_bias
 
+        # compute the foot placement
         u = uy_nom + uy_fb
+
+        # clip the foot placement
+        u = np.clip(u, -self.uy_max, self.uy_max)
 
         return u
 
@@ -432,6 +425,28 @@ class HLIP(LeafSystem):
         return res
 
     # ---------------------------------------------------------------------------------------- #
+
+    # limit the acceleration of the command velocity
+    def rate_limit_velocity(self, v_des_command, v_des_current):
+            
+       # Ensure v_des is initialized
+        v_des = v_des_current
+
+        # Calculate the time difference
+        dt = self.t_current - self.t_last
+
+        # Rate limit the desired velocity
+        v_des += np.sign(v_des_command - v_des_current) * self.a_max * dt
+
+        # Saturate the desired velocity
+        v_des = np.clip(v_des, -self.v_max, self.v_max)
+
+        # Set the old time measurement
+        self.t_last = self.t_current
+
+        return v_des
+
+    # ---------------------------------------------------------------------------------------- #
     def CalcOutput(self, context, output):
 
         print("\n *************************************** \n")
@@ -444,11 +459,14 @@ class HLIP(LeafSystem):
 
         # evaluate the joystick command
         joy_command = self.gamepad_port.Eval(context)
-        self.v_des = joy_command[0] * self.v_max
+        v_des_command = joy_command[0] * self.v_max
+
+        # rate limit the desired velocity
+        self.v_des = self.rate_limit_velocity(v_des_command, self.v_des)
 
         # update everything
         self.update_foot_role()
-        # self.update_hlip_state_H()  # if I do this continuously, I get slightly more robustness 
+        # self.update_hlip_state_H()  # NOTE: if I do this continuously, I get slightly more robustness 
         self.update_hlip_state_R()
         self.plot_meshcat()
 

@@ -20,7 +20,7 @@ model_file = "../../models/achilles_SE3_drake.urdf"
 meshcat = StartMeshcat()
 
 # simulation parameters
-sim_hz = 250
+sim_hz = 300
 sim_config = MultibodyPlantConfig()
 sim_config.time_step = 1 / sim_hz 
 sim_config.discrete_contact_approximation = "lagged"
@@ -44,7 +44,7 @@ plant.RegisterCollisionGeometry(
 plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 
 # add low level PD controllers
-kp_hip = 900
+kp_hip = 1000
 kp_knee = 1000
 kp_ankle = 150
 kd_hip = 10
@@ -86,9 +86,13 @@ diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
 # configuration 
+# q0 = np.array([1, 0, 0, 0,     # orientation: w, x, y, z
+#                0, 0, 0.93,     # position: x, y, z
+#                0, 0, -0.5515, 1.0239,-0.4725,   # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle 
+#                0, 0, -0.5515, 1.0239,-0.4725]) # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
 q0 = np.array([1, 0, 0, 0,     # orientation: w, x, y, z
-               0, 0, 1.0,     # position: x, y, z
-               0, 0, 0, 0, 0,  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle 
+               0, 0, 0.99,     # position: x, y, z
+               0, 0, 0, 0, 0,   # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle 
                0, 0, 0, 0, 0]) # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
 v0 = np.array([0, 0, 0,     
                0, 0, 0,   

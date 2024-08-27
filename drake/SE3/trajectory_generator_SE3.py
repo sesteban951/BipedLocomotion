@@ -74,6 +74,25 @@ class HLIPTrajectoryGeneratorSE3():
         # instantiate the inverse kinematics solver
         self.ik = InverseKinematics(self.plant, with_joint_limits=True)
 
+        # add an error quadratic cost
+        # q_nom = np.array([
+        #     1,0,0,0,                                   # base orientation, (w, x, y, z)
+        #     0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
+        #     0.0000,  0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+        #     0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+        # ])
+        # w_qw, w_qx, w_qy, w_qz = 0, 0, 0, 0
+        # w_px, w_py, w_pz = 0, 0, 0
+        # w_q1, w_q2, w_q3, w_q4, w_q5 = .1, 1, 1, 1, 1
+        # w_q6, w_q7, w_q8, w_q9, w_q10 = .1, 1, 1, 1, 1
+        # Qq = np.diag([w_qw, w_qx, w_qy, w_qz, 
+        #               w_px, w_py, w_pz, 
+        #               w_q1, w_q2, w_q3, w_q4, w_q5, 
+        #               w_q6, w_q7, w_q8, w_q9, w_q10])
+        # self.ik.prog().AddQuadraticErrorCost(Q=Qq, 
+        #                                      x_desired=q_nom, 
+        #                                      vars=self.ik.q())
+
         # inverse kinematics solver settings
         epsilon_feet = 0.00         # foot position tolerance      [m]
         epsilon_base = 0.00         # base position tolerance      [m]
@@ -611,7 +630,6 @@ if __name__ == "__main__":
     deg = 45
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
     quat = orient.ToQuaternion()
-    print(quat)
 
     # initial condition 
     q0 = np.array([

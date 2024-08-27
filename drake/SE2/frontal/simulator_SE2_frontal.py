@@ -10,7 +10,7 @@ sys.path.append(grandparent_dir)
 from joystick import GamepadCommand
 
 # simulation parameters
-sim_time = 5.0
+sim_time = 25.0
 realtime_rate = 1.0
 
 # load model
@@ -86,11 +86,16 @@ diagram_context = diagram.CreateDefaultContext()
 plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
 # configuration 
-q0 = np.array([0, 0.98,      # position (y,z)
-               0,           # theta
-               -0.019265, -0.148381,  0.602583, -0.454202, 
-               0.096043, -0.261451,  0.637849, -0.376398]) # right leg: hip_roll, hip_pitch, knee, ankle
-
+# q0 = np.array([0, 0.98,      # position (y,z)
+#                0,           # theta
+#                -0.019265, -0.148381,  0.602583, -0.454202, 
+#                0.096043, -0.261451,  0.637849, -0.376398]) # right leg: hip_roll, hip_pitch, knee, ankle
+q0 = np.array([          # (parallel legs, bent knees)
+            0.0000, 0.9400,             # base position
+            0.0000,                     # base orientation
+            0, -0.5515, 1.0239,-0.4725, # left leg
+            0, -0.5515, 1.0239,-0.4725, # left leg
+        ])
 v0 = np.zeros(plant.num_velocities())
 v0[0] = 0.0 # forward velocity
 plant.SetPositions(plant_context, q0)
