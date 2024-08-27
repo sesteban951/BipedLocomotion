@@ -113,7 +113,7 @@ joint_titles = {"Hip Left Pitch", "Knee Left Pitch", "Foot Left Pitch", "Hip Rig
 
 % plot individual phase plots
 figure('Name', 'Phase Plots');
-joint_idx = 4;  % Left Hip Pitch (3), Left Knee Pitch (4), Left Foot Pitch (5), 
+joint_idx = 5;  % Left Hip Pitch (3), Left Knee Pitch (4), Left Foot Pitch (5), 
                 % Right Hip Pitch (6), Right Knee Pitch (7), Right Foot Pitch (8)
 q_data = q_data(:, joint_idx);
 v_data = v_data(:, joint_idx);
@@ -130,6 +130,11 @@ plot(nan, nan);
 tic
 t_end = t_data(end);
 idx = 2;
+
+% num_points_to_keep = length(t_data);
+num_points_to_keep = 75;
+line_objects = []; % Initialize an empty list to store line objects
+
 while idx <= length(t_data)
 
     % super title
@@ -141,6 +146,23 @@ while idx <= length(t_data)
     dot = plot(q_data(idx), v_data(idx), 'ro', 'MarkerSize', 5, 'MarkerFaceColor', 'r');
     xlabel("$q$", 'interpreter', 'latex');
     ylabel("$\dot{q}$", 'interpreter', 'latex');
+
+    % Add the new line object to the list
+    line_objects = [line_objects, line];
+
+    % If there are more than num_points_to_keep line objects, delete the oldest one
+    if length(line_objects) > num_points_to_keep
+        delete(line_objects(1));
+        line_objects(1) = []; % Remove the oldest line object from the list
+    end
+
+    % Define a colormap that transitions from blue to white
+    color_map = [linspace(1, 0, num_points_to_keep)', linspace(1, 0, num_points_to_keep)', ones(num_points_to_keep, 1)];
+
+    % Update the color of each line in the list
+    for i = 1:length(line_objects)
+        set(line_objects(i), 'Color', color_map(i, :));
+    end
 
     % draw the plot
     drawnow;

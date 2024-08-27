@@ -3,6 +3,7 @@ from pydrake.all import *
 import numpy as np
 import scipy as sp
 import time
+from trajectory_generator_SE2_frontal import HLIPTrajectoryGeneratorSE2
 
 class HLIP(LeafSystem):
 
@@ -99,7 +100,7 @@ class HLIP(LeafSystem):
         self.sigma_P2 = self.lam * tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
         self.v_des = 0.0
         self.v_max = 0.2
-        self.a_max = 0.05  # m/s^2
+        self.a_max = 0.15  # m/s^2
         self.uy_max = 0.3
 
         # blending foot placement
@@ -165,6 +166,15 @@ class HLIP(LeafSystem):
         self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
                                                                      self.plant.world_frame(), [1, 0, 0],
                                                                      0, foot_epsilon_orient * (np.pi/180))
+        
+        # create a 2D trajectory generator object
+        self.traj_gen = HLIPTrajectoryGeneratorSE2(model_file)
+        self.traj_gen.set_parameters(z_nom = self.z_nom,
+                                     z_apex = self.z_apex,
+                                     bezier_order = self.bez_order,
+                                     T_SSP = self.T_SSP,
+                                     dt = 0.05,
+                                     N = 2)
 
     ########################################################################################################
 
@@ -428,8 +438,8 @@ class HLIP(LeafSystem):
 
     # limit the acceleration of the command velocity
     def rate_limit_velocity(self, v_des_command, v_des_current):
-            
-       # Ensure v_des is initialized
+    
+        # Ensure v_des is initialized
         v_des = v_des_current
 
         # Calculate the time difference
@@ -466,33 +476,48 @@ class HLIP(LeafSystem):
 
         # update everything
         self.update_foot_role()
-        # self.update_hlip_state_H()  # NOTE: if I do this continuously, I get slightly more robustness 
-        self.update_hlip_state_R()
-        self.plot_meshcat()
+        # # self.update_hlip_state_H()  # NOTE: if I do this continuously, I get slightly more robustness 
+        # self.update_hlip_state_R()
+        # self.plot_meshcat()
 
-        # compute desired foot trajectories
-        p_right, p_left = self.update_foot_traj()
+        # # compute desired foot trajectories
+        # p_right, p_left = self.update_foot_traj()
 
-        # solve the inverse kinematics problem
-        p_right_des = np.array([[0], p_right[1], p_right[2]])
-        p_left_des = np.array([[0], p_left[1], p_left[2]])
+        # # solve the inverse kinematics problem
+        # p_right_des = np.array([[0], p_right[1], p_right[2]])
+        # p_left_des = np.array([[0], p_left[1], p_left[2]])
 
-        # solve the IK problem
-        res = self.DoInverseKinematics(p_right_des, 
-                                       p_left_des)
+        # # solve the IK problem
+        # res = self.DoInverseKinematics(p_right_des, 
+        #                                p_left_des)
         
-        # extract the IK solution
-        if res.is_success():
-            q_ik = res.GetSolution(self.ik.q())
-            self.ik_guess = q_ik
-        else:
-            q_ik = self.ik_guess
-            print("\n ************* IK failed! ************* \n")
+        # # extract the IK solution
+        # if res.is_success():
+        #     q_ik = res.GetSolution(self.ik.q())
+        #     self.ik_guess = q_ik
+        # else:
+        #     q_ik = self.ik_guess
+        #     print("\n ************* IK failed! ************* \n")
+
+        # generate a trajectory for the robot
+        q0 = x_hat[0:self.plant.num_positions()]
+        v0 = x_hat[self.plant.num_positions():]
+        q_ref, v_ref = self.traj_gen.generate_trajectory(q0=q0,
+                                                       v0=v0,
+                                                       v_des=self.v_des,
+                                                       t_phase=self.t_phase,
+                                                       initial_swing_foot_pos=self.p_swing_init,
+                                                       stance_foot_pos=self.p_stance,
+                                                       initial_stance_foot_name=self.stance_foot_frame.name())
+        q_ik = q_ref[0]
+        v_ik = v_ref[0]
 
         # compute the nominal state
         q_des = np.array([q_ik[3], q_ik[4], q_ik[5], q_ik[6],    # left leg: hip_roll, hip_pitch, knee, ankle
                           q_ik[7], q_ik[8], q_ik[9], q_ik[10]]) # right leg: hip_roll, hip_pitch, knee, ankle
-        v_des = np.zeros(self.plant.num_actuators())
+        # v_des = np.zeros(self.plant.num_actuators())
+        v_des = np.array([v_ik[3], v_ik[4], v_ik[5], v_ik[6],    # left leg: hip_roll, hip_pitch, knee, ankle
+                          v_ik[7], v_ik[8], v_ik[9], v_ik[10]])
         x_des = np.block([q_des, v_des])
 
         output.SetFromVector(x_des)
