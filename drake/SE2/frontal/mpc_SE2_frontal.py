@@ -92,13 +92,13 @@ def create_optimizer(model_file):
     
     # no arms
     problem.Qq = np.diag([
-            1.0, 10.0,           # base position
+            15.0, 10.0,           # base position
             10.0,                # base orientation
             9.0, 7.0, 7.0, 5.0,  # left leg
             9.0, 7.0, 7.0, 5.0   # right leg
     ])
     problem.Qv = np.diag([
-            1.0, 1.0,            # base position
+            15.0, 1.0,            # base position
             10.0,                # base orientation
             1.0, 1.0, 1.0, 1.0,  # left leg
             1.0, 1.0, 0.01, 1.0  # right leg
@@ -193,7 +193,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
         self.q_stand = standing_position()
 
         # computing the alpha value based on speed
-        p = 1.0
+        p = 0.8
         self.alpha = lambda v: ((1/self.v_max) * abs(v)) ** p
 
     # update the foot info for the HLIP traj gen
@@ -279,23 +279,21 @@ class AchillesPlanarMPC(ModelPredictiveController):
                                                                 initial_swing_foot_pos = self.p_swing_init,
                                                                 stance_foot_pos = self.p_stance,
                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
-        for i in range(self.num_steps + 1):
-            q_HLIP[i][0] = q0[0] + vy_des * i * self.optimizer.time_step()
-            v_HLIP[i][0] = vy_des
+        # for i in range(self.num_steps + 1):
+        #     q_HLIP[i][0] = q0[0] + vy_des * i * self.optimizer.time_step()
+        #     v_HLIP[i][0] = vy_des
 
-        # # compute alpha
-        # a = self.alpha(vy_des)
+        # compute alpha
+        a = self.alpha(vy_des)
 
-        # # convex combination of the standing position and the nominal trajectory
-        # q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
-        # v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
-        # for i in range(self.optimizer.num_steps() + 1):
-        #     q_nom[i] = (1 - a) * q_stand[i] + a * q_HLIP[i]
-        #     v_nom[i] = (1 - a) * v_stand[i] + a * v_HLIP[i]
-        #     # q_nom[i] = (1 - a) * q_HLIP[i] + a * q_stand[i]
-        #     # v_nom[i] = (1 - a) * v_HLIP[i] + a * v_stand[i]
-        q_nom = q_HLIP
-        v_nom = v_HLIP
+        # convex combination of the standing position and the nominal trajectory
+        q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
+        v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
+        for i in range(self.optimizer.num_steps() + 1):
+            q_nom[i] = (1 - a) * q_stand[i] + a * q_HLIP[i]
+            v_nom[i] = (1 - a) * v_stand[i] + a * v_HLIP[i]
+            # q_nom[i] = (1 - a) * q_HLIP[i] + a * q_stand[i]
+            # v_nom[i] = (1 - a) * v_HLIP[i] + a * v_stand[i]
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 
@@ -413,7 +411,7 @@ if __name__=="__main__":
     states = log.data().T
 
     # save the data to a CSV file
-    with open('./data/data_SE2.csv', mode='w') as file:
+    with open('./data/data_SE2_frontal.csv', mode='w') as file:
         writer = csv.writer(file)
         for i in range(len(times)):
             writer.writerow([times[i]] + list(states[i]))
