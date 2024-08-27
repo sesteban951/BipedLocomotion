@@ -60,8 +60,8 @@ class HLIPTrajectoryGeneratorSE3():
         self.vy_des = None
 
         # period 2 feedforward foot placements
-        self.u_L_bias = 0.22   # left is swing foot, add this to the feedforward foot placement
-        self.u_R_bias = -0.22  # right is swing foot, add this to the feedforward foot placement
+        self.u_L_bias = 0.2   # left is swing foot, add this to the feedforward foot placement
+        self.u_R_bias = -0.2  # right is swing foot, add this to the feedforward foot placement
         self.u_L = None
         self.u_R = None
         
@@ -71,20 +71,31 @@ class HLIPTrajectoryGeneratorSE3():
         # bezier curve
         self.bez_order = 7  # 5 or 7
 
+        # create a solver and configure the options
+        self.solver = SnoptSolver()
+        self.solver_options = SolverOptions()
+        self.solver_options.SetOption(self.solver.solver_id(), "Major feasibility tolerance", 1e-3)
+        self.solver_options.SetOption(self.solver.solver_id(), "Major optimality tolerance", 1e-3)
+        # self.solver_options.SetOption(self.solver.solver_id(), "Iterations limit", 10000)
+        # self.solver_options.SetOption(self.solver.solver_id(), "Objective tolerance", 1e-5)
+        # self.solver_options.SetOption(self.solver.solver_id(), "Constraint tolerance", 1e-5)
+        # self.solver_options.SetOption(self.solver.solver_id(), "Step size limit", 1.0)
+        # self.solver_options.SetOption(self.solver.solver_id(), "Scaling", "automatic")
+        
         # instantiate the inverse kinematics solver
         self.ik = InverseKinematics(self.plant, with_joint_limits=True)
 
         # add an error quadratic cost
-        # q_nom = np.array([
-        #     1,0,0,0,                                   # base orientation, (w, x, y, z)
-        #     0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
-        #     0.0000,  0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        #     0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        # ])
-        # w_qw, w_qx, w_qy, w_qz = 0, 0, 0, 0
-        # w_px, w_py, w_pz = 0, 0, 0
-        # w_q1, w_q2, w_q3, w_q4, w_q5 = .1, 1, 1, 1, 1
-        # w_q6, w_q7, w_q8, w_q9, w_q10 = .1, 1, 1, 1, 1
+        q_nom = np.array([
+            1,0,0,0,                                   # base orientation, (w, x, y, z)
+            0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
+            0.0000,  0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+            0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+        ])
+        # w_qw, w_qx, w_qy, w_qz = 0.1, 0.1, 0.1, 0.1
+        # w_px, w_py, w_pz = 0.1, 0.1, 0.1
+        # w_q1, w_q2, w_q3, w_q4, w_q5 = 1, 1, 1, 1, 1
+        # w_q6, w_q7, w_q8, w_q9, w_q10 = 1, 1, 1, 1, 1
         # Qq = np.diag([w_qw, w_qx, w_qy, w_qz, 
         #               w_px, w_py, w_pz, 
         #               w_q1, w_q2, w_q3, w_q4, w_q5, 
@@ -267,19 +278,25 @@ class HLIPTrajectoryGeneratorSE3():
 
             # compute the HLIP preimpact state (P2 orbit dependent in y-direction)
             if self.swing_foot_frame.name() == "left_foot":
-                u_star = self.u_L
+                u_star = self.u_L_bias + self.vy_des * (self.T_SSP + self.T_DSP)
             elif self.swing_foot_frame.name() == "right_foot":
-                u_star = self.u_R
+                u_star = self.u_R_bias + self.vy_des * (self.T_SSP + self.T_DSP)
             py_H_minus = (u_star - self.T_DSP * self.d2) / (2 + self.T_DSP * self.sigma_P2)
             vy_H_minus = self.sigma_P2 * py_H_minus + self.d2
 
-            ux = self.vx_des * self.T_SSP + self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)
-            uy = self.vy_des * self.T_SSP + self.Kp_db * (py_R_minus - py_H_minus) + self.Kd_db * (vy_R_minus - vy_H_minus)
+            # compute P1 orbit step length
+            ux_nom = self.vx_des * self.T_SSP
+            ux_fbk = self.Kp_db * (px_R_minus - px_H_minus) + self.Kd_db * (vx_R_minus - vx_H_minus)
+            ux = ux_nom + ux_fbk
 
+            # compute P2 orbit step length
+            uy_nom = self.vy_des * self.T_SSP
             if self.swing_foot_frame.name() == "left_foot":
-                uy += self.u_L
+                uy_nom += self.u_L_bias
             elif self.swing_foot_frame.name() == "right_foot":
-                uy += self.u_R
+                uy_nom += self.u_R_bias
+            uy_fbk = self.Kp_db * (py_R_minus - py_H_minus) + self.Kd_db * (vy_R_minus - vy_H_minus)
+            uy = uy_nom + uy_fbk
             
             # clip the swing foot target position
             ux = max(-self.ux_max, min(ux, self.ux_max))
@@ -366,8 +383,9 @@ class HLIPTrajectoryGeneratorSE3():
             self.p_left_cons.evaluator().set_bounds(p_swing - self.tol_feet, p_swing + self.tol_feet)
 
         # solve the IK problem
-        self.ik.prog().SetInitialGuess(self.ik.q(), initial_guess)
-        res = SnoptSolver().Solve(self.ik.prog())
+        # self.ik.prog().SetInitialGuess(self.ik.q(), initial_guess)
+        # res = SnoptSolver().Solve(self.ik.prog())
+        res = self.solver.Solve(self.ik.prog(), initial_guess, self.solver_options)
 
         return res
 
@@ -498,8 +516,8 @@ class HLIPTrajectoryGeneratorSE3():
         self.plant.SetVelocities(self.plant_context, v0)
 
         # set the desired velocity (this is the desired velocity in body frame)
-        self.vx_des =  v_des[0][0]
-        self.vy_des = -v_des[1][0] # TODO: why do I need the sign flip?!!!!!!!!!!!!!!!!!
+        self.vx_des = v_des[0][0]
+        self.vy_des = v_des[1][0] 
 
         # set the P2 orbit bias
         self.u_L = self.u_L_bias + self.vy_des * (self.T_SSP + self.T_DSP)
@@ -538,7 +556,7 @@ class HLIPTrajectoryGeneratorSE3():
         self.ik.prog().RemoveConstraint(self.r_right_cons)
         self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(),
                                                            self.plant.world_frame(), self.R_control_stance_W,
-                                                           self.base_epsilon_orient)
+                                                           self.base_epsilon_orient * np.pi / 180)
         self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
                                                                     self.plant.world_frame(), self.R_control_stance_W_mat @ [1, 0, 0],
                                                                     0, self.foot_epsilon_orient * np.pi / 180)
@@ -547,16 +565,16 @@ class HLIPTrajectoryGeneratorSE3():
                                                                     0, self.foot_epsilon_orient * np.pi / 180)
 
         # compute the LIP execution in world frame, X = (Lambda, I, C)
-        # t0 = time.time()
+        t0 = time.time()
         X, p_foot_pos_list, stance_name_list = self.compute_LIP_execution()
         L, I, C = X[0], X[1], X[2]
-        # tf = time.time()
-        # print("Time to compute LIP execution: ", tf - t0)
+        tf = time.time()
+        print("Time to compute LIP execution: ", tf - t0)
 
         # for every swing foot configuration solve the IK problem
         q_ref = []
         q_ik_sol = q0
-        # t0 = time.time()
+        t0 = time.time()
         for i in L:
 
             # unpack the foot position information tuple
@@ -596,9 +614,9 @@ class HLIPTrajectoryGeneratorSE3():
         # get the velocity reference
         v_ref = self.compute_velocity_reference(q_ref, v0)
 
-        # tf = time.time()
-        # print("Time to solve IK: ", tf - t0)
-        # print("Average time per IK: ", (tf - t0) / len(q_ref))
+        tf = time.time()
+        print("Time to solve IK: ", tf - t0)
+        print("Average time per IK: ", (tf - t0) / len(q_ref))
 
         # return the trajectory
         return q_ref, v_ref
@@ -624,8 +642,8 @@ if __name__ == "__main__":
                             z_apex=0.07, 
                             bezier_order=7, 
                             T_SSP=0.3, 
-                            dt=0.05, 
-                            N=200)
+                            dt=0.04, 
+                            N=50)
 
     deg = 45
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
@@ -659,7 +677,7 @@ if __name__ == "__main__":
     yaw = RollPitchYaw(R_stance).yaw_angle()
 
     # generate a trajectory
-    v_des = np.array([[0.2], [-0.2]])
+    v_des = np.array([[0.2], [0.2]])
     t_phase = 0.0
 
     t0 = time.time()
