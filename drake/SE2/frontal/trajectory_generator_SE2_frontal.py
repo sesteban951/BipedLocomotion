@@ -49,8 +49,8 @@ class HLIPTrajectoryGeneratorSE2():
 
         # clip the swing foot target position
         self.uy_max = 0.4
-        self.u_L_bias =  0.23  # left is swing foot
-        self.u_R_bias = -0.23  # right is swing foot
+        self.u_L_bias =  0.3  # left is swing foot
+        self.u_R_bias = -0.3  # right is swing foot
 
         # bezier curve
         self.bez_order = 7  # 5 or 7
@@ -377,7 +377,7 @@ class HLIPTrajectoryGeneratorSE2():
             self.swing_foot_frame = self.left_foot_frame
 
         # set the intial stance foot control frame position in world frame
-        self.p_control_stance_W = np.array([stance_foot_pos[0], stance_foot_pos[1], [0]])
+        self.p_control_stance_W = np.array([[0], stance_foot_pos[1], [0]])
 
         # set the initial swing foot position in world frame
         self.p_swing_init_ground = initial_swing_foot_pos                           # swing foot pos when it takes off from the ground

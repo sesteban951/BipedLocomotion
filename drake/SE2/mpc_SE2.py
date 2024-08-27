@@ -103,7 +103,7 @@ def create_optimizer(model_file):
             0.01, 0.01, 0.01,       # left leg
             0.01, 0.01, 0.01       # right leg
     ])
-    problem.R = 0.01 * np.diag([
+    problem.R = 0.01 * np.diag([   #< ---------------- NOTE: there was a 0.01 here the whole time lol
         200.0, 200.0,               # base position
         200.0,                      # base orientation
         0.01, 0.01, 0.01,              # left leg
