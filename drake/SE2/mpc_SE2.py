@@ -86,7 +86,7 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 15
+    problem.num_steps = 20
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
@@ -94,8 +94,8 @@ def create_optimizer(model_file):
     problem.Qq = np.diag([
             10.0, 10.0,          # base position
             10.0,                # base orientation
-            0.1, 0.1, 0.1,     # left leg
-            0.1, 0.1, 0.1     # right leg
+            0.01, 0.01, 0.01,     # left leg
+            0.01, 0.01, 0.01     # right leg
     ])
     problem.Qv = np.diag([
             10.0, 10.0,            # base position
@@ -103,13 +103,13 @@ def create_optimizer(model_file):
             0.01, 0.01, 0.01,       # left leg
             0.01, 0.01, 0.01       # right leg
     ])
-    problem.R = 0.01 * np.diag([   #< ---------------- NOTE: there was a 0.01 here the whole time lol
-        200.0, 200.0,               # base position
-        200.0,                      # base orientation
-        0.01, 0.01, 0.01,              # left leg
-        0.01, 0.01, 0.01              # right leg
+    problem.R = np.diag([  
+        100.0, 100.0,               # base position
+        100.0,                      # base orientation
+        0.0001, 0.0001, 0.0001,              # left leg
+        0.0001, 0.0001, 0.0001              # right leg
     ])
-    problem.Qf_q = 1.0 * np.copy(problem.Qq)
+    problem.Qf_q = 3.0 * np.copy(problem.Qq)
     problem.Qf_v = 1.0 * np.copy(problem.Qv)
 
     v_nom = np.zeros(nv)
@@ -165,9 +165,9 @@ class AchillesPlanarMPC(ModelPredictiveController):
         self.number_of_steps = -1   # number of individual swing foot steps taken
 
         #  z height parameters
-        z_com_nom = 0.64    # nominal CoM height
+        z_com_nom = 0.63    # nominal CoM height
         bezier_order = 7   # 5 or 7
-        z_apex = 0.08      # apex height
+        z_apex = 0.06      # apex height
 
         # maximum velocity for the robot
         self.v_max = 0.3
@@ -308,7 +308,7 @@ if __name__=="__main__":
     # Add implicit PD controllers (must use kLagged or kSimilar)
     kp_hip = 750
     kp_knee = 750
-    kp_ankle = 150
+    kp_ankle = 100
     kd_hip = 10
     kd_knee = 10
     kd_ankle = 1
@@ -334,7 +334,7 @@ if __name__=="__main__":
     joystick = builder.AddSystem(GamepadCommand(deadzone=0.05))
 
     # Create the MPC controller and interpolator systems
-    mpc_rate = 75  # Hz
+    mpc_rate = 50  # Hz
     controller = builder.AddSystem(AchillesPlanarMPC(optimizer, q_guess, mpc_rate, model_file))
 
     Bv = plant.MakeActuationMatrix()
@@ -386,7 +386,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(8.0)
+    simulator.AdvanceTo(15.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
