@@ -43,9 +43,7 @@ class HLIPTrajectoryGeneratorSE2():
         # swing foot parameters
         self.z_nom = 0.64
         self.z_apex = 0.08     # height of the apex of the swing foot 
-        self.z_offset = 0.0    # offset of the swing foot from the ground
-        self.z0_offset = 0.0
-        self.zf_offset = 0.0
+        self.z_offset = 0.02   # offset of the swing foot from the ground
 
         # clip the swing foot target position
         self.uy_max = 0.4
@@ -117,11 +115,11 @@ class HLIPTrajectoryGeneratorSE2():
         # compute primary bezier curve control points
         if self.bez_order == 7:
             ctrl_pts_y = np.array([u0_y, u0_y, u0_y, (u0_y+uf_y)/2, uf_y, uf_y, uf_y])
-            ctrl_pts_z = np.array([self.z0_offset, self.z0_offset, self.z0_offset, (16/5)*(self.z_apex), self.zf_offset, self.zf_offset, self.zf_offset]) + self.z_offset
+            ctrl_pts_z = np.array([self.z_offset, self.z_offset, self.z_offset, (16/5)*(self.z_apex), self.z_offset, self.z_offset, self.z_offset])
 
         elif self.bez_order == 5:
             ctrl_pts_y = np.array([u0_y, u0_y, (u0_y+uf_y)/2, uf_y, uf_y])
-            ctrl_pts_z = np.array([self.z0_offset, self.z0_offset, (8/3)*self.z_apex, self.zf_offset, self.zf_offset]) + self.z_offset
+            ctrl_pts_z = np.array([self.z_offset, self.z_offset, (8/3)*self.z_apex, self.z_offset, self.z_offset])
 
         # set the primary control points
         ctrl_pts = np.vstack((ctrl_pts_y, 
@@ -320,7 +318,7 @@ class HLIPTrajectoryGeneratorSE2():
     # -------------------------------------------------------------------------------------------------- #
 
     # set the trajectory generation problem parameters
-    def set_parameters(self, z_nom, z_apex, bezier_order, T_SSP, dt, N):
+    def set_parameters(self, z_nom, z_apex, z_offset, bezier_order, T_SSP, dt, N):
 
         # make sure that N is non-zero
         assert N >= 1, "N must be an integer >= 1."
@@ -340,6 +338,7 @@ class HLIPTrajectoryGeneratorSE2():
         # set variables that depend on z com nominal
         self.z_apex = z_apex
         self.z_nom = z_nom
+        self.z_offset = z_offset
         g = 9.81
         self.lam = np.sqrt(g/self.z_nom)       # natural frequency
         self.A = np.array([[0,           1],   # LIP drift matrix
@@ -377,7 +376,7 @@ class HLIPTrajectoryGeneratorSE2():
             self.swing_foot_frame = self.left_foot_frame
 
         # set the intial stance foot control frame position in world frame
-        self.p_control_stance_W = np.array([[0], stance_foot_pos[1], [0]])
+        self.p_control_stance_W = np.array([[0], stance_foot_pos[1], [self.z_offset]])
 
         # set the initial swing foot position in world frame
         self.p_swing_init_ground = initial_swing_foot_pos                           # swing foot pos when it takes off from the ground
@@ -416,7 +415,7 @@ class HLIPTrajectoryGeneratorSE2():
                 
                 # compute the swing foot target
                 b_t = b_swing.value(t)
-                p_swing_target_W = np.array([[0], b_t[0], b_t[1]]) # NOTE: y-direction does not matter here
+                p_swing_target_W = np.array([[0], b_t[0], b_t[1]])
 
                 # compute the COM position target
                 p_R = xt_R[k][0][0]
@@ -459,6 +458,7 @@ if __name__ == "__main__":
     # set the parameters
     traj_gen.set_parameters(z_nom=0.64, 
                             z_apex=0.05, 
+                            z_offset=0.05,
                             bezier_order=7, 
                             T_SSP=0.3, 
                             dt=0.02, 

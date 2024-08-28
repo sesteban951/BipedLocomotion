@@ -33,7 +33,7 @@ class HLIPTrajectoryGeneratorSE3():
         self.dt = None
         self.N = None
 
-        # for keeping track of the pahse time
+        # for keeping track of the phase time
         self.T_DSP = None
         self.T_SSP = None
         self.T = None
@@ -47,9 +47,7 @@ class HLIPTrajectoryGeneratorSE3():
         # swing foot parameters
         self.z_nom = 0.64
         self.z_apex = 0.08     # height of the apex of the swing foot 
-        self.z_offset = 0.0    # offset of the swing foot from the ground
-        self.z0_offset = 0.0
-        self.zf_offset = 0.0
+        self.z_offset = 0.02   # offset of the swing foot from the ground
 
         # clip the swing foot target position
         self.ux_max = 0.5
@@ -116,10 +114,6 @@ class HLIPTrajectoryGeneratorSE3():
         self.p_com_cons = self.ik.AddPositionConstraint(self.static_com_frame, [0, 0, 0], 
                                                         self.plant.world_frame(), 
                                                         [0, 0, 0], [0, 0, 0])
-        # self.C = np.diag([1, 1, 1]) * 100
-        # self.p_com_cons = self.ik.AddPositionCost(self.static_com_frame, [0,0,0],
-        #                                           self.plant.world_frame(), [0,0,0],
-        #                                           self.C)
 
         # Add foot position constraints (continuously update the lower and upper bounds)
         self.p_left_cons =  self.ik.AddPositionConstraint(self.left_foot_frame, [0, 0, 0],
@@ -128,12 +122,6 @@ class HLIPTrajectoryGeneratorSE3():
         self.p_right_cons = self.ik.AddPositionConstraint(self.right_foot_frame, [0, 0, 0],
                                                           self.plant.world_frame(), 
                                                           [0, 0, 0], [0, 0, 0]) 
-        # self.p_left_cons = self.ik.AddPositionCost(self.left_foot_frame, [0,0,0],
-        #                                             self.plant.world_frame(), [0,0,0],
-        #                                             self.C)
-        # self.p_right_cons = self.ik.AddPositionCost(self.right_foot_frame, [0,0,0],
-        #                                             self.plant.world_frame(), [0,0,0],
-        #                                             self.C)
         
         # Add foot and com orientation constraints, aligns toe directions (updated once at every trajectory gen query)
         self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(), 
@@ -145,16 +133,6 @@ class HLIPTrajectoryGeneratorSE3():
         self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
                                                                     self.plant.world_frame(), [1, 0, 0],
                                                                     0, 0)
-        # self.c = 1 * 50
-        # self.r_com_cons = self.ik.AddOrientationCost(self.static_com_frame, RotationMatrix(),
-        #                                              self.plant.world_frame(), RotationMatrix(),
-        #                                              self.c)
-        # self.r_left_cons = self.ik.AddAngleBetweenVectorsCost(self.left_foot_frame, [1, 0, 0],
-        #                                                       self.plant.world_frame(), [1, 0, 0],
-        #                                                       self.c)
-        # self.r_right_cons = self.ik.AddAngleBetweenVectorsCost(self.right_foot_frame, [1, 0, 0],
-        #                                                       self.plant.world_frame(), [1, 0, 0],
-        #                                                       self.c)
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -198,12 +176,12 @@ class HLIPTrajectoryGeneratorSE3():
         if self.bez_order == 7:
             ctrl_pts_x = np.array([u0_x, u0_x, u0_x, (u0_x+uf_x)/2, uf_x, uf_x, uf_x])
             ctrl_pts_y = np.array([u0_y, u0_y, u0_y, (u0_y+uf_y)/2, uf_y, uf_y, uf_y])
-            ctrl_pts_z = np.array([self.z0_offset, self.z0_offset, self.z0_offset, (16/5)*(self.z_apex), self.zf_offset, self.zf_offset, self.zf_offset]) + self.z_offset
+            ctrl_pts_z = np.array([self.z_offset, self.z_offset, self.z_offset, (16/5)*(self.z_apex), self.z_offset, self.z_offset, self.z_offset])
 
         elif self.bez_order == 5:
             ctrl_pts_x = np.array([u0_x, u0_x, (u0_x+uf_x)/2, uf_x, uf_x])
             ctrl_pts_y = np.array([u0_y, u0_y, (u0_y+uf_y)/2, uf_y, uf_y])
-            ctrl_pts_z = np.array([self.z0_offset, self.z0_offset, (8/3)*self.z_apex, self.zf_offset, self.zf_offset]) + self.z_offset
+            ctrl_pts_z = np.array([self.z_offset, self.z_offset, (8/3)*self.z_apex, self.z_offset, self.z_offset])
 
         # set the primary control points
         ctrl_pts = np.vstack((ctrl_pts_x, 
@@ -393,33 +371,14 @@ class HLIPTrajectoryGeneratorSE3():
 
         # update the COM target position
         self.p_com_cons.evaluator().set_bounds(p_com_pos - self.tol_base, p_com_pos + self.tol_base)
-        # self.ik.prog().RemoveCost(self.p_com_cons)
-        # self.p_com_cons = self.ik.AddPositionCost(self.static_com_frame, [0,0,0],
-        #                                           self.plant.world_frame(), p_com_pos,
-        #                                           self.C)
-
-        # self.ik.prog().RemoveCost(self.p_left_cons)
-        # self.ik.prog().RemoveCost(self.p_right_cons)
         
         if stance_name == "left_foot":
             self.p_left_cons.evaluator().set_bounds(p_stance - self.tol_feet, p_stance + self.tol_feet)
             self.p_right_cons.evaluator().set_bounds(p_swing - self.tol_feet, p_swing + self.tol_feet)
-            # self.p_left_cons = self.ik.AddPositionCost(self.left_foot_frame, [0,0,0],
-            #                                            self.plant.world_frame(), p_stance,
-            #                                            self.C)
-            # self.p_right_cons = self.ik.AddPositionCost(self.right_foot_frame, [0,0,0],
-            #                                             self.plant.world_frame(), p_swing,
-            #                                             self.C)
 
         elif stance_name == "right_foot":
             self.p_right_cons.evaluator().set_bounds(p_stance - self.tol_feet, p_stance + self.tol_feet)
             self.p_left_cons.evaluator().set_bounds(p_swing - self.tol_feet, p_swing + self.tol_feet)
-            # self.p_right_cons = self.ik.AddPositionCost(self.right_foot_frame, [0,0,0],
-            #                                             self.plant.world_frame(), p_stance,
-            #                                             self.C)
-            # self.p_left_cons = self.ik.AddPositionCost(self.left_foot_frame, [0,0,0],
-            #                                              self.plant.world_frame(), p_swing,
-            #                                              self.C)
 
         # solve the IK problem
         self.ik.prog().SetInitialGuess(self.ik.q(), initial_guess)
@@ -512,7 +471,7 @@ class HLIPTrajectoryGeneratorSE3():
     # -------------------------------------------------------------------------------------------------- #
 
     # set the trajectory generation problem parameters
-    def set_parameters(self, z_nom, z_apex, bezier_order, T_SSP, dt, N):
+    def set_parameters(self, z_nom, z_apex, z_offset, bezier_order, T_SSP, dt, N):
 
         # make sure that N is non-zero
         assert N >= 1, "N must be an integer >= 1."
@@ -532,6 +491,7 @@ class HLIPTrajectoryGeneratorSE3():
         # set variables that depend on z com nominal
         self.z_apex = z_apex
         self.z_nom = z_nom
+        self.z_offset = z_offset
         g = 9.81
         self.lam = np.sqrt(g/self.z_nom)       # natural frequency
         self.A = np.array([[0,           1],   # LIP drift matrix
@@ -579,7 +539,7 @@ class HLIPTrajectoryGeneratorSE3():
 
         # set the initial stance foot control frame position in world frame
         self.control_stance_yaw = stance_foot_yaw
-        self.p_control_stance_W = np.array([stance_foot_pos[0], stance_foot_pos[1], [0]])
+        self.p_control_stance_W = np.array([stance_foot_pos[0], stance_foot_pos[1], [self.z_offset]])
         self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0, stance_foot_yaw))
         self.R_control_stance_W_mat = self.R_control_stance_W.matrix()
 
@@ -602,18 +562,6 @@ class HLIPTrajectoryGeneratorSE3():
         self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
                                                                     self.plant.world_frame(), self.R_control_stance_W_mat @ [1, 0, 0],
                                                                     0, self.foot_epsilon_orient * np.pi / 180)
-        # self.ik.prog().RemoveCost(self.r_com_cons)
-        # self.ik.prog().RemoveCost(self.r_left_cons)
-        # self.ik.prog().RemoveCost(self.r_right_cons)
-        # self.r_com_cons = self.ik.AddOrientationCost(self.static_com_frame, RotationMatrix(),
-        #                                              self.plant.world_frame(), self.R_control_stance_W,
-        #                                              self.c)
-        # self.r_left_cons = self.ik.AddAngleBetweenVectorsCost(self.left_foot_frame, [1, 0, 0],
-        #                                                       self.plant.world_frame(), self.R_control_stance_W_mat @ [1, 0, 0],
-        #                                                       self.c)
-        # self.r_right_cons = self.ik.AddAngleBetweenVectorsCost(self.right_foot_frame, [1, 0, 0],
-        #                                                        self.plant.world_frame(), self.R_control_stance_W_mat @ [1, 0, 0],
-        #                                                        self.c)
 
         # compute the LIP execution in world frame, X = (Lambda, I, C)
         t0 = time.time()
@@ -691,6 +639,7 @@ if __name__ == "__main__":
     # set the parameters
     traj_gen.set_parameters(z_nom=0.64, 
                             z_apex=0.07, 
+                            z_offset=0.05,
                             bezier_order=7, 
                             T_SSP=0.3, 
                             dt=0.04, 
@@ -767,7 +716,7 @@ if __name__ == "__main__":
     dt = 1.0 / configs_per_sec
     for i in range(len(q_HLIP)):
 
-        # Wait for the next state estimate        
+        # Wait for the next state estimate  
         time.sleep(dt)
 
         # Set the Drake model to have this state

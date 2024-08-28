@@ -41,9 +41,7 @@ class HLIPTrajectoryGeneratorSE2():
         # swing foot parameters
         self.z_nom = 0.64
         self.z_apex = 0.08     # height of the apex of the swing foot 
-        self.z_offset = 0.0    # offset of the swing foot from the ground
-        self.z0_offset = 0.0
-        self.zf_offset = 0.0
+        self.z_offset = 0.02   # offset of the swing foot from the ground
 
         # clip the swing foot target position
         self.ux_max = 0.4
@@ -66,19 +64,11 @@ class HLIPTrajectoryGeneratorSE2():
         self.p_com_cons = self.ik.AddPositionConstraint(self.static_com_frame, [0, 0, 0], 
                                                         self.plant.world_frame(), 
                                                         [0, 0, 0], [0, 0, 0])
-        # self.Cp = np.diag([1, 1, 1])
-        # self.p_com_cons = self.ik.AddPositionCost(self.static_com_frame, [0,0,0],
-        #                                           self.plant.world_frame(), [0,0,0], 
-        #                                           self.Cp)
 
         # # Add com orientation constraint (fixed constraint)
         self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(),
                                                            self.plant.world_frame(), RotationMatrix(),
                                                            base_epsilon_orient * (np.pi/180))
-        # self.c = 1
-        # self.r_com_cons = self.ik.AddOrientationCost(self.static_com_frame, RotationMatrix(),
-        #                                             self.plant.world_frame(), RotationMatrix(),
-        #                                             self.c)
 
         # # Add foot position constraints (continuously update the lower and upper bounds)
         self.p_left_cons =  self.ik.AddPositionConstraint(self.left_foot_frame, [0, 0, 0],
@@ -87,12 +77,6 @@ class HLIPTrajectoryGeneratorSE2():
         self.p_right_cons = self.ik.AddPositionConstraint(self.right_foot_frame, [0, 0, 0],
                                                           self.plant.world_frame(), 
                                                           [0, 0, 0], [0, 0, 0]) 
-        # self.p_left_cons = self.ik.AddPositionCost(self.left_foot_frame, [0, 0, 0],
-        #                                           self.plant.world_frame(), [0, 0, 0],
-        #                                           self.Cp)
-        # self.p_right_cons = self.ik.AddPositionCost(self.right_foot_frame, [0, 0, 0],
-        #                                             self.plant.world_frame(), [0, 0, 0],
-        #                                             self.Cp)
         
         # # Add foot orientation constraints (fixed constraint)
         self.r_left_cons =  self.ik.AddOrientationConstraint(self.left_foot_frame, RotationMatrix(),
@@ -101,12 +85,6 @@ class HLIPTrajectoryGeneratorSE2():
         self.r_right_cons = self.ik.AddOrientationConstraint(self.right_foot_frame, RotationMatrix(),
                                                              self.plant.world_frame(), RotationMatrix(),
                                                              foot_epsilon_orient * (np.pi/180))
-        # self.r_left_cons = self.ik.AddOrientationCost(self.left_foot_frame, RotationMatrix(),
-        #                                                 self.plant.world_frame(), RotationMatrix(),
-        #                                                 self.c)
-        # self.r_right_cons = self.ik.AddOrientationCost(self.right_foot_frame, RotationMatrix(),
-        #                                                 self.plant.world_frame(), RotationMatrix(),
-        #                                                 self.c)
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -133,11 +111,11 @@ class HLIPTrajectoryGeneratorSE2():
         # compute primary bezier curve control points
         if self.bez_order == 7:
             ctrl_pts_x = np.array([u0_x, u0_x, u0_x, (u0_x+uf_x)/2, uf_x, uf_x, uf_x])
-            ctrl_pts_z = np.array([self.z0_offset, self.z0_offset, self.z0_offset, (16/5)*(self.z_apex), self.zf_offset, self.zf_offset, self.zf_offset]) + self.z_offset
+            ctrl_pts_z = np.array([self.z_offset, self.z_offset, self.z_offset, (16/5)*(self.z_apex), self.z_offset, self.z_offset, self.z_offset])
 
         elif self.bez_order == 5:
             ctrl_pts_x = np.array([u0_x, u0_x, (u0_x+uf_x)/2, uf_x, uf_x])
-            ctrl_pts_z = np.array([self.z0_offset, self.z0_offset, (8/3)*self.z_apex, self.zf_offset, self.zf_offset]) + self.z_offset
+            ctrl_pts_z = np.array([self.z_offset, self.z_offset, (8/3)*self.z_apex, self.z_offset, self.z_offset])
 
         # set the primary control points
         ctrl_pts = np.vstack((ctrl_pts_x, 
@@ -287,24 +265,14 @@ class HLIPTrajectoryGeneratorSE2():
     def solve_ik(self, p_com_pos, p_stance, p_swing, stance_name, initial_guess):
 
         # update the COM target position
-        # self.p_com_cons.evaluator().UpdateLowerBound(p_com_pos - self.tol_base)
-        # self.p_com_cons.evaluator().UpdateUpperBound(p_com_pos + self.tol_base)
         self.p_com_cons.evaluator().set_bounds(p_com_pos - self.tol_base, p_com_pos + self.tol_base)
 
         if stance_name == "left_foot":
-            # self.p_left_cons.evaluator().UpdateLowerBound(p_stance - self.tol_feet)
-            # self.p_left_cons.evaluator().UpdateUpperBound(p_stance + self.tol_feet)
             self.p_left_cons.evaluator().set_bounds(p_stance - self.tol_feet, p_stance + self.tol_feet)
-            # self.p_right_cons.evaluator().UpdateLowerBound(p_swing - self.tol_feet)
-            # self.p_right_cons.evaluator().UpdateUpperBound(p_swing + self.tol_feet)
             self.p_right_cons.evaluator().set_bounds(p_swing - self.tol_feet, p_swing + self.tol_feet)
 
         elif stance_name == "right_foot":
-            # self.p_right_cons.evaluator().UpdateLowerBound(p_stance - self.tol_feet)
-            # self.p_right_cons.evaluator().UpdateUpperBound(p_stance + self.tol_feet)
             self.p_right_cons.evaluator().set_bounds(p_stance - self.tol_feet, p_stance + self.tol_feet)
-            # self.p_left_cons.evaluator().UpdateLowerBound(p_swing - self.tol_feet)
-            # self.p_left_cons.evaluator().UpdateUpperBound(p_swing + self.tol_feet)
             self.p_left_cons.evaluator().set_bounds(p_swing - self.tol_feet, p_swing + self.tol_feet)
 
         # solve the IK problem
@@ -336,7 +304,7 @@ class HLIPTrajectoryGeneratorSE2():
     # -------------------------------------------------------------------------------------------------- #
 
     # set the trajectory generation problem parameters
-    def set_parameters(self, z_nom, z_apex, bezier_order, T_SSP, dt, N):
+    def set_parameters(self, z_nom, z_apex, z_offset, bezier_order, T_SSP, dt, N):
 
         # make sure that N is non-zero
         assert N >= 1, "N must be an integer >= 1."
@@ -356,6 +324,7 @@ class HLIPTrajectoryGeneratorSE2():
         # set variables that depend on z com nominal
         self.z_apex = z_apex
         self.z_nom = z_nom
+        self.z_offset = z_offset
         g = 9.81
         lam = np.sqrt(g/self.z_nom)       # natural frequency
         self.A = np.array([[0,           1],   # LIP drift matrix
@@ -393,7 +362,7 @@ class HLIPTrajectoryGeneratorSE2():
             self.swing_foot_frame = self.left_foot_frame
 
         # set the intial stance foot control frame position in world frame
-        self.p_control_stance_W = np.array([stance_foot_pos[0], stance_foot_pos[1], [0]])
+        self.p_control_stance_W = np.array([stance_foot_pos[0], stance_foot_pos[1], [self.z_offset]])
 
         # set the initial swing foot position in world frame
         self.p_swing_init_ground = initial_swing_foot_pos                           # swing foot pos when it takes off from the ground
@@ -455,105 +424,106 @@ class HLIPTrajectoryGeneratorSE2():
 
 ####################################################################################################
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-#     # model file
-#     model_file = "../../models/achilles_SE2_drake.urdf"
+    # model file
+    model_file = "../../models/achilles_SE2_drake.urdf"
 
-#     # create a plant model for testing
-#     plant = MultibodyPlant(0)
-#     Parser(plant).AddModels(model_file)
-#     plant.Finalize()
-#     plant_context = plant.CreateDefaultContext()
+    # create a plant model for testing
+    plant = MultibodyPlant(0)
+    Parser(plant).AddModels(model_file)
+    plant.Finalize()
+    plant_context = plant.CreateDefaultContext()
 
-#     # create the trajectory generator
-#     traj_gen = HLIPTrajectoryGeneratorSE2(model_file)
+    # create the trajectory generator
+    traj_gen = HLIPTrajectoryGeneratorSE2(model_file)
 
-#     # set the parameters
-#     traj_gen.set_parameters(z_nom=0.64, 
-#                             z_apex=0.05, 
-#                             bezier_order=7, 
-#                             T_SSP=0.3, 
-#                             dt=0.02, 
-#                             N=400)
+    # set the parameters
+    traj_gen.set_parameters(z_nom=0.64, 
+                            z_apex=0.05, 
+                            z_offset=0.05,
+                            bezier_order=7, 
+                            T_SSP=0.3, 
+                            dt=0.02, 
+                            N=400)
 
-#     # configuration 
-#     q0 = np.array([0, 1.0,  # position (x,z)
-#                 0,        # theta
-#                 0, 0, 0,  # left leg: hip_pitch, knee, ankle 
-#                 0, 0, 0]) # right leg: hip_pitch, knee, ankle
-#     v0 = np.zeros(plant.num_velocities())
-#     v0[0] = -0.0 # forward velocity
-#     plant.SetPositions(plant_context, q0)
-#     plant.SetVelocities(plant_context, v0)
+    # configuration 
+    q0 = np.array([0, 1.0,  # position (x,z)
+                0,        # theta
+                0, 0, 0,  # left leg: hip_pitch, knee, ankle 
+                0, 0, 0]) # right leg: hip_pitch, knee, ankle
+    v0 = np.zeros(plant.num_velocities())
+    v0[0] = -0.0 # forward velocity
+    plant.SetPositions(plant_context, q0)
+    plant.SetVelocities(plant_context, v0)
 
-#     swing_foot_frame = plant.GetFrameByName("left_foot")
-#     stance_foot_frame = plant.GetFrameByName("right_foot")
+    swing_foot_frame = plant.GetFrameByName("left_foot")
+    stance_foot_frame = plant.GetFrameByName("right_foot")
 
-#     p_swing = plant.CalcPointsPositions(plant_context,
-#                                         swing_foot_frame, [0, 0, 0],
-#                                         plant.world_frame())
-#     p_stance = plant.CalcPointsPositions(plant_context, 
-#                                          stance_foot_frame, [0, 0, 0], 
-#                                          plant.world_frame())
+    p_swing = plant.CalcPointsPositions(plant_context,
+                                        swing_foot_frame, [0, 0, 0],
+                                        plant.world_frame())
+    p_stance = plant.CalcPointsPositions(plant_context, 
+                                         stance_foot_frame, [0, 0, 0], 
+                                         plant.world_frame())
     
-#     # generate a trajectory
-#     v_des = 0.0
-#     t_phase = 0.0
+    # generate a trajectory
+    v_des = 0.2
+    t_phase = 0.0
 
-#     t0 = time.time()
-#     q_HLIP, v_HLIP = traj_gen.generate_trajectory(q0=q0,
-#                                                   v0=v0,
-#                                                   v_des=v_des,
-#                                                   t_phase=t_phase,
-#                                                   initial_swing_foot_pos=p_swing,
-#                                                   stance_foot_pos=p_stance,
-#                                                   initial_stance_foot_name="right_foot")
-#     tf = time.time()
-#     print("Time to solve 2D prop: ", tf - t0)
+    t0 = time.time()
+    q_HLIP, v_HLIP = traj_gen.generate_trajectory(q0=q0,
+                                                  v0=v0,
+                                                  v_des=v_des,
+                                                  t_phase=t_phase,
+                                                  initial_swing_foot_pos=p_swing,
+                                                  stance_foot_pos=p_stance,
+                                                  initial_stance_foot_name="right_foot")
+    tf = time.time()
+    print("Time to solve 2D prop: ", tf - t0)
 
-#     # start meshcat
-#     meshcat = StartMeshcat()
+    # start meshcat
+    meshcat = StartMeshcat()
 
-#     # Set up a system diagram that includes a plant, scene graph, and meshcat
-#     builder = DiagramBuilder()
-#     plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.0)
-#     models = Parser(plant).AddModels(model_file)
-#     plant.Finalize()
+    # Set up a system diagram that includes a plant, scene graph, and meshcat
+    builder = DiagramBuilder()
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.0)
+    models = Parser(plant).AddModels(model_file)
+    plant.Finalize()
 
-#     AddDefaultVisualization(builder, meshcat)
+    AddDefaultVisualization(builder, meshcat)
 
-#     diagram = builder.Build()
-#     diagram_context = diagram.CreateDefaultContext()
-#     plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
+    diagram = builder.Build()
+    diagram_context = diagram.CreateDefaultContext()
+    plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
-#     # Start meshcat recording
-#     meshcat.StartRecording()
+    # Start meshcat recording
+    meshcat.StartRecording()
 
-#     time_elapsed = 0.0
-#     tot_time_des = 5.0
-#     configs_per_sec = len(q_HLIP) / tot_time_des
-#     dt = 1.0 / configs_per_sec
-#     for i in range(len(q_HLIP)):
+    time_elapsed = 0.0
+    tot_time_des = 5.0
+    configs_per_sec = len(q_HLIP) / tot_time_des
+    dt = 1.0 / configs_per_sec
+    for i in range(len(q_HLIP)):
 
-#         # Wait for the next state estimate        
-#         time.sleep(dt)
+        # Wait for the next state estimate        
+        time.sleep(dt)
 
-#         # Set the Drake model to have this state
-#         q0 = q_HLIP[i]
-#         plant.SetPositions(plant_context, q0)
+        # Set the Drake model to have this state
+        q0 = q_HLIP[i]
+        plant.SetPositions(plant_context, q0)
 
-#         # Set the time in the Drake diagram. This will allow meshcat playback to work.
-#         time_elapsed += dt
-#         diagram_context.SetTime(time_elapsed)
+        # Set the time in the Drake diagram. This will allow meshcat playback to work.
+        time_elapsed += dt
+        diagram_context.SetTime(time_elapsed)
 
-#         # Perform a forced publish event. This will propagate the plant's state to 
-#         # meshcat, without doing any physics simulation.
-#         diagram.ForcedPublish(diagram_context)
+        # Perform a forced publish event. This will propagate the plant's state to 
+        # meshcat, without doing any physics simulation.
+        diagram.ForcedPublish(diagram_context)
 
-#     # Publish the meshcat recording
-#     meshcat.StopRecording()
-#     meshcat.PublishRecording()
+    # Publish the meshcat recording
+    meshcat.StopRecording()
+    meshcat.PublishRecording()
 
     
 
