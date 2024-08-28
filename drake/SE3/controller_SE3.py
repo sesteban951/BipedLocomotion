@@ -81,17 +81,18 @@ class HLIP(LeafSystem):
         self.v_R = None     # center of mass velocity (in control stance foot frame)
 
         # LIP model preimpact states
-        self.p_H_minus_x = 0
-        self.v_H_minus_x = 0
         self.p_R_minus_x = 0
-        self.v_R_minus_x = 0
-        self.p_H_minus_y = 0
-        self.v_H_minus_y = 0
         self.p_R_minus_y = 0
+        self.v_R_minus_x = 0
         self.v_R_minus_y = 0
 
+        self.p_H_minus_x = 0
+        self.p_H_minus_y = 0
+        self.v_H_minus_x = 0
+        self.v_H_minus_y = 0
+
         # swing foot parameters
-        self.z_apex = 0.08    # NOTE: this is affected by bezier curve swing belnding
+        self.z_apex = 0.08    
         self.z_offset = 0.0
         self.z0 = 0.0
         self.zf = 0.0
@@ -108,14 +109,14 @@ class HLIP(LeafSystem):
         self.sigma_P2 = self.lam * tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
         
         # desired velocity
-        self.v_des_x = 0.0
-        self.v_des_y = 0.0
+        self.v_des_x = 0.0  # [m/s]
+        self.v_des_y = 0.0  # [m/s]
         
         # maximum velocity and acceleration 
-        self.v_max_x = 0.3
-        self.v_max_y = 0.2
-        self.a_max_x = 0.1
-        self.a_max_y = 0.05
+        self.v_max_x = 0.4  # [m/s]
+        self.v_max_y = 0.3  # [m/s]
+        self.a_max_x = 0.5  # [m/s^2]
+        self.a_max_y = 0.3  # [m/s^2]
         
         # maximum foot placement
         self.u_max_x = 0.4
@@ -215,20 +216,20 @@ class HLIP(LeafSystem):
                                                                      self.right_foot_frame)
                     # set the initial swing foot position
                     self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
-                                                                        self.left_foot_frame, [0,0,0],
-                                                                        self.plant.world_frame())
+                                                                         self.left_foot_frame, [0,0,0],
+                                                                         self.plant.world_frame())
                 else:
                     # set the stance foot frame
                     p_stance = self.plant.CalcPointsPositions(self.plant_context,
-                                                            self.swing_foot_frame, [0,0,0],
-                                                            self.plant.world_frame())
+                                                              self.swing_foot_frame, [0,0,0],
+                                                              self.plant.world_frame())
                     R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
-                                                                    self.plant.world_frame(),
-                                                                    self.swing_foot_frame)
+                                                                     self.plant.world_frame(),
+                                                                     self.swing_foot_frame)
                     # set the initial swing foot position
                     self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
-                                                                        self.stance_foot_frame, [0,0,0],
-                                                                        self.plant.world_frame())
+                                                                         self.stance_foot_frame, [0,0,0],
+                                                                         self.plant.world_frame())
                 self.control_stance_yaw = RollPitchYaw(R_stance).yaw_angle()
                 self.p_control_stance_W = np.array([p_stance[0], p_stance[1], [self.z_offset]])
                 self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0, self.control_stance_yaw)).matrix()
@@ -241,7 +242,7 @@ class HLIP(LeafSystem):
                 # add the new orientation constraints
                 self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(),
                                                                    self.plant.world_frame(), RotationMatrix(self.R_control_stance_W),
-                                                                   0.0)
+                                                                   self.foot_epsilon_orient * np.pi / 180)
                 self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
                                                                             self.plant.world_frame(), self.R_control_stance_W @ [1, 0, 0],
                                                                             0, self.foot_epsilon_orient * np.pi / 180)
@@ -273,20 +274,20 @@ class HLIP(LeafSystem):
                                                                      self.left_foot_frame)
                     # set the initial swing foot position
                     self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
-                                                                        self.right_foot_frame, [0,0,0],
-                                                                        self.plant.world_frame())
+                                                                         self.right_foot_frame, [0,0,0],
+                                                                         self.plant.world_frame())
                 else:
                     # set the stance foot frame
                     p_stance = self.plant.CalcPointsPositions(self.plant_context,
-                                                            self.swing_foot_frame,[0,0,0],
-                                                            self.plant.world_frame())
+                                                              self.swing_foot_frame,[0,0,0],
+                                                              self.plant.world_frame())
                     R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
-                                                                    self.plant.world_frame(),
-                                                                    self.swing_foot_frame)
+                                                                     self.plant.world_frame(),
+                                                                     self.swing_foot_frame)
                     # set the initial swing foot position
                     self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
-                                                                        self.stance_foot_frame, [0,0,0],
-                                                                        self.plant.world_frame())
+                                                                         self.stance_foot_frame, [0,0,0],
+                                                                         self.plant.world_frame())
                 self.control_stance_yaw = RollPitchYaw(R_stance).yaw_angle()
                 self.p_control_stance_W = np.array([p_stance[0], p_stance[1], [self.z_offset]])
                 self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0, self.control_stance_yaw)).matrix()
@@ -299,7 +300,7 @@ class HLIP(LeafSystem):
                 # add the new orientation constraints
                 self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(),
                                                                    self.plant.world_frame(), RotationMatrix(self.R_control_stance_W),
-                                                                   0.0)
+                                                                   self.foot_epsilon_orient * np.pi / 180)
                 self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
                                                                             self.plant.world_frame(), self.R_control_stance_W @ [1, 0, 0],
                                                                             0, self.foot_epsilon_orient * np.pi / 180)
@@ -396,7 +397,7 @@ class HLIP(LeafSystem):
             p = np.array([p[0], p[1], p_com_W[2]])
             self.meshcat.SetTransform("com_vel", RigidTransform(rpy,p), self.t_current)
 
-        # draw teh stance foot control frame
+        # draw the stance foot control frame
         self.draw_stance_frame(self.R_control_stance_W, self.p_control_stance_W)
 
     # ---------------------------------------------------------------------------------------- #
@@ -428,6 +429,10 @@ class HLIP(LeafSystem):
             uy_nom += self.u_R_bias
         uy_fb = self.Kp_db * (py_R_minus - py_H_minus) + self.Kd_db * (vy_R_minus - vy_H_minus)
         uy = uy_nom + uy_fb
+
+        # TODO: should I add CBF or simple heuristic to avoid foot swing foot and stance foot collision?
+        # 1) CBF is expensive to compute in terms of the required kinematics
+        # 2) Heuristic is simple and fast, requires projection oracle. 
 
         # saturate the commands
         ux = np.clip(ux, -self.u_max_x, self.u_max_x)
