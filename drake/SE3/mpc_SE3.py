@@ -167,9 +167,10 @@ class AchillesMPC(ModelPredictiveController):
         self.number_of_steps = -1   # number of individual swing foot steps taken
 
         # z height parameters
-        z_com_nom = 0.64   # nominal CoM height
-        bezier_order = 7   # 5 or 7
-        z_apex = 0.08      # apex height
+        z_com_nom = 0.64     # nominal CoM height
+        bezier_order = 7     # 5 or 7
+        z_apex = 0.08        # apex height
+        z_foot_offset = 0.01 # foot offset from the ground
 
         # maximum velocity for the robot
         self.v_max = 0.2
@@ -191,6 +192,7 @@ class AchillesMPC(ModelPredictiveController):
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE3(model_file)
         self.traj_gen_HLIP.set_parameters(z_nom = z_com_nom,
                                           z_apex = z_apex,
+                                          z_offset = z_foot_offset,
                                           bezier_order = bezier_order,
                                           T_SSP = self.T_SSP,
                                           dt = self.optimizer.time_step(),
@@ -388,8 +390,7 @@ if __name__=="__main__":
     actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
     for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):
         plant.get_joint_actuator(actuator_index).set_controller_gains(
-            PdControllerGains(p=Kp, d=Kd))
-    
+            PdControllerGains(p=Kp, d=Kd))    
     plant.Finalize()
 
     # Set up the trajectory optimization problem

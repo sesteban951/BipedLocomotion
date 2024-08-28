@@ -173,9 +173,10 @@ class AchillesPlanarMPC(ModelPredictiveController):
         self.number_of_steps = -1   # number of individual swing foot steps taken
 
         # z height parameters
-        z_com_nom = 0.63    # nominal CoM height
-        bezier_order = 7   # 5 or 7
-        z_apex = 0.07      # apex height
+        z_com_nom = 0.63     # nominal CoM height
+        bezier_order = 7     # 5 or 7
+        z_apex = 0.07        # apex height
+        z_foot_offset = 0.00 # foot offset from the ground
 
         # maximum velocity for the robot
         self.v_max = 0.3
@@ -193,6 +194,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file_no_arms)
         self.traj_gen_HLIP.set_parameters(z_nom = z_com_nom,
                                           z_apex = z_apex,
+                                          z_offset = z_foot_offset,
                                           bezier_order = bezier_order,
                                           T_SSP = self.T_SSP,
                                           dt = self.optimizer.time_step(),
