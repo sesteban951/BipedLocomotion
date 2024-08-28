@@ -57,7 +57,9 @@ def standing_position():
             0.0000, 0.9400,             # base position
             0.0000,                     # base orientation
             0, -0.5515, 1.0239,-0.4725, # left leg
+            0, 0,                       # left arm
             0, -0.5515, 1.0239,-0.4725, # right leg
+            0, 0                        # right arm
         ])
 
     return q_stand
@@ -95,19 +97,25 @@ def create_optimizer(model_file):
             15.0, 10.0,          # base position
             10.0,                # base orientation
             9.0, 7.0, 7.0, 5.0,  # left leg
-            9.0, 7.0, 7.0, 5.0   # right leg
+            1.0, 1.0,            # left arm
+            9.0, 7.0, 7.0, 5.0,  # right leg
+            1.0, 1.0             # right arm
     ])
     problem.Qv = np.diag([
-            15.0, 1.0,           # base position
+            15.0, 1.0,            # base position
             10.0,                # base orientation
             1.0, 1.0, 1.0, 1.0,  # left leg
-            1.0, 1.0, 1.0, 1.0   # right leg
+            0.1, 0.1,            # left arm
+            1.0, 1.0, 1.0, 1.0,  # right leg
+            0.1, 0.1             # right arm
     ])
     problem.R = np.diag([
         100.0, 100.0,               # base position
         100.0,                      # base orientation
-        0.01, 0.01, 0.01, 0.01,         # left leg
-        0.01, 0.01, 0.01, 0.01          # right leg
+        0.01, 0.01, 0.01, 0.01,     # left leg
+        0.01, 0.01,                 # left arm
+        0.01, 0.01, 0.01, 0.01,     # right leg
+        0.01, 0.01                  # right arm
     ])
     problem.Qf_q = 2.0 * np.copy(problem.Qq)
     problem.Qf_v = 1.0 * np.copy(problem.Qv)
@@ -147,7 +155,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
     def __init__(self, optimizer, q_guess, mpc_rate, model_file):
 
         # inherit from the ModelPredictiveController class
-        ModelPredictiveController.__init__(self, optimizer, q_guess, 11, 11, mpc_rate)
+        ModelPredictiveController.__init__(self, optimizer, q_guess, 15, 15, mpc_rate)
 
         self.joystick_port = self.DeclareVectorInputPort("joy_command",
                                                          BasicVector(5))  # LS_x, LS_y, RS_x, A button, RT (Xbox)
@@ -181,7 +189,8 @@ class AchillesPlanarMPC(ModelPredictiveController):
         self.p_swing_init = None
 
         # create an HLIP trajectory generator object and set the parameters
-        self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file)
+        model_file_no_arms = "../../../models/achilles_SE2_drake_frontal.urdf"
+        self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE2(model_file_no_arms)
         self.traj_gen_HLIP.set_parameters(z_nom = z_com_nom,
                                           z_apex = z_apex,
                                           bezier_order = bezier_order,
@@ -195,6 +204,9 @@ class AchillesPlanarMPC(ModelPredictiveController):
         # computing the alpha value based on speed
         p = 0.8
         self.alpha = lambda v: ((1/self.v_max) * abs(v)) ** p
+
+        # indeces for wholebody to simplified model with no armss
+        self.idx_no_arms = [0,1,2,3,4,5,6,9,10,11,12]
 
     # update the foot info for the HLIP traj gen
     def UpdateFootInfo(self):
@@ -272,8 +284,10 @@ class AchillesPlanarMPC(ModelPredictiveController):
         self.UpdateFootInfo()
 
         # get a new reference trajectory
-        q_HLIP, v_HLIP = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
-                                                                v0 = v0,
+        q0_no_arms = [q0[i] for i in self.idx_no_arms]
+        v0_no_arms = [v0[i] for i in self.idx_no_arms]
+        q_HLIP, v_HLIP = self.traj_gen_HLIP.generate_trajectory(q0 = q0_no_arms,
+                                                                v0 = v0_no_arms,
                                                                 v_des = vy_des,
                                                                 t_phase = self.t_phase,
                                                                 initial_swing_foot_pos = self.p_swing_init,
@@ -290,10 +304,8 @@ class AchillesPlanarMPC(ModelPredictiveController):
         q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
         v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
         for i in range(self.optimizer.num_steps() + 1):
-            q_nom[i] = (1 - a) * q_stand[i] + a * q_HLIP[i]
-            v_nom[i] = (1 - a) * v_stand[i] + a * v_HLIP[i]
-            # q_nom[i] = (1 - a) * q_HLIP[i] + a * q_stand[i]
-            # v_nom[i] = (1 - a) * v_HLIP[i] + a * v_stand[i]
+            q_nom[i][self.idx_no_arms] = (1 - a) * q_stand[i][self.idx_no_arms] + a * q_HLIP[i]
+            v_nom[i][self.idx_no_arms] = (1 - a) * v_stand[i][self.idx_no_arms] + a * v_HLIP[i]
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 
@@ -302,7 +314,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
 if __name__=="__main__":
 
     meshcat = StartMeshcat()
-    model_file = "../../../models/achilles_SE2_drake_frontal.urdf"
+    model_file = "../../../models/achilles_SE2_arms_drake_frontal.urdf"
 
     # Set up a Drake diagram for simulation
     builder = DiagramBuilder()
@@ -320,14 +332,16 @@ if __name__=="__main__":
     # Add implicit PD controllers (must use kLagged or kSimilar)
     kp_hip = 750
     kp_knee = 750
-    kp_ankle = 150
+    kp_ankle = 75
+    kp_arm = 50
     kd_hip = 10
     kd_knee = 10
     kd_ankle = 1
+    kd_arm = 1
     
-    # no arms
-    Kp = np.array([kp_hip, kp_hip, kp_knee, kp_ankle, kp_hip, kp_hip, kp_knee, kp_ankle])
-    Kd = np.array([kd_hip, kd_hip, kd_knee, kd_ankle, kd_hip, kd_hip, kd_knee, kd_ankle])
+    # with arms
+    Kp = np.array([kp_hip, kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm, kp_hip, kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm])
+    Kd = np.array([kd_hip, kd_hip, kd_knee, kd_ankle, kd_arm, kd_arm, kd_hip, kd_hip, kd_knee, kd_ankle, kd_arm, kd_arm])
     
     actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
     for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):

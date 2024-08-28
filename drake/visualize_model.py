@@ -11,8 +11,7 @@ from pydrake.all import ModelVisualizer, MultibodyPlant, Parser, StartMeshcat
 from pydrake.all import *
 
 # load model
-# urdf_path = "../models/achilles_drake.urdf"
-urdf_path = "../models/achilles_SE2_drake_frontal.urdf"
+urdf_path = "../models/achilles_SE2_arms_drake_frontal.urdf"
 plant = MultibodyPlant(0)
 Parser(plant).AddModels(urdf_path)
 plant.Finalize()
