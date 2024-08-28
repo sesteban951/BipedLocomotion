@@ -564,16 +564,16 @@ class HLIPTrajectoryGeneratorSE3():
                                                                     0, self.foot_epsilon_orient * np.pi / 180)
 
         # compute the LIP execution in world frame, X = (Lambda, I, C)
-        t0 = time.time()
+        # t0 = time.time()
         X, p_foot_pos_list, stance_name_list = self.compute_LIP_execution()
         L, I, C = X[0], X[1], X[2]
-        tf = time.time()
-        print("Time to compute LIP execution: ", tf - t0)
+        # tf = time.time()
+        # print("Time to compute LIP execution: ", tf - t0)
 
         # for every swing foot configuration solve the IK problem
         q_ref = []
         q_ik_sol = q0
-        t0 = time.time()
+        # t0 = time.time()
         for i in L:
 
             # unpack the foot position information tuple
@@ -613,9 +613,9 @@ class HLIPTrajectoryGeneratorSE3():
         # get the velocity reference
         v_ref = self.compute_velocity_reference(q_ref, v0)
 
-        tf = time.time()
-        print("Time to solve IK: ", tf - t0)
-        print("Average time per IK: ", (tf - t0) / len(q_ref))
+        # tf = time.time()
+        # print("Time to solve IK: ", tf - t0)
+        # print("Average time per IK: ", (tf - t0) / len(q_ref))
 
         # return the trajectory
         return q_ref, v_ref

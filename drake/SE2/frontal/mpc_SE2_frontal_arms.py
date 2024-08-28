@@ -172,7 +172,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
         self.T_SSP = 0.3           # swing phase duration
         self.number_of_steps = -1   # number of individual swing foot steps taken
 
-        #  z height parameters
+        # z height parameters
         z_com_nom = 0.62     # nominal CoM height
         bezier_order = 7     # 5 or 7
         z_apex = 0.06        # apex height

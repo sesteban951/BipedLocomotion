@@ -93,7 +93,7 @@ class HLIP(LeafSystem):
 
         # swing foot parameters
         self.z_apex = 0.08    
-        self.z_offset = 0.0
+        self.z_offset = -0.01
         self.z0 = 0.0
         self.zf = 0.0
 
@@ -169,6 +169,16 @@ class HLIP(LeafSystem):
         self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
                                                                     self.plant.world_frame(), [1, 0, 0],
                                                                     0, 0)
+        
+        # Instatntiate the trajectory generator (For Testing Only)
+        self.traj_gen = HLIPTrajectoryGeneratorSE3(model_file)
+        self.traj_gen.set_parameters(z_nom=self.z_nom,
+                                     z_apex=self.z_apex,
+                                     z_offset=self.z_offset,
+                                     bezier_order=self.bez_order,
+                                     T_SSP=self.T_SSP,
+                                     dt=0.01,
+                                     N=2)
 
     ########################################################################################################
 
@@ -567,25 +577,42 @@ class HLIP(LeafSystem):
         # update everything
         self.update_foot_role()
         # self.update_hlip_state_H()    # NOTE: if I do this continuously, I get slightly more robustness 
-        self.update_hlip_state_R()
+        # self.update_hlip_state_R()
 
-        # update the foot trajectory
-        p_swing_W = self.update_foot_traj()
+        # # update the foot trajectory
+        # p_swing_W = self.update_foot_traj()
 
-        # solve the IK problem
-        res = self.DoInverseKinematics(p_swing_W)
+        # # solve the IK problem
+        # res = self.DoInverseKinematics(p_swing_W)
 
-        # extract the IK solution
-        if res.is_success():
-            q_ik = res.GetSolution(self.ik.q())
-            self.q_ik_sol = q_ik
-        else:
-            q_ik = self.plant.GetPositions(self.plant_context)
-            print("\n ************* IK failed! ************* \n")
+        # # extract the IK solution
+        # if res.is_success():
+        #     q_ik = res.GetSolution(self.ik.q())
+        #     self.q_ik_sol = q_ik
+        # else:
+        #     q_ik = self.plant.GetPositions(self.plant_context)
+        #     print("\n ************* IK failed! ************* \n")
 
-        # # compute the nominal state
+        # generate a trajectory for the robot
+        q0 = x_hat[:self.plant.num_positions()]
+        v0 = x_hat[self.plant.num_positions():]
+        v_des = np.array([[self.v_des_x], [self.v_des_y]])
+        q_HLIP, v_HLIP = self.traj_gen.generate_trajectory(q0=q0,
+                                                           v0=v0,
+                                                           v_des=v_des,
+                                                           t_phase=self.t_phase,
+                                                           initial_swing_foot_pos=self.p_swing_init_W,
+                                                           stance_foot_pos=self.p_control_stance_W,
+                                                           stance_foot_yaw=self.control_stance_yaw,
+                                                           initial_stance_foot_name=self.stance_foot_frame.name())
+        q_ik = q_HLIP[0]
+        v_ik = v_HLIP[0]
+
+        # compute the nominal state
         q_des = np.array([q_ik[7],  q_ik[8],  q_ik[9],  q_ik[10], q_ik[11],  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle 
                           q_ik[12], q_ik[13], q_ik[14], q_ik[15], q_ik[16]]) # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
+        # v_des = np.array([v_ik[6],  v_ik[7],  v_ik[8],  v_ik[9], v_ik[10],  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle
+        #                   v_ik[11], v_ik[12], v_ik[13], v_ik[14], v_ik[15]])
         v_des = np.zeros(self.plant.num_actuators())
         x_des = np.block([q_des, v_des])
 
