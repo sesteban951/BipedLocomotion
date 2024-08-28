@@ -97,27 +97,27 @@ def create_optimizer(model_file):
             10.0, 10.0,       # base position
             10.0,             # base orientation
             0.1, 0.1, 0.1,    # left leg
-            0.01, 0.01,       # left arm
+            0.01, 0.001,       # left arm
             0.1, 0.1, 0.1,    # right leg
-            0.01, 0.01        # right
+            0.01, 0.001        # right
     ])
     problem.Qv = np.diag([
             10.0, 10.0,           # base position
             10.0,                 # base orientation
             0.01, 0.01, 0.01,     # left leg
-            0.01, 0.01,           # left arm
+            0.01, 0.001,           # left arm
             0.01, 0.01, 0.01,     # right leg
-            0.01, 0.01            # right arm
+            0.01, 0.001            # right arm
     ])
-    problem.R = 0.01 * np.diag([
-        200.0, 200.0,             # base position
-        200.0,                    # base orientation
-        0.01, 0.01, 0.01,         # left leg
-        0.01, 0.01,               # left arm
-        0.01, 0.01, 0.01,         # right leg
-        0.01, 0.01                # right arm
+    problem.R = np.diag([
+        100.0, 100.0,             # base position
+        100.0,                    # base orientation
+        0.0001, 0.0001, 0.0001,         # left leg
+        0.0001, 0.0001,               # left arm
+        0.0001, 0.0001, 0.0001,         # right leg
+        0.0001, 0.0001                # right arm
     ])
-    problem.Qf_q = 1.0 * np.copy(problem.Qq)
+    problem.Qf_q = 3.0 * np.copy(problem.Qq)
     problem.Qf_v = 1.0 * np.copy(problem.Qv)
 
     v_nom = np.zeros(nv)
@@ -323,11 +323,11 @@ if __name__=="__main__":
     # Add implicit PD controllers (must use kLagged or kSimilar)
     kp_hip = 850
     kp_knee = 1000
-    kp_ankle = 150
+    kp_ankle = 75
     kp_arm = 50
     kd_hip = 10
     kd_knee = 10
-    kd_ankle = 1
+    kd_ankle = 2
     kd_arm = 1
     
     Kp = np.array([kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm, kp_hip, kp_knee, kp_ankle, kp_arm, kp_arm])
@@ -413,9 +413,6 @@ if __name__=="__main__":
     log = logger.FindLog(diagram_context)
     times = log.sample_times()
     states = log.data().T
-
-    print(times.shape)
-    print(states.shape)
 
     # save the data to a CSV file
     with open('./data/data_SE2_arms.csv', mode='w') as file:
