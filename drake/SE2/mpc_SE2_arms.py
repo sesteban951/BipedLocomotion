@@ -272,7 +272,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
 
         # map the wholebody model to the model with no arms
         q0_no_arms = [q0[i] for i in self.idx_no_arms]
-        v0_no_arms = [q0[i] for i in self.idx_no_arms]
+        v0_no_arms = [v0[i] for i in self.idx_no_arms]
 
         # get a new reference trajectory
         q_HLIP, v_HLIP = self.traj_gen_HLIP.generate_trajectory(q0 = q0_no_arms,
