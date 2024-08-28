@@ -106,8 +106,8 @@ def create_optimizer(model_file):
     problem.R = np.diag([
         100.0, 100.0,               # base position
         100.0,                      # base orientation
-        0.01, 0.01, 0.01, 0.01,         # left leg
-        0.01, 0.01, 0.01, 0.01          # right leg
+        0.0001, 0.0001, 0.0001, 0.0001,         # left leg
+        0.0001, 0.0001, 0.0001, 0.0001          # right leg
     ])
     problem.Qf_q = 2.0 * np.copy(problem.Qq)
     problem.Qf_v = 1.0 * np.copy(problem.Qv)
@@ -279,9 +279,9 @@ class AchillesPlanarMPC(ModelPredictiveController):
                                                                 initial_swing_foot_pos = self.p_swing_init,
                                                                 stance_foot_pos = self.p_stance,
                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
-        # for i in range(self.num_steps + 1):
-        #     q_HLIP[i][0] = q0[0] + vy_des * i * self.optimizer.time_step()
-        #     v_HLIP[i][0] = vy_des
+        for i in range(self.num_steps + 1):
+            q_HLIP[i][0] = q0[0] + vy_des * i * self.optimizer.time_step()
+            v_HLIP[i][0] = vy_des
 
         # compute alpha
         a = self.alpha(vy_des)
@@ -292,8 +292,6 @@ class AchillesPlanarMPC(ModelPredictiveController):
         for i in range(self.optimizer.num_steps() + 1):
             q_nom[i] = (1 - a) * q_stand[i] + a * q_HLIP[i]
             v_nom[i] = (1 - a) * v_stand[i] + a * v_HLIP[i]
-            # q_nom[i] = (1 - a) * q_HLIP[i] + a * q_stand[i]
-            # v_nom[i] = (1 - a) * v_HLIP[i] + a * v_stand[i]
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 

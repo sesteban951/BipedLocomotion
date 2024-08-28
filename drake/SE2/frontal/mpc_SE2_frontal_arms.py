@@ -97,9 +97,9 @@ def create_optimizer(model_file):
             15.0, 10.0,          # base position
             10.0,                # base orientation
             9.0, 7.0, 7.0, 5.0,  # left leg
-            1.0, 1.0,            # left arm
+            0.1, 0.1,            # left arm
             9.0, 7.0, 7.0, 5.0,  # right leg
-            1.0, 1.0             # right arm
+            0.1, 0.1             # right arm
     ])
     problem.Qv = np.diag([
             15.0, 1.0,            # base position
@@ -110,12 +110,12 @@ def create_optimizer(model_file):
             0.1, 0.1             # right arm
     ])
     problem.R = np.diag([
-        100.0, 100.0,               # base position
-        100.0,                      # base orientation
-        0.01, 0.01, 0.01, 0.01,     # left leg
-        0.01, 0.01,                 # left arm
-        0.01, 0.01, 0.01, 0.01,     # right leg
-        0.01, 0.01                  # right arm
+        100.0, 100.0,                   # base position
+        100.0,                          # base orientation
+        0.0001, 0.0001, 0.0001, 0.0001, # left leg
+        0.0001, 0.0001,                 # left arm
+        0.0001, 0.0001, 0.0001, 0.0001, # right leg
+        0.0001, 0.0001                  # right arm
     ])
     problem.Qf_q = 2.0 * np.copy(problem.Qq)
     problem.Qf_v = 1.0 * np.copy(problem.Qv)
@@ -293,9 +293,9 @@ class AchillesPlanarMPC(ModelPredictiveController):
                                                                 initial_swing_foot_pos = self.p_swing_init,
                                                                 stance_foot_pos = self.p_stance,
                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
-        # for i in range(self.num_steps + 1):
-        #     q_HLIP[i][0] = q0[0] + vy_des * i * self.optimizer.time_step()
-        #     v_HLIP[i][0] = vy_des
+        for i in range(self.num_steps + 1):
+            q_HLIP[i][0] = q0[0] + vy_des * i * self.optimizer.time_step()
+            v_HLIP[i][0] = vy_des
 
         # compute alpha
         a = self.alpha(vy_des)
