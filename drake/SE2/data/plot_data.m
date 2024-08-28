@@ -4,7 +4,7 @@
 clear all; close all; clc;
 
 % Load the csv data
-data = csvread('data_SE2.csv');
+data = csvread('data_SE2.csv'); % saggittal plane data
 
 % Extract the data
 t_data = data(:,1);
