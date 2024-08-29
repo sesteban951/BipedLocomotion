@@ -171,6 +171,7 @@ class HLIP(LeafSystem):
         self.traj_gen = HLIPTrajectoryGeneratorSE2(model_file)
         self.traj_gen.set_parameters(z_nom = self.z_nom,
                                      z_apex = self.z_apex,
+                                     z_offset= self.z_offset,
                                      bezier_order = self.bez_order,
                                      T_SSP = self.T_SSP,
                                      dt = 0.05,
