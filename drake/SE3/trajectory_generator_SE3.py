@@ -192,6 +192,17 @@ class HLIPTrajectoryGeneratorSE3():
         b = BezierCurve(0, self.T_SSP, ctrl_pts)
 
         return b
+    
+    # -------------------------------------------------------------------------------------------------- #
+
+    # project the foot target position to the half space constraint
+    def FootTargetProjection(self, ux, uy):
+
+        # TODO: complette the projection
+        
+
+        return ux, uy
+
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -299,6 +310,11 @@ class HLIPTrajectoryGeneratorSE3():
             # clip the swing foot target position
             ux = max(-self.ux_max, min(ux, self.ux_max))
             uy = max(-self.uy_max, min(uy, self.uy_max))
+
+
+            # TODO: apply half space projection herre
+            ux, uy = self.FootTargetProjection(ux, uy)
+
             ux_W, uy_W = self.RotateVectorToWorld(ux, uy)
 
             # populate foot position information
@@ -576,6 +592,7 @@ class HLIPTrajectoryGeneratorSE3():
 
         # for every swing foot configuration solve the IK problem
         q_ref = []
+        meshcat_horizon = []   # takes in tuple (p_com_W, p_stance_W, p_swing_target_W)
         q_ik_sol = q0
         # t0 = time.time()
         for i in L:
@@ -606,6 +623,9 @@ class HLIPTrajectoryGeneratorSE3():
                 px_R_W, py_R_W = self.RotateVectorToWorld(px_R, py_R)
                 p_com_pos =  p_stance + np.array([px_R_W, py_R_W, self.z_nom]).reshape(3,1)
 
+                # save the meshcat horizon
+                meshcat_horizon.append((p_com_pos, p_stance, p_swing_target_W))
+
                 res = self.solve_ik(p_com_pos, p_stance, p_swing_target_W, stance_foot_name, q_ik_sol)
                 if res.is_success():
                     q_ik_sol = res.GetSolution(self.ik.q())
@@ -622,7 +642,7 @@ class HLIPTrajectoryGeneratorSE3():
         # print("Average time per IK: ", (tf - t0) / len(q_ref))
 
         # return the trajectory
-        return q_ref, v_ref
+        return q_ref, v_ref, meshcat_horizon
 
 ####################################################################################################
 
@@ -647,8 +667,8 @@ if __name__ == "__main__":
                             hip_bias=0.2,
                             bezier_order=7, 
                             T_SSP=0.3, 
-                            dt=0.04, 
-                            N=50)
+                            dt=0.02, 
+                            N=400)
 
     deg = 45
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
@@ -686,19 +706,37 @@ if __name__ == "__main__":
     t_phase = 0.0
 
     t0 = time.time()
-    q_HLIP, v_HLIP = traj_gen.generate_trajectory(q0=q0,
-                                                  v0=v0,
-                                                  v_des=v_des,
-                                                  t_phase=t_phase,
-                                                  initial_swing_foot_pos=p_swing,
-                                                  stance_foot_pos=p_stance,
-                                                  stance_foot_yaw=yaw,
-                                                  initial_stance_foot_name="right_foot")
+    q_HLIP, v_HLIP, meshcat_horizon = traj_gen.generate_trajectory(q0=q0,
+                                                                   v0=v0,
+                                                                   v_des=v_des,
+                                                                   t_phase=t_phase,
+                                                                   initial_swing_foot_pos=p_swing,
+                                                                   stance_foot_pos=p_stance,
+                                                                   stance_foot_yaw=yaw,
+                                                                   initial_stance_foot_name="right_foot")
     tf = time.time()
     print("Time to solve 3D prop: ", tf - t0)
     
     # start meshcat
     meshcat = StartMeshcat()
+
+    # create object to visualize the trajectory
+    red_color = Rgba(1, 0, 0, 1)
+    green_color = Rgba(0, 1, 0, 1)
+    blue_color = Rgba(0, 0, 1, 1)
+    sphere_com = Sphere(0.02)
+    sphere_swing = Sphere(0.015)
+    sphere_stance = Sphere(0.017)
+    h = len(q_HLIP)
+    for i in range(h):
+        O = meshcat_horizon[i]
+        p_com_pos, p_stance, p_swing_target = O
+        meshcat.SetObject("com_{}".format(i), sphere_com, green_color)
+        meshcat.SetObject("stance_{}".format(i), sphere_stance, red_color)
+        meshcat.SetObject("swing_{}".format(i), sphere_swing, blue_color)
+        meshcat.SetTransform("com_{}".format(i), RigidTransform(p_com_pos))
+        meshcat.SetTransform("stance_{}".format(i), RigidTransform(p_stance))
+        meshcat.SetTransform("swing_{}".format(i), RigidTransform(p_swing_target))
 
     # Set up a system diagram that includes a plant, scene graph, and meshcat
     builder = DiagramBuilder()
