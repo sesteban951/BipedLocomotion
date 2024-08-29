@@ -94,25 +94,25 @@ def create_optimizer(model_file):
     
     # no arms
     problem.Qq = np.diag([
-        10.0, 10.0, 10.0, 10.0,   # base orientation
-        15.0, 15.0, 10.0,         # base position
-        9.0, 9.0, 7.0, 5.0, 5.0,  # left leg
-        9.0, 9.0, 7.0, 5.0, 5.0   # left leg
+        1.0, 1.0, 1.0, 1.0,   # base orientation
+        1.0, 1.0, 1.0,         # base position
+        0.1, 1.0, 0.1, 0.1, 0.1,  # left leg
+        0.1, 1.0, 0.1, 0.1, 0.1   # left leg
     ])
     problem.Qv = np.diag([
-        15.0, 15.0, 10.0,         # base orientation
-        10.0, 10.0, 1.0,          # base position
-        1.0, 1.0, 1.0, 1.0, 1.0,  # left leg
-        1.0, 1.0, 1.0, 1.0, 1.0,  # right leg
+        0.1, 0.1, 0.1,         # base orientation
+        0.1, 0.1, 0.1,          # base position
+        0.01, 0.1, 0.01, 0.01, 0.01,  # left leg
+        0.01, 0.1, 0.01, 0.01, 0.01,  # right leg
     ])
     problem.R = np.diag([
-        10.0, 10.0, 10.0, 10.0,    # base orientation
-        10.0, 10.0, 10.0,           # base position
+        50.0, 50.0, 50.0,           # base orientation
+        50.0, 50.0, 50.0,           # base position
         0.0001, 0.0001, 0.0001, 0.0001, 0.0001,  # left leg
         0.0001, 0.0001, 0.0001, 0.0001, 0.0001,  # right leg
     ])
-    problem.Qf_q = 1.0 * np.copy(problem.Qq)
-    problem.Qf_v = 0.1 * np.copy(problem.Qv)
+    problem.Qf_q = 10.0 * np.copy(problem.Qq)
+    problem.Qf_v = 10.0 * np.copy(problem.Qv)
 
     v_nom = np.zeros(nv)
     problem.q_nom = [np.copy(q_stand) for i in range(problem.num_steps + 1)]
@@ -126,11 +126,11 @@ def create_optimizer(model_file):
     params.Delta0 = 1e1
     params.Delta_max = 1e5
     params.num_threads = 10
-    params.contact_stiffness = 10_000
+    params.contact_stiffness = 5_000
     params.dissipation_velocity = 0.1
     params.smoothing_factor = 0.01
     params.friction_coefficient = 0.5
-    params.stiction_velocity = 0.2
+    params.stiction_velocity = 0.1
     params.verbose = False
 
     # Create the optimizer
@@ -318,7 +318,7 @@ class AchillesMPC(ModelPredictiveController):
         # print(f"quat_stance: {self.quat_stance}")
         # print(f"control_stance_yaw: {self.control_stance_yaw}")
 
-        # # get a new reference trajectory
+        # get a new reference trajectory
         q_HLIP, v_HLIP = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
                                                                 v0 = v0,
                                                                 v_des = v_des,
@@ -345,7 +345,7 @@ class AchillesMPC(ModelPredictiveController):
         a = self.alpha(v_norm)
 
         # clamp a to [0, 1]
-        a = np.clip(a, 0, 1) # TODO: alpha is not mapping joystick vel to [0,1], do this mote intelligently
+        a = np.clip(a, 0, 1) # TODO: alpha is not mapping joystick vel to [0,1], do this more intelligently
         print(f"alpha: {a}")
 
         # convex combination of the standing position and the nominal trajectory
@@ -354,8 +354,6 @@ class AchillesMPC(ModelPredictiveController):
         for i in range(self.optimizer.num_steps() + 1):
             q_nom[i] = (1 - a) * q_stand[i] + a * q_HLIP[i]
             v_nom[i] = (1 - a) * v_stand[i] + a * v_HLIP[i]
-            # q_nom[i] = (1 - a) * q_HLIP[i] + a * q_stand[i]
-            # v_nom[i] = (1 - a) * v_HLIP[i] + a * v_stand[i]
 
         # q_nom = q_stand
         # v_nom = v_stand
