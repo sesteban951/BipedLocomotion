@@ -79,6 +79,23 @@ def create_optimizer(model_file):
         RigidTransform(p=[0, 0, -25]), 
         Box(50, 50, 50), "ground", 
         CoulombFriction(0.7, 0.7))
+
+    # Add a wall in front of the robot
+    plant.RegisterVisualGeometry(
+        plant.world_body(),
+        RigidTransform(p=[0.8, 0, 0.0]),
+        Box(0.5, 5.0, 5.0),
+        "wbox",
+        [0.5, 0.5, 0.5, 1.0]
+    )
+    plant.RegisterCollisionGeometry(
+        plant.world_body(),
+        RigidTransform(p=[0.8, 0, 0.0]),
+        Box(0.5, 5.0, 5.0),
+        "wall",
+        CoulombFriction(0.5, 0.5)
+    )
+
     plant.Finalize()
     diagram = builder.Build()
 
@@ -100,15 +117,15 @@ def create_optimizer(model_file):
             0.1, 0.1, 0.1,    # left leg
             0.01, 0.001,       # left arm
             0.1, 0.1, 0.1,    # right leg
-            0.01, 0.001        # right
+            0.01, 0.001        # right arm
     ])
     problem.Qv = np.diag([
             10.0, 10.0,           # base position
             10.0,                 # base orientation
             0.01, 0.01, 0.01,     # left leg
-            0.01, 0.001,           # left arm
+            0.001, 0.001,           # left arm
             0.01, 0.01, 0.01,     # right leg
-            0.01, 0.001            # right arm
+            0.001, 0.001            # right arm
     ])
     problem.R = np.diag([
         100.0, 100.0,             # base position
@@ -164,6 +181,7 @@ class AchillesPlanarMPC(ModelPredictiveController):
         # create internal model of the robot, TODO: there has to be a better way to do this
         self.plant = MultibodyPlant(0)
         Parser(self.plant).AddModels(model_file_arms)
+
         self.plant.Finalize()
         self.plant_context = self.plant.CreateDefaultContext()
 
@@ -322,6 +340,22 @@ if __name__=="__main__":
         RigidTransform(p=[0, 0, -25]), 
         Box(50, 50, 50), "ground", 
         CoulombFriction(0.5, 0.5))
+    
+    # Add a wall in front of the robot
+    plant.RegisterVisualGeometry(
+        plant.world_body(),
+        RigidTransform(p=[0.8, 0, 0.0]),
+        Box(0.5, 5.0, 5.0),
+        "wbox",
+        [0.5, 0.5, 0.5, 1.0]
+    )
+    plant.RegisterCollisionGeometry(
+        plant.world_body(),
+        RigidTransform(p=[0.8, 0, 0.0]),
+        Box(0.5, 5.0, 5.0),
+        "wall",
+        CoulombFriction(0.5, 0.5)
+    )
 
     # Add implicit PD controllers (must use kLagged or kSimilar)
     kp_hip = 850
@@ -369,9 +403,9 @@ if __name__=="__main__":
     
     # Disturbance generator
     disturbance_tau = np.zeros(plant.num_velocities())
-    disturbance_tau[0] = 100.0
+    disturbance_tau[0] = 20.0
     dist_gen = builder.AddSystem(DisturbanceGenerator(
-        plant, disturbance_tau, 5.0, 0.1))
+        plant, disturbance_tau, 5.0, 2.0))  # time, duration
 
     # Wire the systems together
     builder.Connect(
