@@ -44,6 +44,7 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 from mpc_utils import Interpolator, ModelPredictiveController
 from joystick import GamepadCommand
+from disturbance_generator import DisturbanceGenerator
 
 #--------------------------------------------------------------------------------------------------------------------------#
 
@@ -288,9 +289,9 @@ class AchillesPlanarMPC(ModelPredictiveController):
             q_HLIP[i][0] = q0[0] + vx_des * i * self.optimizer.time_step()
             v_HLIP[i][0] = vx_des
 
-        # compute alpha
-        # a = self.alpha(v0[0])
-        a = self.alpha(vx_des)
+        # compute alpha based on both the desired base velocity and the current base velocity
+        v = np.max([np.abs(v0[0]), np.abs(vx_des)])
+        a = self.alpha(v)
 
         # convex combination of the standing position and the nominal trajectory
         q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
@@ -365,6 +366,12 @@ if __name__=="__main__":
     builder.Connect(
             plant.get_state_output_port(), 
             logger.get_input_port())
+    
+    # Disturbance generator
+    disturbance_tau = np.zeros(plant.num_velocities())
+    disturbance_tau[0] = 100.0
+    dist_gen = builder.AddSystem(DisturbanceGenerator(
+        plant, disturbance_tau, 5.0, 0.1))
 
     # Wire the systems together
     builder.Connect(
@@ -383,6 +390,10 @@ if __name__=="__main__":
     builder.Connect(
         joystick.get_output_port(), 
         controller.GetInputPort("joy_command")
+    )
+    builder.Connect(
+        dist_gen.get_output_port(),
+        plant.get_applied_generalized_force_input_port(),
     )
     
     # Connect the plant to meshcat for visualization
