@@ -71,13 +71,13 @@ def create_optimizer(model_file):
 
     # Create the system diagram that the optimizer uses
     builder = DiagramBuilder()
-    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.005)
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.05)
     Parser(plant).AddModels(model_file)
     plant.RegisterCollisionGeometry(
         plant.world_body(), 
         RigidTransform(p=[0, 0, -25]), 
         Box(50, 50, 50), "ground", 
-        CoulombFriction(0.5, 0.5))
+        CoulombFriction(0.7, 0.7))
     plant.Finalize()
     diagram = builder.Build()
 
@@ -94,24 +94,24 @@ def create_optimizer(model_file):
     
     # no arms
     problem.Qq = np.diag([
-        18.0, 18.0, 18.0, 18.0,   # base orientation
-        18.0, 18.0, 18.0,         # base position
-        9.0, 9.0, 9.0, 9.0, 9.0,  # left leg
-        9.0, 9.0, 9.0, 9.0, 9.0   # left leg
+        10.0, 10.0, 10.0, 10.0,   # base orientation
+        15.0, 15.0, 10.0,         # base position
+        9.0, 9.0, 7.0, 5.0, 5.0,  # left leg
+        9.0, 9.0, 7.0, 5.0, 5.0   # left leg
     ])
     problem.Qv = np.diag([
-        10.0, 10.0, 10.0,         # base orientation
+        15.0, 15.0, 10.0,         # base orientation
         10.0, 10.0, 1.0,          # base position
-        3.1, 3.1, 3.1, 3.1, 1.1,  # left leg
-        3.1, 3.1, 3.1, 3.1, 1.1   # right leg
+        1.0, 1.0, 1.0, 1.0, 1.0,  # left leg
+        1.0, 1.0, 1.0, 1.0, 1.0,  # right leg
     ])
-    problem.R = 0.01 * np.diag([
-        100.0, 100.0, 100.0, 100.0,    # base orientation
-        100.0, 100.0, 100.0,           # base position
-        0.01, 0.01, 0.01, 0.01, 0.01,  # left leg
-        0.01, 0.01, 0.01, 0.01, 0.01,  # right leg
+    problem.R = np.diag([
+        10.0, 10.0, 10.0, 10.0,    # base orientation
+        10.0, 10.0, 10.0,           # base position
+        0.0001, 0.0001, 0.0001, 0.0001, 0.0001,  # left leg
+        0.0001, 0.0001, 0.0001, 0.0001, 0.0001,  # right leg
     ])
-    problem.Qf_q = 3.0 * np.copy(problem.Qq)
+    problem.Qf_q = 1.0 * np.copy(problem.Qq)
     problem.Qf_v = 0.1 * np.copy(problem.Qv)
 
     v_nom = np.zeros(nv)
@@ -120,7 +120,7 @@ def create_optimizer(model_file):
 
     # Set the solver parameters
     params = SolverParameters()
-    params.max_iterations = 1
+    params.max_iterations = 2
     params.scaling = True
     params.equality_constraints = False
     params.Delta0 = 1e1
@@ -169,8 +169,9 @@ class AchillesMPC(ModelPredictiveController):
         # z height parameters
         z_com_nom = 0.64     # nominal CoM height
         bezier_order = 7     # 5 or 7
-        z_apex = 0.08        # apex height
+        z_apex = 0.06        # apex height
         z_foot_offset = 0.01 # foot offset from the ground
+        hip_bias = 0.3       # bias between the foot-to-foot distance in y-direciotn
 
         # maximum velocity for the robot
         self.v_max = 0.2
@@ -180,19 +181,19 @@ class AchillesMPC(ModelPredictiveController):
         self.right_foot_frame = self.plant.GetFrameByName("right_foot")
         self.stance_foot_frame = self.right_foot_frame
         self.swing_foot_frame  = self.left_foot_frame
-        self.p_stance = None
-        self.p_swing_init = None
-        self.p_stance = None
-        self.R_stance = None
-        self.control_stance_yaw = None
-        self.R_stance_2D = None
+        self.p_stance_W = None
+        self.R_stance_W = None
+        self.R_stance_W_2D = None
+        self.p_swing_init_W = None
         self.quat_stance = None
+        self.control_stance_yaw = None
 
         # create an HLIP trajectory generator object and set the parameters
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE3(model_file)
         self.traj_gen_HLIP.set_parameters(z_nom = z_com_nom,
                                           z_apex = z_apex,
                                           z_offset = z_foot_offset,
+                                          hip_bias = hip_bias,
                                           bezier_order = bezier_order,
                                           T_SSP = self.T_SSP,
                                           dt = self.optimizer.time_step(),
@@ -202,69 +203,65 @@ class AchillesMPC(ModelPredictiveController):
         self.q_stand = standing_position()
 
         # computing the alpha value based on speed
-        p = 1.0
+        p = 2.0
         self.alpha = lambda v_des: ((1/self.v_max) * v_des) ** p
 
     # update the foot info for the HLIP traj gen
     def UpdateFootInfo(self):
 
         # check if entered new step period
-        if (self.t_phase >= self.T_SSP) or (self.p_stance is None):
+        if (self.t_phase >= self.T_SSP) or (self.p_stance_W is None):
+
+            # increment the number of steps
+            self.number_of_steps += 1
 
             # left foot is swing foot, right foot is stance foot
             if self.number_of_steps % 2 == 0:
 
+                # set the initial swing foot position
+                self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                                    self.left_foot_frame,
+                                                                    [0,0,0],
+                                                                    self.plant.world_frame())
+                # set the current stance foot position
+                self.p_stance_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                                self.right_foot_frame,
+                                                                [0,0,0],
+                                                                self.plant.world_frame())
+                # get the current stance yaw position of the robot
+                self.R_stance_W = self.plant.CalcRelativeRotationMatrix(self.plant_context,
+                                                                        self.plant.world_frame(),
+                                                                        self.right_foot_frame)
                 # switch the foot roles
                 self.stance_foot_frame = self.right_foot_frame
                 self.swing_foot_frame = self.left_foot_frame
 
-                # set the initial swing foot position
-                self.p_swing_init = self.plant.CalcPointsPositions(self.plant_context,
-                                                                   self.left_foot_frame,
-                                                                   [0,0,0],
-                                                                   self.plant.world_frame())
-
-                # set the current stance foot position
-                self.p_stance = self.plant.CalcPointsPositions(self.plant_context,
-                                                               self.right_foot_frame,
-                                                               [0,0,0],
-                                                               self.plant.world_frame())
-                # get the current stance yaw position of the robot
-                self.R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
-                                                                      self.plant.world_frame(),
-                                                                      self.right_foot_frame)
-
             # right foot is swing foot, left foot is stance foot
             else:
 
+                # set the initial swing foot position
+                self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                                     self.right_foot_frame,
+                                                                     [0,0,0],
+                                                                     self.plant.world_frame())
+                # set the current stance foot position
+                self.p_stance_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                                 self.left_foot_frame,
+                                                                 [0,0,0],
+                                                                 self.plant.world_frame())
+                # get the current stance yaw position of the robot
+                self.R_stance_W = self.plant.CalcRelativeRotationMatrix(self.plant_context,
+                                                                        self.plant.world_frame(),
+                                                                        self.left_foot_frame)
                 # switch the foot roles
                 self.stance_foot_frame = self.left_foot_frame
                 self.swing_foot_frame = self.right_foot_frame
-
-                # set the initial swing foot position
-                self.p_swing_init = self.plant.CalcPointsPositions(self.plant_context,
-                                                                   self.right_foot_frame,
-                                                                   [0,0,0],
-                                                                   self.plant.world_frame())
-
-                # set the current stance foot position
-                self.p_stance = self.plant.CalcPointsPositions(self.plant_context,
-                                                               self.left_foot_frame,
-                                                               [0,0,0],
-                                                               self.plant.world_frame())
-                # get the current stance yaw position of the robot
-                self.R_stance = self.plant.CalcRelativeRotationMatrix(self.plant_context,
-                                                                      self.plant.world_frame(),
-                                                                      self.left_foot_frame)
             
             # compute the stance foot yaw angle and the 2D rotation matrix
-            self.control_stance_yaw = RollPitchYaw(self.R_stance).yaw_angle()
-            self.R_stance_2D = np.array([[np.cos(self.control_stance_yaw), -np.sin(self.control_stance_yaw)],
+            self.control_stance_yaw = RollPitchYaw(self.R_stance_W).yaw_angle()
+            self.R_stance_W_2D = np.array([[np.cos(self.control_stance_yaw), -np.sin(self.control_stance_yaw)],
                                          [np.sin(self.control_stance_yaw),  np.cos(self.control_stance_yaw)]])
             self.quat_stance = RollPitchYaw([0,0,self.control_stance_yaw]).ToQuaternion()
-
-            # increment the number of steps
-            self.number_of_steps += 1
 
         # update the phase time
         self.t_phase = self.t_current - self.number_of_steps * self.T_SSP
@@ -291,22 +288,21 @@ class AchillesMPC(ModelPredictiveController):
 
         # unpack the joystick commands
         joy_command = self.joystick_port.Eval(context)
-        vx_des =  joy_command[1] * self.v_max  # (+) ^ up and down v (-)
-        vy_des = -joy_command[0] * self.v_max  # (+) <---- left and right ----> (-)
+        vx_des = joy_command[1] * self.v_max  
+        vy_des = joy_command[0] * self.v_max 
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
-        # v_des = np.array([[0.0], [0.0]]) # in local stance foot frame
 
         # Get the desired MPC standing trajectory
         q_stand = [np.copy(self.q_stand) for i in range(self.optimizer.num_steps() + 1)]
         v_stand = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
-        v_des_W = self.R_stance_2D @ v_des
+        v_des_W = self.R_stance_W_2D @ v_des
         for i in range(self.num_steps + 1):
             q_stand[i][0] = self.quat_stance.w()
             q_stand[i][1] = self.quat_stance.x()
             q_stand[i][2] = self.quat_stance.y()
             q_stand[i][3] = self.quat_stance.z()
             
-            p_increment = self.R_stance_2D @ (v_des * i * self.optimizer.time_step())
+            p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
             q_stand[i][4] = q0[4] + p_increment[0][0]
             q_stand[i][5] = q0[5] + p_increment[1][0]
             v_stand[i][3] = v_des_W[0][0]
@@ -314,34 +310,45 @@ class AchillesMPC(ModelPredictiveController):
 
         print("------------------------------------------------------------")
         print(f"t_current: {self.t_current}")
+        # print("stance foot info:", self.stance_foot_frame.name())
+        # print(f"p_stance_W: {self.p_stance_W}")
+        # print(f"R_stance_W: {self.R_stance_W}")
+        # print(f"R_stance_W_2D: {self.R_stance_W_2D}")
+        # print(f"p_swing_init_W: {self.p_swing_init_W}")
+        # print(f"quat_stance: {self.quat_stance}")
+        # print(f"control_stance_yaw: {self.control_stance_yaw}")
 
-        # get a new reference trajectory
+        # # get a new reference trajectory
         q_HLIP, v_HLIP = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
                                                                 v0 = v0,
                                                                 v_des = v_des,
                                                                 t_phase = self.t_phase,
-                                                                initial_swing_foot_pos = self.p_swing_init,
-                                                                stance_foot_pos = self.p_stance,
+                                                                initial_swing_foot_pos = self.p_swing_init_W,
+                                                                stance_foot_pos = self.p_stance_W,
                                                                 stance_foot_yaw = self.control_stance_yaw,
                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
+        # throw away HLIP floating base reference trajectory
         for i in range(self.num_steps + 1):
             q_HLIP[i][0] = self.quat_stance.w()
             q_HLIP[i][1] = self.quat_stance.x()
             q_HLIP[i][2] = self.quat_stance.y()
             q_HLIP[i][3] = self.quat_stance.z()
             
-            p_increment = self.R_stance_2D @ (v_des * i * self.optimizer.time_step())
+            p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
             q_HLIP[i][4] = q0[4] + p_increment[0][0]
             q_HLIP[i][5] = q0[5] + p_increment[1][0]
             v_HLIP[i][3] = v_des_W[0][0]
             v_HLIP[i][4] = v_des_W[1][0]
 
-        # compute alpha
+        # compute alpha 
         v_norm = np.linalg.norm(v_des)
         a = self.alpha(v_norm)
+
+        # clamp a to [0, 1]
+        a = np.clip(a, 0, 1) # TODO: alpha is not mapping joystick vel to [0,1], do this mote intelligently
         print(f"alpha: {a}")
 
-        # # convex combination of the standing position and the nominal trajectory
+        # convex combination of the standing position and the nominal trajectory
         q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
         v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
         for i in range(self.optimizer.num_steps() + 1):
@@ -375,11 +382,11 @@ if __name__=="__main__":
         plant.world_body(), 
         RigidTransform(p=[0, 0, -25]), 
         Box(50, 50, 50), "ground", 
-        CoulombFriction(0.9, 0.9))
+        CoulombFriction(0.7, 0.7))
 
     # Add implicit PD controllers (must use kLagged or kSimilar)
-    kp_hip = 850
-    kp_knee = 950
+    kp_hip = 900
+    kp_knee = 1000
     kp_ankle = 150
     kd_hip = 10
     kd_knee = 10

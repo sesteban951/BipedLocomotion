@@ -45,9 +45,9 @@ class HLIPTrajectoryGeneratorSE3():
         self.sech = lambda x: 1 / np.cosh(x)
 
         # swing foot parameters
-        self.z_nom = 0.64
-        self.z_apex = 0.08     # height of the apex of the swing foot 
-        self.z_offset = 0.02   # offset of the swing foot from the ground
+        self.z_nom = None
+        self.z_apex = None     # height of the apex of the swing foot 
+        self.z_offset = None   # offset of the swing foot from the ground
 
         # clip the swing foot target position
         self.ux_max = 0.5
@@ -58,8 +58,8 @@ class HLIPTrajectoryGeneratorSE3():
         self.vy_des = None
 
         # period 2 feedforward foot placements
-        self.u_L_bias = 0.2   # left is swing foot, add this to the feedforward foot placement
-        self.u_R_bias = -0.2  # right is swing foot, add this to the feedforward foot placement
+        self.u_L_bias = None  # left is swing foot, add this to the feedforward foot placement
+        self.u_R_bias = None  # right is swing foot, add this to the feedforward foot placement
         self.u_L = None
         self.u_R = None
         
