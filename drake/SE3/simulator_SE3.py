@@ -47,9 +47,9 @@ plant.gravity_field().set_gravity_vector([0, 0, -9.81])
 kp_hip = 850
 kp_knee = 950
 kp_ankle = 150
-kd_hip = 10
-kd_knee = 10
-kd_ankle = 2
+kd_hip = 30
+kd_knee = 30
+kd_ankle = 5
 Kp = np.array([kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle, kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle])
 Kd = np.array([kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle, kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle])
 actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]

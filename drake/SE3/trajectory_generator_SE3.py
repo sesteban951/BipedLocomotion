@@ -471,7 +471,7 @@ class HLIPTrajectoryGeneratorSE3():
     # -------------------------------------------------------------------------------------------------- #
 
     # set the trajectory generation problem parameters
-    def set_parameters(self, z_nom, z_apex, z_offset, bezier_order, T_SSP, dt, N):
+    def set_parameters(self, z_nom, z_apex, z_offset, hip_bias, bezier_order, T_SSP, dt, N):
 
         # make sure that N is non-zero
         assert N >= 1, "N must be an integer >= 1."
@@ -487,6 +487,10 @@ class HLIPTrajectoryGeneratorSE3():
 
         # set bezier curve order
         self.bez_order = bezier_order
+
+        # set the hip bias
+        self.u_L_bias =  hip_bias
+        self.u_R_bias = -hip_bias
 
         # set variables that depend on z com nominal
         self.z_apex = z_apex
@@ -640,6 +644,7 @@ if __name__ == "__main__":
     traj_gen.set_parameters(z_nom=0.64, 
                             z_apex=0.07, 
                             z_offset=0.05,
+                            hip_bias=0.2,
                             bezier_order=7, 
                             T_SSP=0.3, 
                             dt=0.04, 

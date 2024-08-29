@@ -123,8 +123,9 @@ class HLIP(LeafSystem):
         self.u_max_y = 0.3
 
         # period 2 feedforward foot placements
-        self.u_L_bias = 0.3   # left is swing foot, add this to the feedforward foot placement
-        self.u_R_bias = -0.3  # right is swing foot, add this to the feedforward foot placement
+        hip_bias = 0.3
+        self.u_L_bias =  hip_bias  # left is swing foot, add this to the feedforward foot placement
+        self.u_R_bias = -hip_bias  # right is swing foot, add this to the feedforward foot placement
 
         # blending foot placement
         self.bez_order = 7
@@ -175,6 +176,7 @@ class HLIP(LeafSystem):
         self.traj_gen.set_parameters(z_nom=self.z_nom,
                                      z_apex=self.z_apex,
                                      z_offset=self.z_offset,
+                                     hip_bias=hip_bias,
                                      bezier_order=self.bez_order,
                                      T_SSP=self.T_SSP,
                                      dt=0.01,
@@ -611,8 +613,8 @@ class HLIP(LeafSystem):
         # compute the nominal state
         q_des = np.array([q_ik[7],  q_ik[8],  q_ik[9],  q_ik[10], q_ik[11],  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle 
                           q_ik[12], q_ik[13], q_ik[14], q_ik[15], q_ik[16]]) # right leg: hip_yaw, hip_roll, hip_pitch, knee, ankle
-        # v_des = np.array([v_ik[6],  v_ik[7],  v_ik[8],  v_ik[9], v_ik[10],  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle
-        #                   v_ik[11], v_ik[12], v_ik[13], v_ik[14], v_ik[15]])
+        v_des = np.array([v_ik[6],  v_ik[7],  v_ik[8],  v_ik[9], v_ik[10],  # left leg:  hip_yaw, hip_roll, hip_pitch, knee, ankle
+                          v_ik[11], v_ik[12], v_ik[13], v_ik[14], v_ik[15]])
         v_des = np.zeros(self.plant.num_actuators())
         x_des = np.block([q_des, v_des])
 
