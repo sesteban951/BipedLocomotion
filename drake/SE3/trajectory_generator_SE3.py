@@ -198,7 +198,7 @@ class HLIPTrajectoryGeneratorSE3():
     # project the foot target position to the half space constraint
     def FootTargetProjection(self, ux, uy):
 
-        # TODO: complette the projection
+        # TODO: complete the projection
         
 
         return ux, uy
@@ -592,7 +592,7 @@ class HLIPTrajectoryGeneratorSE3():
 
         # for every swing foot configuration solve the IK problem
         q_ref = []
-        meshcat_horizon = []   # takes in tuple (p_com_W, p_stance_W, p_swing_target_W)
+        meshcat_horizon = []   # takes in tuple (p_com_W, p_left_W, p_right_W)
         q_ik_sol = q0
         # t0 = time.time()
         for i in L:
@@ -623,8 +623,11 @@ class HLIPTrajectoryGeneratorSE3():
                 px_R_W, py_R_W = self.RotateVectorToWorld(px_R, py_R)
                 p_com_pos =  p_stance + np.array([px_R_W, py_R_W, self.z_nom]).reshape(3,1)
 
-                # save the meshcat horizon
-                meshcat_horizon.append((p_com_pos, p_stance, p_swing_target_W))
+                # save the meshcat horizon point
+                if stance_foot_name == "left_foot":
+                    meshcat_horizon.append((p_com_pos, p_stance, p_swing_target_W))
+                elif stance_foot_name == "right_foot":
+                    meshcat_horizon.append((p_com_pos, p_swing_target_W, p_stance))
 
                 res = self.solve_ik(p_com_pos, p_stance, p_swing_target_W, stance_foot_name, q_ik_sol)
                 if res.is_success():
@@ -699,7 +702,7 @@ if __name__ == "__main__":
     # set the parameters
     traj_gen.set_parameters(z_nom=0.64, 
                             z_apex=0.07, 
-                            z_offset=0.05,
+                            z_offset=0.01,
                             hip_bias=0.2,
                             bezier_order=7, 
                             T_SSP=0.3, 
@@ -760,45 +763,45 @@ if __name__ == "__main__":
     red_color = Rgba(1, 0, 0, 1)
     green_color = Rgba(0, 1, 0, 1)
     blue_color = Rgba(0, 0, 1, 1)
-    grey_color = Rgba(1, 1, 1, 0.5)
+    red_color_faint = Rgba(1, 0, 0, 0.5)
+    blue_color_faint = Rgba(0, 0, 1, 0.5)
     
     sphere_com = Sphere(0.02)
-    sphere_swing = Sphere(0.015)
-    sphere_stance = Sphere(0.017)    
-    h = len(q_HLIP)
-    for i in range(h):
+    sphere_foot = Sphere(0.01)
+
+    for i in range(len(q_HLIP)):
         
         # unpack the data
         O = meshcat_horizon[i]
-        p_com_pos, p_stance, p_swing_target = O
+        p_com, p_left, p_right = O
 
-        # compute the rigid transform for each leg
-        p_stance_leg = 0.5 * (p_stance + p_com_pos)
-        R_stance_leg = RotationMatrix(rotation_matrix_from_points(p_stance_leg, p_com_pos))
-        p_stance_leg_len = np.linalg.norm(p_stance - p_com_pos)
-
-        p_swing_leg = 0.5 * (p_swing_target + p_com_pos)
-        R_swing_leg = RotationMatrix(rotation_matrix_from_points(p_swing_leg, p_com_pos))
-        p_swing_leg_len = np.linalg.norm(p_swing_target - p_com_pos)
-
-        # create a cylinder for the stance leg
-        cyl_stance = Cylinder(0.005, p_stance_leg_len)
-        meshcat.SetObject("stance_leg_{}".format(i), cyl_stance, grey_color)
-        meshcat.SetTransform("stance_leg_{}".format(i), RigidTransform(R_stance_leg, p_stance_leg))
-
-        # create a cylinder for the swing leg
-        cyl_swing = Cylinder(0.005, p_swing_leg_len)
-        meshcat.SetObject("swing_leg_{}".format(i), cyl_swing, grey_color)
-        meshcat.SetTransform("swing_leg_{}".format(i), RigidTransform(R_swing_leg, p_swing_leg))
-
-        # plot on meshcat
+        # plot the foot and com positions
         meshcat.SetObject("com_{}".format(i), sphere_com, green_color)
-        meshcat.SetObject("stance_{}".format(i), sphere_stance, red_color)
-        meshcat.SetObject("swing_{}".format(i), sphere_swing, blue_color)
-        meshcat.SetTransform("com_{}".format(i), RigidTransform(p_com_pos))
-        meshcat.SetTransform("stance_{}".format(i), RigidTransform(p_stance))
-        meshcat.SetTransform("swing_{}".format(i), RigidTransform(p_swing_target))
+        meshcat.SetObject("left_{}".format(i), sphere_foot, blue_color)
+        meshcat.SetObject("right_{}".format(i), sphere_foot, red_color)
+        meshcat.SetTransform("com_{}".format(i), RigidTransform(p_com))
+        meshcat.SetTransform("left_{}".format(i), RigidTransform(p_left))
+        meshcat.SetTransform("right_{}".format(i), RigidTransform(p_right))
 
+        # compute left leg rigid ttransform
+        p_left_leg = 0.5 * (p_left + p_com)
+        R_left_leg = RotationMatrix(rotation_matrix_from_points(p_left_leg, p_com))
+        p_left_leg_len = np.linalg.norm(p_left - p_com)
+
+        # compute right leg rigid transform
+        p_right_leg = 0.5 * (p_right + p_com)
+        R_right_leg = RotationMatrix(rotation_matrix_from_points(p_right_leg, p_com))
+        p_right_leg_len = np.linalg.norm(p_right - p_com)
+
+        # create a cylinder for the left leg
+        cyl_left = Cylinder(0.005, p_left_leg_len)
+        meshcat.SetObject("left_leg_{}".format(i), cyl_left, blue_color)
+        meshcat.SetTransform("left_leg_{}".format(i), RigidTransform(R_left_leg, p_left_leg))
+
+        # create a cylinder for the right leg
+        cyl_right = Cylinder(0.005, p_right_leg_len)
+        meshcat.SetObject("right_leg_{}".format(i), cyl_right, red_color)
+        meshcat.SetTransform("right_leg_{}".format(i), RigidTransform(R_right_leg, p_right_leg))
 
 
     # Set up a system diagram that includes a plant, scene graph, and meshcat
