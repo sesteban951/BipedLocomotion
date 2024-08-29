@@ -646,6 +646,42 @@ class HLIPTrajectoryGeneratorSE3():
 
 ####################################################################################################
 
+def rotation_matrix_from_points(p1, p2):
+    """
+    Returns a 3D rotation matrix that aligns with the line segment connecting two points.
+    
+    Parameters:
+    p1: numpy array of shape (3, 1) - starting point
+    p2: numpy array of shape (3, 1) - ending point
+    
+    Returns:
+    R: 3x3 numpy array representing the rotation matrix
+    """
+    # Calculate the direction vector between p1 and p2
+    v = p2 - p1
+    # Normalize the vector to get the unit vector along the line segment
+    v_hat = v / np.linalg.norm(v)
+
+    # Choose a reference vector (not aligned with v_hat). We'll choose the x-axis unit vector [1, 0, 0].
+    # If v_hat is aligned with the x-axis, choose another arbitrary vector like [0, 1, 0].
+    if np.allclose(v_hat.flatten(), np.array([1, 0, 0])):  # if aligned with x-axis
+        e_ref = np.array([0, 1, 0])  # pick y-axis as reference
+    else:
+        e_ref = np.array([1, 0, 0])  # pick x-axis as reference
+
+    # Compute the first orthogonal vector by taking the cross product
+    u1 = np.cross(v_hat.flatten(), e_ref)
+    u1 = u1 / np.linalg.norm(u1)  # normalize the vector to get unit vector u1
+
+    # Compute the second orthogonal vector as the cross product of v_hat and u1
+    u2 = np.cross(v_hat.flatten(), u1)
+    u2 = u2 / np.linalg.norm(u2)  # normalize the vector to get unit vector u2
+
+    # Construct the rotation matrix using u1, u2, and v_hat
+    R = np.column_stack((u1, u2, v_hat.flatten()))
+
+    return R
+
 if __name__ == "__main__":
 
     # model file
@@ -667,8 +703,8 @@ if __name__ == "__main__":
                             hip_bias=0.2,
                             bezier_order=7, 
                             T_SSP=0.3, 
-                            dt=0.02, 
-                            N=400)
+                            dt=0.05, 
+                            N=50)
 
     deg = 45
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
@@ -724,19 +760,46 @@ if __name__ == "__main__":
     red_color = Rgba(1, 0, 0, 1)
     green_color = Rgba(0, 1, 0, 1)
     blue_color = Rgba(0, 0, 1, 1)
+    grey_color = Rgba(1, 1, 1, 0.5)
+    
     sphere_com = Sphere(0.02)
     sphere_swing = Sphere(0.015)
-    sphere_stance = Sphere(0.017)
+    sphere_stance = Sphere(0.017)    
     h = len(q_HLIP)
     for i in range(h):
+        
+        # unpack the data
         O = meshcat_horizon[i]
         p_com_pos, p_stance, p_swing_target = O
+
+        # compute the rigid transform for each leg
+        p_stance_leg = 0.5 * (p_stance + p_com_pos)
+        R_stance_leg = RotationMatrix(rotation_matrix_from_points(p_stance_leg, p_com_pos))
+        p_stance_leg_len = np.linalg.norm(p_stance - p_com_pos)
+
+        p_swing_leg = 0.5 * (p_swing_target + p_com_pos)
+        R_swing_leg = RotationMatrix(rotation_matrix_from_points(p_swing_leg, p_com_pos))
+        p_swing_leg_len = np.linalg.norm(p_swing_target - p_com_pos)
+
+        # create a cylinder for the stance leg
+        cyl_stance = Cylinder(0.005, p_stance_leg_len)
+        meshcat.SetObject("stance_leg_{}".format(i), cyl_stance, grey_color)
+        meshcat.SetTransform("stance_leg_{}".format(i), RigidTransform(R_stance_leg, p_stance_leg))
+
+        # create a cylinder for the swing leg
+        cyl_swing = Cylinder(0.005, p_swing_leg_len)
+        meshcat.SetObject("swing_leg_{}".format(i), cyl_swing, grey_color)
+        meshcat.SetTransform("swing_leg_{}".format(i), RigidTransform(R_swing_leg, p_swing_leg))
+
+        # plot on meshcat
         meshcat.SetObject("com_{}".format(i), sphere_com, green_color)
         meshcat.SetObject("stance_{}".format(i), sphere_stance, red_color)
         meshcat.SetObject("swing_{}".format(i), sphere_swing, blue_color)
         meshcat.SetTransform("com_{}".format(i), RigidTransform(p_com_pos))
         meshcat.SetTransform("stance_{}".format(i), RigidTransform(p_stance))
         meshcat.SetTransform("swing_{}".format(i), RigidTransform(p_swing_target))
+
+
 
     # Set up a system diagram that includes a plant, scene graph, and meshcat
     builder = DiagramBuilder()
