@@ -755,7 +755,7 @@ if __name__ == "__main__":
                                                                    initial_stance_foot_name="right_foot")
     tf = time.time()
     print("Time to solve 3D prop: ", tf - t0)
-    
+
     # start meshcat
     meshcat = StartMeshcat()
 
@@ -769,11 +769,22 @@ if __name__ == "__main__":
     sphere_com = Sphere(0.02)
     sphere_foot = Sphere(0.01)
 
+    # CSV file location directory
+    import csv
+    import os
+    csv_dir = "/home/sergio/projects/achilles-ik/example_data"
+    csv_file_path = os.path.join(csv_dir, 'data.csv')
+    data = np.zeros((len(q_HLIP), 9))
+
     for i in range(len(q_HLIP)):
         
         # unpack the data
         O = meshcat_horizon[i]
         p_com, p_left, p_right = O
+
+        # append this to data array
+        P = np.concatenate((p_com.flatten(), p_left.flatten(), p_right.flatten()))
+        data[i,:] = P
 
         # plot the foot and com positions
         meshcat.SetObject("com_{}".format(i), sphere_com, green_color)
@@ -803,6 +814,10 @@ if __name__ == "__main__":
         meshcat.SetObject("right_leg_{}".format(i), cyl_right, red_color_faint)
         meshcat.SetTransform("right_leg_{}".format(i), RigidTransform(R_right_leg, p_right_leg))
 
+    # write the data to a csv file
+    with open(csv_file_path, mode='w') as file:
+        writer = csv.writer(file)
+        writer.writerows(data)
 
     # Set up a system diagram that includes a plant, scene graph, and meshcat
     builder = DiagramBuilder()
