@@ -23,7 +23,7 @@ from pydrake.all import (
     MultibodyPlant,
     VectorLogSink,
     RollPitchYaw,
-    RotationMatrix
+    Rgba, Sphere
 )
 
 import time
@@ -88,7 +88,7 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 20
+    problem.num_steps = 25
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
@@ -146,11 +146,15 @@ class AchillesMPC(ModelPredictiveController):
     """
     A Model Predictive Controller for the Achilles humanoid.
     """
-    def __init__(self, optimizer, q_guess, mpc_rate, model_file):
+    def __init__(self, optimizer, q_guess, mpc_rate, model_file, meshcat):
 
         # inherit from the ModelPredictiveController class
         ModelPredictiveController.__init__(self, optimizer, q_guess, 17, 16, mpc_rate)
 
+        # make a copy of meshcat
+        self.meshcat = meshcat
+
+        # create input port for the joystick command
         self.joystick_port = self.DeclareVectorInputPort("joy_command",
                                                          BasicVector(5))  # LS_x, LS_y, RS_x, A button, RT (Xbox)
         
@@ -205,6 +209,35 @@ class AchillesMPC(ModelPredictiveController):
         # computing the alpha value based on speed
         p = 2.0
         self.alpha = lambda v_des: ((1/self.v_max) * v_des) ** p
+
+        # create someobjects for the meshcat plot
+        red_color = Rgba(1, 0, 0, 1)
+        green_color = Rgba(0, 1, 0, 1)
+        blue_color = Rgba(0, 0, 1, 1)
+        sphere_com = Sphere(0.018)
+        sphere_foot = Sphere(0.015)
+
+        # create separate objects for the CoM and the feet visualization
+        for i in range(self.optimizer.num_steps() + 1):
+            self.meshcat.SetObject(f"com_{i}", sphere_com, green_color)
+            self.meshcat.SetObject(f"left_{i}", sphere_foot, blue_color)
+            self.meshcat.SetObject(f"right_{i}", sphere_foot, red_color)
+
+    #----------------------------------------------------------------------------------------------------------------------#
+
+    # update the meshcat plot with the HLIP horizon
+    def plot_meshcat_horizon(self, meshcat_horizon, t):
+
+        for i in range(self.optimizer.num_steps() + 1):
+            
+            # unpack the horizon data
+            O = meshcat_horizon[i]
+            p_com, p_left, p_right = O
+
+            # plot the foot and com positions
+            self.meshcat.SetTransform(f"com_{i}", RigidTransform(p_com), t)
+            self.meshcat.SetTransform(f"left_{i}", RigidTransform(p_left), t)
+            self.meshcat.SetTransform(f"right_{i}", RigidTransform(p_right), t)
 
     # update the foot info for the HLIP traj gen
     def UpdateFootInfo(self):
@@ -310,16 +343,9 @@ class AchillesMPC(ModelPredictiveController):
 
         print("------------------------------------------------------------")
         print(f"t_current: {self.t_current}")
-        # print("stance foot info:", self.stance_foot_frame.name())
-        # print(f"p_stance_W: {self.p_stance_W}")
-        # print(f"R_stance_W: {self.R_stance_W}")
-        # print(f"R_stance_W_2D: {self.R_stance_W_2D}")
-        # print(f"p_swing_init_W: {self.p_swing_init_W}")
-        # print(f"quat_stance: {self.quat_stance}")
-        # print(f"control_stance_yaw: {self.control_stance_yaw}")
 
         # get a new reference trajectory
-        q_HLIP, v_HLIP = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
+        q_HLIP, v_HLIP, meshcat_horizon = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
                                                                 v0 = v0,
                                                                 v_des = v_des,
                                                                 t_phase = self.t_phase,
@@ -339,6 +365,9 @@ class AchillesMPC(ModelPredictiveController):
             q_HLIP[i][5] = q0[5] + p_increment[1][0]
             v_HLIP[i][3] = v_des_W[0][0]
             v_HLIP[i][4] = v_des_W[1][0]
+
+        # draw the meshcat horizon
+        self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
 
         # compute alpha 
         v_norm = np.linalg.norm(v_des)
@@ -409,7 +438,7 @@ if __name__=="__main__":
 
     # Create the MPC controller and interpolator systems
     mpc_rate = 50  # Hz
-    controller = builder.AddSystem(AchillesMPC(optimizer, q_guess, mpc_rate, model_file))
+    controller = builder.AddSystem(AchillesMPC(optimizer, q_guess, mpc_rate, model_file, meshcat))
 
     Bv = plant.MakeActuationMatrix()
     N = plant.MakeVelocityToQDotMap(plant.CreateDefaultContext())
@@ -460,7 +489,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(5.0)
+    simulator.AdvanceTo(15.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")

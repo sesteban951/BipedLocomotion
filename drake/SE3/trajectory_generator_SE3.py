@@ -709,7 +709,7 @@ if __name__ == "__main__":
                             dt=0.05, 
                             N=50)
 
-    deg = 45
+    deg = 0
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
     quat = orient.ToQuaternion()
 
@@ -741,7 +741,7 @@ if __name__ == "__main__":
     yaw = RollPitchYaw(R_stance).yaw_angle()
 
     # generate a trajectory
-    v_des = np.array([[0.2], [0.2]])
+    v_des = np.array([[0.2], [0.]])
     t_phase = 0.0
 
     t0 = time.time()
@@ -763,8 +763,8 @@ if __name__ == "__main__":
     red_color = Rgba(1, 0, 0, 1)
     green_color = Rgba(0, 1, 0, 1)
     blue_color = Rgba(0, 0, 1, 1)
-    red_color_faint = Rgba(1, 0, 0, 0.5)
-    blue_color_faint = Rgba(0, 0, 1, 0.5)
+    red_color_faint = Rgba(1, 0, 0, 0.25)
+    blue_color_faint = Rgba(0, 0, 1, 0.25)
     
     sphere_com = Sphere(0.02)
     sphere_foot = Sphere(0.01)
@@ -795,12 +795,12 @@ if __name__ == "__main__":
 
         # create a cylinder for the left leg
         cyl_left = Cylinder(0.005, p_left_leg_len)
-        meshcat.SetObject("left_leg_{}".format(i), cyl_left, blue_color)
+        meshcat.SetObject("left_leg_{}".format(i), cyl_left, blue_color_faint)
         meshcat.SetTransform("left_leg_{}".format(i), RigidTransform(R_left_leg, p_left_leg))
 
         # create a cylinder for the right leg
         cyl_right = Cylinder(0.005, p_right_leg_len)
-        meshcat.SetObject("right_leg_{}".format(i), cyl_right, red_color)
+        meshcat.SetObject("right_leg_{}".format(i), cyl_right, red_color_faint)
         meshcat.SetTransform("right_leg_{}".format(i), RigidTransform(R_right_leg, p_right_leg))
 
 
