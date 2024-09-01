@@ -178,7 +178,8 @@ class AchillesMPC(ModelPredictiveController):
         hip_bias = 0.3       # bias between the foot-to-foot distance in y-direciotn
 
         # maximum velocity for the robot
-        self.v_max = 0.2
+        self.v_max = 0.2  # [m/s]
+        self.w_max = 25   # [deg/s]
 
         # foot info variables
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
@@ -238,6 +239,19 @@ class AchillesMPC(ModelPredictiveController):
             self.meshcat.SetTransform(f"com_{i}", RigidTransform(p_com), t)
             self.meshcat.SetTransform(f"left_{i}", RigidTransform(p_left), t)
             self.meshcat.SetTransform(f"right_{i}", RigidTransform(p_right), t)
+
+    # increment a current quaternion given omega_z
+    def increment_quaternion(self, quat_0, omega_z, T):
+
+        # convert the quaternion to a RollPitchYaw object
+        rpy = RollPitchYaw([0, 0, omega_z * T])
+        quat_delta = rpy.ToQuaternion()
+
+        # multiply the quaternions
+        quat_final = quat_delta.multiply(quat_0)
+
+        # return the final incremented quaternion
+        return quat_final
 
     # update the foot info for the HLIP traj gen
     def UpdateFootInfo(self):
@@ -322,7 +336,8 @@ class AchillesMPC(ModelPredictiveController):
         # unpack the joystick commands
         joy_command = self.joystick_port.Eval(context)
         vx_des = joy_command[1] * self.v_max  
-        vy_des = joy_command[0] * self.v_max 
+        vy_des = joy_command[0] * self.v_max
+        wz_des = joy_command[2] * self.w_max * (np.pi / 180)
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
 
         # Get the desired MPC standing trajectory
@@ -330,11 +345,15 @@ class AchillesMPC(ModelPredictiveController):
         v_stand = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
         v_des_W = self.R_stance_W_2D @ v_des
         for i in range(self.num_steps + 1):
-            q_stand[i][0] = self.quat_stance.w()
-            q_stand[i][1] = self.quat_stance.x()
-            q_stand[i][2] = self.quat_stance.y()
-            q_stand[i][3] = self.quat_stance.z()
+
+            # increment orientation
+            quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
+            q_stand[i][0] = quat_delta.w()
+            q_stand[i][1] = quat_delta.x()
+            q_stand[i][2] = quat_delta.y()
+            q_stand[i][3] = quat_delta.z()
             
+            # increment position
             p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
             q_stand[i][4] = q0[4] + p_increment[0][0]
             q_stand[i][5] = q0[5] + p_increment[1][0]
@@ -355,11 +374,15 @@ class AchillesMPC(ModelPredictiveController):
                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
         # throw away HLIP floating base reference trajectory
         for i in range(self.num_steps + 1):
-            q_HLIP[i][0] = self.quat_stance.w()
-            q_HLIP[i][1] = self.quat_stance.x()
-            q_HLIP[i][2] = self.quat_stance.y()
-            q_HLIP[i][3] = self.quat_stance.z()
             
+            # increment orientation
+            quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
+            q_HLIP[i][0] = quat_delta.w()
+            q_HLIP[i][1] = quat_delta.x()
+            q_HLIP[i][2] = quat_delta.y()
+            q_HLIP[i][3] = quat_delta.z()
+            
+            # increment position
             p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
             q_HLIP[i][4] = q0[4] + p_increment[0][0]
             q_HLIP[i][5] = q0[5] + p_increment[1][0]
@@ -370,7 +393,7 @@ class AchillesMPC(ModelPredictiveController):
         self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
 
         # compute alpha 
-        v_norm = np.linalg.norm(v_des)
+        v_norm = np.linalg.norm([vx_des, vy_des, wz_des])
         a = self.alpha(v_norm)
 
         # clamp a to [0, 1]
@@ -489,7 +512,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(15.0)
+    simulator.AdvanceTo(25.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")

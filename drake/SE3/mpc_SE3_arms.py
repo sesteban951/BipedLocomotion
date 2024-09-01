@@ -373,6 +373,7 @@ class AchillesMPC(ModelPredictiveController):
                                                                 stance_foot_pos = self.p_stance_W,
                                                                 stance_foot_yaw = self.control_stance_yaw,
                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
+        print(f"q_HLIP: {q_HLIP[0][6]}")
         # replace HLIP floating base reference trajectory
         for i in range(self.num_steps + 1):
             q_HLIP[i][0] = self.quat_stance.w()
@@ -385,6 +386,7 @@ class AchillesMPC(ModelPredictiveController):
             q_HLIP[i][5] = q0[5] + p_increment[1][0]
             v_HLIP[i][3] = v_des_W[0][0]
             v_HLIP[i][4] = v_des_W[1][0]
+
 
         # draw the meshcat horizon
         self.plot_meshcat_horizon(meshcat_horizon, self.t_current)

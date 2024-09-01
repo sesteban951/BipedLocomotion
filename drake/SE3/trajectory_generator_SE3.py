@@ -333,7 +333,7 @@ class HLIPTrajectoryGeneratorSE3():
     # -------------------------------------------------------------------------------------------------- #
 
     # solve the inverse kinematics problem
-    def solve_ik(self, p_com_pos_W, p_stance_W, p_swing_W, stance_name, initial_guess):
+    def solve_ik(self, p_com_pos_W, p_stance_W, p_swing_W, stance_name):
 
         # get the torso position in world frame
         p_torso_W = p_com_pos_W + self.p_torso_com
@@ -358,9 +358,9 @@ class HLIPTrajectoryGeneratorSE3():
                           self.quat_control_stance.x(), 
                           self.quat_control_stance.y(), 
                           self.quat_control_stance.z(),
-                          q_sol[4] + p_torso_W[0][0],                        # base position, x
-                          q_sol[5] + p_torso_W[1][0],                        # base position, y
-                          q_sol[6] + p_torso_W[2][0],                        # base position, z
+                          q_sol[4] + p_torso_W[0][0],                          # base position, x
+                          q_sol[5] + p_torso_W[1][0],                          # base position, y
+                          q_sol[6] + p_torso_W[2][0],                          # base position, z
                           q_sol[7], q_sol[8], q_sol[9],q_sol[10], q_sol[11],   # left leg
                           q_sol[16], q_sol[17], q_sol[18],q_sol[19], q_sol[20] # right leg
                           ])
@@ -544,7 +544,6 @@ class HLIPTrajectoryGeneratorSE3():
         # for every swing foot configuration solve the IK problem
         q_ref = []
         meshcat_horizon = []   # takes in tuple (p_com_W, p_left_W, p_right_W)
-        q_ik_sol = q0
         t0 = time.time()
         for i in L:
 
@@ -580,7 +579,7 @@ class HLIPTrajectoryGeneratorSE3():
                 elif stance_foot_name == "right_foot":
                     meshcat_horizon.append((p_com_pos, p_swing_target_W, p_stance))
 
-                q_ik = self.solve_ik(p_com_pos, p_stance, p_swing_target_W, stance_foot_name, q_ik_sol)
+                q_ik = self.solve_ik(p_com_pos, p_stance, p_swing_target_W, stance_foot_name)
                 q_ref.append(q_ik)
 
         # get the velocity reference
@@ -634,7 +633,7 @@ def rotation_matrix_from_points(p1, p2):
 if __name__ == "__main__":
 
     # model file
-    model_file = "../../models/achilles_drake.urdf"
+    model_file = "../../models/achilles_SE3_drake.urdf"
 
     # create a plant model for testing
     plant = MultibodyPlant(0)
@@ -655,7 +654,7 @@ if __name__ == "__main__":
                             dt=0.05, 
                             N=40)
 
-    deg = 180.0
+    deg = -45.0
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
     quat = orient.ToQuaternion()
 
@@ -667,8 +666,6 @@ if __name__ == "__main__":
         0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
     ])
     v0 = np.zeros(plant.num_velocities())
-    v0[3] = 0.0 # x velocity
-    v0[4] = 0.0 # forward velocity
     plant.SetPositions(plant_context, q0)
     plant.SetVelocities(plant_context, v0)
 
