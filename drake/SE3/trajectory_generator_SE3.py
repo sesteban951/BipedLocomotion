@@ -339,8 +339,8 @@ class HLIPTrajectoryGeneratorSE3():
         p_torso_W = p_com_pos_W + self.p_torso_com
 
         # get the position of the feet relative to the torso
-        p_stance_torso =  p_stance_W - p_torso_W
-        p_swing_torso =  p_swing_W - p_torso_W
+        p_stance_torso =  self.R_control_stance_W_mat.T @ (p_stance_W - p_torso_W)
+        p_swing_torso =  self.R_control_stance_W_mat.T @ (p_swing_W - p_torso_W)
 
         # convert to list for the IK solver
         if stance_name == "left_foot":
@@ -655,7 +655,7 @@ if __name__ == "__main__":
                             dt=0.05, 
                             N=40)
 
-    deg = 0.0
+    deg = 180.0
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
     quat = orient.ToQuaternion()
 
@@ -687,7 +687,7 @@ if __name__ == "__main__":
     yaw = RollPitchYaw(R_stance).yaw_angle()
 
     # generate a trajectory
-    v_des = np.array([[0.2], [-0.2]])
+    v_des = np.array([[0.2], [0.2]])
     t_phase = 0.0
 
     t0 = time.time()
