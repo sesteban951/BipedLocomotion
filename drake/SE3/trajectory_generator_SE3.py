@@ -82,7 +82,7 @@ class HLIPTrajectoryGeneratorSE3():
 
         # instantiate the IK object
         self.ik = ak.AchillesKinematics()
-        self.ik.Initialize("../../models/achilles.urdf")  # whole
+        self.ik.Initialize("../../models/achilles_drake.urdf")  # whole
 
     # -------------------------------------------------------------------------------------------------- #
 

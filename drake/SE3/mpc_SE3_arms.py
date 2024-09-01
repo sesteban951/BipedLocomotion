@@ -2,7 +2,7 @@
 
 ##
 #
-# MPC with 3D version of the Achilles humanoid.
+# MPC with 3D+arms version of the Achilles humanoid.
 #
 ##
 
@@ -58,8 +58,10 @@ def standing_position():
     q_stand = np.array([
         1.0000, 0.0000, 0.0000, 0.0000,            # base orientation, (w, x, y, z)
         0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
-        0.0000,  0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        0.0000, -0.0209, -0.5515, 1.0239,-0.4725   # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+        0.0000, 0.0209, -0.5515, 1.0239,-0.4725,   # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+        0.0000, 0.0000, 0.0000, 0.0000,            # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
+        0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+        0.0000, 0.0000, 0.0000, 0.0000             # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
     ])
 
     return q_stand
@@ -94,22 +96,28 @@ def create_optimizer(model_file):
     
     # no arms
     problem.Qq = np.diag([
-        1.0, 1.0, 1.0, 1.0,   # base orientation
-        1.0, 1.0, 1.0,         # base position
-        0.1, 1.0, 0.1, 0.1, 0.1,  # left leg
-        0.1, 1.0, 0.1, 0.1, 0.1   # left leg
+        1.0, 1.0, 1.0, 1.0,      # base orientation
+        1.0, 1.0, 1.0,           # base position
+        0.1, 1.0, 0.1, 0.1, 0.1, # left leg
+        0.05, 0.05, 0.05, 0.05,  # left arm
+        0.1, 1.0, 0.1, 0.1, 0.1, # left leg
+        0.05, 0.05, 0.05, 0.05   # left arm
     ])
     problem.Qv = np.diag([
-        0.1, 0.1, 0.1,         # base orientation
-        0.1, 0.1, 0.1,          # base position
-        0.01, 0.1, 0.01, 0.01, 0.01,  # left leg
-        0.01, 0.1, 0.01, 0.01, 0.01,  # right leg
+        0.1, 0.1, 0.1,               # base orientation
+        0.1, 0.1, 0.1,               # base position
+        0.01, 0.1, 0.01, 0.01, 0.01, # left leg
+        0.01, 0.01, 0.01, 0.01,      # left arm
+        0.01, 0.1, 0.01, 0.01, 0.01, # right leg
+        0.01, 0.01, 0.01, 0.01       # right arm
     ])
     problem.R = np.diag([
-        50.0, 50.0, 50.0,           # base orientation
-        50.0, 50.0, 50.0,           # base position
-        0.0001, 0.0001, 0.0001, 0.0001, 0.0001,  # left leg
-        0.0001, 0.0001, 0.0001, 0.0001, 0.0001,  # right leg
+        50.0, 50.0, 50.0,                       # base orientation
+        50.0, 50.0, 50.0,                       # base position
+        0.0001, 0.0001, 0.0001, 0.0001, 0.0001, # left leg
+        0.0001, 0.0001, 0.0001, 0.0001,         # left arm
+        0.0001, 0.0001, 0.0001, 0.0001, 0.0001, # right leg
+        0.0001, 0.0001, 0.0001, 0.0001          # right arm
     ])
     problem.Qf_q = 10.0 * np.copy(problem.Qq)
     problem.Qf_v = 10.0 * np.copy(problem.Qv)
@@ -149,7 +157,7 @@ class AchillesMPC(ModelPredictiveController):
     def __init__(self, optimizer, q_guess, mpc_rate, model_file, meshcat):
 
         # inherit from the ModelPredictiveController class
-        ModelPredictiveController.__init__(self, optimizer, q_guess, 17, 16, mpc_rate)
+        ModelPredictiveController.__init__(self, optimizer, q_guess, 25, 24, mpc_rate)
 
         # make a copy of meshcat
         self.meshcat = meshcat
@@ -209,6 +217,16 @@ class AchillesMPC(ModelPredictiveController):
         # computing the alpha value based on speed
         p = 2.0
         self.alpha = lambda v_des: ((1/self.v_max) * v_des) ** p
+
+        # index of whole body that are leg joints
+        self.idx_no_arms_q = [0, 1, 2, 3,         # quat coords
+                              4, 5, 6,            # pos coords
+                              7, 8, 9, 10, 11,    # left leg
+                              16, 17, 18, 19, 20] # right leg
+        self.idx_no_arms_v = [0, 1, 2,            # omega coords
+                              3, 4, 5,            # v coords
+                              6, 7, 8, 9, 10,     # left leg
+                              15, 16, 17, 18, 19] # right leg
 
         # create someobjects for the meshcat plot
         red_color = Rgba(1, 0, 0, 1)
@@ -381,8 +399,8 @@ class AchillesMPC(ModelPredictiveController):
         q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
         v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
         for i in range(self.optimizer.num_steps() + 1):
-            q_nom[i] = (1 - a) * q_stand[i] + a * q_HLIP[i]
-            v_nom[i] = (1 - a) * v_stand[i] + a * v_HLIP[i]
+            q_nom[i][self.idx_no_arms_q] = (1 - a) * q_stand[i][self.idx_no_arms_q] + a * q_HLIP[i]
+            v_nom[i][self.idx_no_arms_v] = (1 - a) * v_stand[i][self.idx_no_arms_v] + a * v_HLIP[i]
 
         # q_nom = q_stand
         # v_nom = v_stand
@@ -396,7 +414,7 @@ class AchillesMPC(ModelPredictiveController):
 if __name__=="__main__":
 
     meshcat = StartMeshcat()
-    model_file = "../../models/achilles_SE3_drake.urdf"
+    model_file = "../../models/achilles_drake.urdf"
 
     # Set up a Drake diagram for simulation
     builder = DiagramBuilder()
@@ -415,11 +433,19 @@ if __name__=="__main__":
     kp_hip = 900
     kp_knee = 1000
     kp_ankle = 150
+    kp_arm = 100
     kd_hip = 10
     kd_knee = 10
     kd_ankle = 1
-    Kp = np.array([kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle, kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle])
-    Kd = np.array([kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle, kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle])
+    kd_arm = 1
+    Kp = np.array([kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle, 
+                   kp_arm, kp_arm, kp_arm, kp_arm,
+                   kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle,
+                   kp_arm, kp_arm, kp_arm, kp_arm])
+    Kd = np.array([kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle, 
+                   kd_arm, kd_arm, kd_arm, kd_arm,
+                   kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle,
+                   kd_arm, kd_arm, kd_arm, kd_arm])
     
     actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
     for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):
@@ -502,7 +528,7 @@ if __name__=="__main__":
     states = log.data().T
 
     # save the data to a CSV file
-    with open('./data/data_SE3.csv', mode='w') as file:
+    with open('./data/data_SE3_arms.csv', mode='w') as file:
         writer = csv.writer(file)
         for i in range(len(times)):
             writer.writerow([times[i]] + list(states[i]))

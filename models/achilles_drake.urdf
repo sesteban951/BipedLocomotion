@@ -327,10 +327,23 @@
       <mass value="0.001"/>
       <inertia ixx="1e-06" ixy="0.0" ixz="0.0" iyy="1e-06" iyz="0.0" izz="1e-06"/>
     </inertial>
+      <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <sphere radius="0.031"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <sphere radius="0.031"/>
+      </geometry>
+    </collision>
   </link>
   <!-- Hand radius is 0.03 m -->
   <joint name="left_hand_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0.0 0.0 -0.19"/>
+    <origin rpy="0 0 0" xyz="0.0 0.0 -0.192"/>
     <parent link="left_elbow_pitch"/>
     <child link="left_hand"/>
   </joint>
@@ -633,10 +646,23 @@
       <mass value="0.001"/>
       <inertia ixx="1e-06" ixy="0.0" ixz="0.0" iyy="1e-06" iyz="0.0" izz="1e-06"/>
     </inertial>
+      <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <sphere radius="0.031"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <sphere radius="0.031"/>
+      </geometry>
+    </collision>
   </link>
   <!-- Hand radius is 0.03 m -->
   <joint name="right_hand_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0.0 0.0 -0.19"/>
+    <origin rpy="0 0 0" xyz="0.0 0.0 -0.192"/>
     <parent link="right_elbow_pitch"/>
     <child link="right_hand"/>
   </joint>
