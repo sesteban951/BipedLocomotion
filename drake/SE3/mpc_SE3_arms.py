@@ -90,7 +90,7 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 25
+    problem.num_steps = 20
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
@@ -183,10 +183,11 @@ class AchillesMPC(ModelPredictiveController):
         bezier_order = 7     # 5 or 7
         z_apex = 0.06        # apex height
         z_foot_offset = 0.01 # foot offset from the ground
-        hip_bias = 0.3       # bias between the foot-to-foot distance in y-direciotn
+        hip_bias = 0.25       # bias between the foot-to-foot distance in y-direciotn
 
         # maximum velocity for the robot
         self.v_max = 0.2
+        self.w_max = 0.1
 
         # foot info variables
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
@@ -339,8 +340,9 @@ class AchillesMPC(ModelPredictiveController):
 
         # unpack the joystick commands
         joy_command = self.joystick_port.Eval(context)
-        vx_des = joy_command[1] * self.v_max  
-        vy_des = joy_command[0] * self.v_max 
+        vx_des = joy_command[1] * self.v_max  # forward and backward velocity
+        vy_des = joy_command[0] * self.v_max  # left and right velocity
+        wz_des = joy_command[2] * self.w_max  # yaw rate
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
 
         # Get the desired MPC standing trajectory
@@ -361,9 +363,9 @@ class AchillesMPC(ModelPredictiveController):
 
         print("------------------------------------------------------------")
         print(f"t_current: {self.t_current}")
-
         # get a new reference trajectory
-        q_HLIP, v_HLIP, meshcat_horizon = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
+        q_HLIP, v_HLIP, meshcat_horizon = self.traj_gen_HLIP.generate_trajectory(
+                                                                q0 = q0,
                                                                 v0 = v0,
                                                                 v_des = v_des,
                                                                 t_phase = self.t_phase,
@@ -371,7 +373,7 @@ class AchillesMPC(ModelPredictiveController):
                                                                 stance_foot_pos = self.p_stance_W,
                                                                 stance_foot_yaw = self.control_stance_yaw,
                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
-        # throw away HLIP floating base reference trajectory
+        # replace HLIP floating base reference trajectory
         for i in range(self.num_steps + 1):
             q_HLIP[i][0] = self.quat_stance.w()
             q_HLIP[i][1] = self.quat_stance.x()

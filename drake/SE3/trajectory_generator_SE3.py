@@ -634,7 +634,7 @@ def rotation_matrix_from_points(p1, p2):
 if __name__ == "__main__":
 
     # model file
-    model_file = "../../models/achilles_SE3_drake.urdf"
+    model_file = "../../models/achilles_drake.urdf"
 
     # create a plant model for testing
     plant = MultibodyPlant(0)

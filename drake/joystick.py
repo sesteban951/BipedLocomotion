@@ -51,7 +51,7 @@ class GamepadCommand(LeafSystem):
             # map the joystick axes (XBOX One Controller)
             LS_x = -self.joysticks[0].get_axis(0)             # Left Stick X-direction  (left = +1, right = -1)
             LS_y = -self.joysticks[0].get_axis(1)             # Left Stick Y-direction  (up = -1, down = +1)
-            RS_x =  self.joysticks[0].get_axis(3)             # Right Stick X-direction (left = -1, right = +1)
+            RS_x = -self.joysticks[0].get_axis(3)             # Right Stick X-direction (left = -1, right = +1)
             A = self.joysticks[0].get_button(0)               # A button (unpressed = 0, pressed = 1)
             RT = 0.5 * (self.joysticks[0].get_axis(5) + 1.0)  # Right Trigger (unpressed = 0, pressed = 1)
 
