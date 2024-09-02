@@ -451,7 +451,7 @@ class HLIPTrajectoryGeneratorSE3():
     # -------------------------------------------------------------------------------------------------- #
 
     # set the trajectory generation problem parameters
-    def set_parameters(self, z_nom, z_apex, z_offset, hip_bias, bezier_order, T_SSP, dt, N):
+    def set_parameters(self, z_apex, z_offset, hip_bias, bezier_order, T_SSP, dt, N):
 
         # make sure that N is non-zero
         assert N >= 1, "N must be an integer >= 1."
@@ -474,25 +474,14 @@ class HLIPTrajectoryGeneratorSE3():
 
         # set variables that depend on z com nominal
         self.z_apex = z_apex
-        self.z_nom = z_nom
         self.z_offset = z_offset
-        g = 9.81
-        self.lam = np.sqrt(g/self.z_nom)       # natural frequency
-        self.A = np.array([[0,           1],   # LIP drift matrix
-                           [self.lam**2, 0]])
-
-        # define the deadbeat gains and orbital slopes
-        self.Kp_db = 1
-        self.Kd_db = self.T_DSP + (1/self.lam) * self.coth(self.lam * self.T_SSP)  # deadbeat gains
-        self.sigma_P1 = self.lam * self.coth(0.5 * self.lam * self.T_SSP)          # orbital slope (P1)
-        self.sigma_P2 = self.lam * self.tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
 
         return "Parameters set successfully."
 
     # -------------------------------------------------------------------------------------------------- #
 
     # main function that updates the whole problem
-    def generate_trajectory(self, q0, v0, v_des, t_phase, initial_swing_foot_pos, stance_foot_pos, stance_foot_yaw, initial_stance_foot_name):
+    def generate_trajectory(self, q0, v0, v_des, z_com_des, t_phase, initial_swing_foot_pos, stance_foot_pos, stance_foot_yaw, initial_stance_foot_name):
 
         # set the robot state
         self.plant.SetPositions(self.plant_context, q0)
@@ -505,6 +494,19 @@ class HLIPTrajectoryGeneratorSE3():
         # set the P2 orbit bias
         self.u_L = self.u_L_bias + self.vy_des * (self.T_SSP + self.T_DSP)
         self.u_R = self.u_R_bias + self.vy_des * (self.T_SSP + self.T_DSP)
+
+        # set varibles dependent on the nominal z_com
+        self.z_nom = z_com_des
+        g = 9.81
+        self.lam = np.sqrt(g/self.z_nom)       # natural frequency
+        self.A = np.array([[0,           1],   # LIP drift matrix
+                           [self.lam**2, 0]])
+
+        # define the deadbeat gains and orbital slopes
+        self.Kp_db = 1
+        self.Kd_db = self.T_DSP + (1/self.lam) * self.coth(self.lam * self.T_SSP)  # deadbeat gains
+        self.sigma_P1 = self.lam * self.coth(0.5 * self.lam * self.T_SSP)          # orbital slope (P1)
+        self.sigma_P2 = self.lam * self.tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
 
         # P2 orbit shifting
         self.d2 = self.lam**2 * (self.sech(0.5 * self.lam * self.T_SSP))**2 * (self.T * self.vy_des) / (self.lam**2 * self.T_DSP + 2 * self.sigma_P2)
@@ -645,8 +647,7 @@ if __name__ == "__main__":
     traj_gen = HLIPTrajectoryGeneratorSE3(model_file)
 
     # set the parameters
-    traj_gen.set_parameters(z_nom=0.64, 
-                            z_apex=0.07, 
+    traj_gen.set_parameters(z_apex=0.07, 
                             z_offset=0.01,
                             hip_bias=0.2,
                             bezier_order=7, 
@@ -691,6 +692,7 @@ if __name__ == "__main__":
     q_HLIP, v_HLIP, meshcat_horizon = traj_gen.generate_trajectory(q0=q0,
                                                                    v0=v0,
                                                                    v_des=v_des,
+                                                                   z_com_des=0.64,
                                                                    t_phase=t_phase,
                                                                    initial_swing_foot_pos=p_swing,
                                                                    stance_foot_pos=p_stance,

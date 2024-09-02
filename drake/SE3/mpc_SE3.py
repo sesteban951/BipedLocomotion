@@ -23,6 +23,7 @@ from pydrake.all import (
     MultibodyPlant,
     VectorLogSink,
     RollPitchYaw,
+    RotationMatrix,
     Rgba, Sphere
 )
 
@@ -171,11 +172,12 @@ class AchillesMPC(ModelPredictiveController):
         self.number_of_steps = -1   # number of individual swing foot steps taken
 
         # z height parameters
-        z_com_nom = 0.64     # nominal CoM height
-        bezier_order = 7     # 5 or 7
-        z_apex = 0.06        # apex height
-        z_foot_offset = 0.01 # foot offset from the ground
-        hip_bias = 0.3       # bias between the foot-to-foot distance in y-direciotn
+        self.z_com_upper = 0.64   # upper CoM height
+        self.z_com_lower = 0.45   # lower CoM height
+        z_apex = 0.06           # apex height
+        z_foot_offset = 0.01    # foot offset from the ground
+        bezier_order = 7        # 5 or 7
+        hip_bias = 0.3          # bias between the foot-to-foot distance in y-direction
 
         # maximum velocity for the robot
         self.v_max = 0.2  # [m/s]
@@ -193,10 +195,17 @@ class AchillesMPC(ModelPredictiveController):
         self.quat_stance = None
         self.control_stance_yaw = None
 
+        # get the constant offset of the torso frame in the CoM frame
+        torso_frame = self.plant.GetFrameByName("torso")
+        static_com_frame = self.plant.GetFrameByName("static_com")
+        self.p_torso_com = self.plant.CalcPointsPositions(self.plant_context,
+                                                          torso_frame,
+                                                          [0, 0, 0],
+                                                          static_com_frame)
+
         # create an HLIP trajectory generator object and set the parameters
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE3(model_file)
-        self.traj_gen_HLIP.set_parameters(z_nom = z_com_nom,
-                                          z_apex = z_apex,
+        self.traj_gen_HLIP.set_parameters(z_apex = z_apex,
                                           z_offset = z_foot_offset,
                                           hip_bias = hip_bias,
                                           bezier_order = bezier_order,
@@ -306,9 +315,10 @@ class AchillesMPC(ModelPredictiveController):
             
             # compute the stance foot yaw angle and the 2D rotation matrix
             self.control_stance_yaw = RollPitchYaw(self.R_stance_W).yaw_angle()
-            self.R_stance_W_2D = np.array([[np.cos(self.control_stance_yaw), -np.sin(self.control_stance_yaw)],
-                                         [np.sin(self.control_stance_yaw),  np.cos(self.control_stance_yaw)]])
             self.quat_stance = RollPitchYaw([0,0,self.control_stance_yaw]).ToQuaternion()
+            self.R_satnce_W = RotationMatrix(self.quat_stance).matrix()
+            self.R_stance_W_2D = np.array([[np.cos(self.control_stance_yaw), -np.sin(self.control_stance_yaw)],
+                                           [np.sin(self.control_stance_yaw),  np.cos(self.control_stance_yaw)]])
 
         # update the phase time
         self.t_phase = self.t_current - self.number_of_steps * self.T_SSP
@@ -338,6 +348,7 @@ class AchillesMPC(ModelPredictiveController):
         vx_des = joy_command[1] * self.v_max  
         vy_des = joy_command[0] * self.v_max
         wz_des = joy_command[2] * self.w_max * (np.pi / 180)
+        z_com_des = joy_command[4] * (self.z_com_lower - self.z_com_upper) + self.z_com_upper
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
 
         # Get the desired MPC standing trajectory
@@ -357,6 +368,7 @@ class AchillesMPC(ModelPredictiveController):
             p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
             q_stand[i][4] = q0[4] + p_increment[0][0]
             q_stand[i][5] = q0[5] + p_increment[1][0]
+            q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
             v_stand[i][3] = v_des_W[0][0]
             v_stand[i][4] = v_des_W[1][0]
 
@@ -367,6 +379,7 @@ class AchillesMPC(ModelPredictiveController):
         q_HLIP, v_HLIP, meshcat_horizon = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
                                                                 v0 = v0,
                                                                 v_des = v_des,
+                                                                z_com_des = z_com_des,
                                                                 t_phase = self.t_phase,
                                                                 initial_swing_foot_pos = self.p_swing_init_W,
                                                                 stance_foot_pos = self.p_stance_W,
@@ -386,6 +399,7 @@ class AchillesMPC(ModelPredictiveController):
             p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
             q_HLIP[i][4] = q0[4] + p_increment[0][0]
             q_HLIP[i][5] = q0[5] + p_increment[1][0]
+            q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
             v_HLIP[i][3] = v_des_W[0][0]
             v_HLIP[i][4] = v_des_W[1][0]
 
