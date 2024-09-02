@@ -185,7 +185,7 @@ class AchillesMPC(ModelPredictiveController):
         z_apex = 0.06           # apex height
         z_foot_offset = 0.01    # foot offset from the ground
         bezier_order = 7        # 5 or 7
-        hip_bias = 0.3          # bias between the foot-to-foot distance in y-direction
+        hip_bias = 0.28          # bias between the foot-to-foot distance in y-direction
 
         # maximum velocity for the robot
         self.v_max = 0.2  # [m/s]
@@ -426,22 +426,21 @@ class AchillesMPC(ModelPredictiveController):
         self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
 
         # compute alpha 
-        # v_norm = np.linalg.norm([vx_des, vy_des, wz_des])
-        # a = self.alpha(v_norm)
+        v_norm = np.linalg.norm([vx_des, vy_des, wz_des])
+        a = self.alpha(v_norm)
 
-        # # clamp a to [0, 1]
-        # a = np.clip(a, 0, 1) # TODO: alpha is not mapping joystick vel to [0,1], do this more intelligently
-        # print(f"alpha: {a}")
+        # clamp a to [0, 1]
+        a = np.clip(a, 0, 1) # TODO: alpha is not mapping joystick vel to [0,1], do this more intelligently
 
-        # # convex combination of the standing position and the nominal trajectory
-        # q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
-        # v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
-        # for i in range(self.optimizer.num_steps() + 1):
-        #     q_nom[i][self.idx_no_arms_q] = (1 - a) * q_stand[i][self.idx_no_arms_q] + a * q_HLIP[i]
-        #     v_nom[i][self.idx_no_arms_v] = (1 - a) * v_stand[i][self.idx_no_arms_v] + a * v_HLIP[i]
+        # convex combination of the standing position and the nominal trajectory
+        q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
+        v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
+        for i in range(self.optimizer.num_steps() + 1):
+            q_nom[i][self.idx_no_arms_q] = (1 - a) * q_stand[i][self.idx_no_arms_q] + a * q_HLIP[i]
+            v_nom[i][self.idx_no_arms_v] = (1 - a) * v_stand[i][self.idx_no_arms_v] + a * v_HLIP[i]
 
-        q_nom = q_stand
-        v_nom = v_stand
+        # q_nom = q_stand
+        # v_nom = v_stand
         # q_nom = q_HLIP
         # v_nom = v_HLIP
 
