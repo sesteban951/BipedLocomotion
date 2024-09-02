@@ -23,6 +23,7 @@ from pydrake.all import (
     MultibodyPlant,
     VectorLogSink,
     RollPitchYaw,
+    RotationMatrix,
     Rgba, Sphere
 )
 
@@ -137,8 +138,8 @@ def create_optimizer(model_file):
     params.contact_stiffness = 5_000
     params.dissipation_velocity = 0.1
     params.smoothing_factor = 0.01
-    params.friction_coefficient = 0.5
-    params.stiction_velocity = 0.1
+    params.friction_coefficient = 0.9
+    params.stiction_velocity = 0.5
     params.verbose = False
 
     # Create the optimizer
@@ -179,15 +180,16 @@ class AchillesMPC(ModelPredictiveController):
         self.number_of_steps = -1   # number of individual swing foot steps taken
 
         # z height parameters
-        z_com_nom = 0.64     # nominal CoM height
-        bezier_order = 7     # 5 or 7
-        z_apex = 0.06        # apex height
-        z_foot_offset = 0.01 # foot offset from the ground
-        hip_bias = 0.25       # bias between the foot-to-foot distance in y-direciotn
+        self.z_com_upper = 0.64   # upper CoM height
+        self.z_com_lower = 0.45   # lower CoM height
+        z_apex = 0.06           # apex height
+        z_foot_offset = 0.01    # foot offset from the ground
+        bezier_order = 7        # 5 or 7
+        hip_bias = 0.3          # bias between the foot-to-foot distance in y-direction
 
         # maximum velocity for the robot
-        self.v_max = 0.2
-        self.w_max = 0.1
+        self.v_max = 0.2  # [m/s]
+        self.w_max = 25   # [deg/s]
 
         # foot info variables
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
@@ -201,10 +203,17 @@ class AchillesMPC(ModelPredictiveController):
         self.quat_stance = None
         self.control_stance_yaw = None
 
+        # get the constant offset of the torso frame in the CoM frame
+        torso_frame = self.plant.GetFrameByName("torso")
+        static_com_frame = self.plant.GetFrameByName("static_com")
+        self.p_torso_com = self.plant.CalcPointsPositions(self.plant_context,
+                                                          torso_frame,
+                                                          [0, 0, 0],
+                                                          static_com_frame)
+
         # create an HLIP trajectory generator object and set the parameters
         self.traj_gen_HLIP = HLIPTrajectoryGeneratorSE3(model_file)
-        self.traj_gen_HLIP.set_parameters(z_nom = z_com_nom,
-                                          z_apex = z_apex,
+        self.traj_gen_HLIP.set_parameters(z_apex = z_apex,
                                           z_offset = z_foot_offset,
                                           hip_bias = hip_bias,
                                           bezier_order = bezier_order,
@@ -258,6 +267,19 @@ class AchillesMPC(ModelPredictiveController):
             self.meshcat.SetTransform(f"left_{i}", RigidTransform(p_left), t)
             self.meshcat.SetTransform(f"right_{i}", RigidTransform(p_right), t)
 
+    # increment a current quaternion given omega_z
+    def increment_quaternion(self, quat_0, omega_z, T):
+
+        # convert the quaternion to a RollPitchYaw object
+        rpy = RollPitchYaw([0, 0, omega_z * T])
+        quat_delta = rpy.ToQuaternion()
+
+        # multiply the quaternions
+        quat_final = quat_delta.multiply(quat_0)
+
+        # return the final incremented quaternion
+        return quat_final
+
     # update the foot info for the HLIP traj gen
     def UpdateFootInfo(self):
 
@@ -310,10 +332,11 @@ class AchillesMPC(ModelPredictiveController):
                 self.swing_foot_frame = self.right_foot_frame
             
             # compute the stance foot yaw angle and the 2D rotation matrix
-            self.control_stance_yaw = RollPitchYaw(self.R_stance_W).yaw_angle()
-            self.R_stance_W_2D = np.array([[np.cos(self.control_stance_yaw), -np.sin(self.control_stance_yaw)],
-                                         [np.sin(self.control_stance_yaw),  np.cos(self.control_stance_yaw)]])
+            self.control_stance_yaw = RollPitchYaw(self.R_stance_W).yaw_angle()  # NOTE: could cause singularity
             self.quat_stance = RollPitchYaw([0,0,self.control_stance_yaw]).ToQuaternion()
+            self.R_satnce_W = RotationMatrix(self.quat_stance).matrix()
+            self.R_stance_W_2D = np.array([[np.cos(self.control_stance_yaw), -np.sin(self.control_stance_yaw)],
+                                           [np.sin(self.control_stance_yaw),  np.cos(self.control_stance_yaw)]])
 
         # update the phase time
         self.t_phase = self.t_current - self.number_of_steps * self.T_SSP
@@ -340,9 +363,10 @@ class AchillesMPC(ModelPredictiveController):
 
         # unpack the joystick commands
         joy_command = self.joystick_port.Eval(context)
-        vx_des = joy_command[1] * self.v_max  # forward and backward velocity
-        vy_des = joy_command[0] * self.v_max  # left and right velocity
-        wz_des = joy_command[2] * self.w_max  # yaw rate
+        vx_des = joy_command[1] * self.v_max  
+        vy_des = joy_command[0] * self.v_max
+        wz_des = joy_command[2] * self.w_max * (np.pi / 180)
+        z_com_des = joy_command[4] * (self.z_com_lower - self.z_com_upper) + self.z_com_upper
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
 
         # Get the desired MPC standing trajectory
@@ -350,64 +374,74 @@ class AchillesMPC(ModelPredictiveController):
         v_stand = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
         v_des_W = self.R_stance_W_2D @ v_des
         for i in range(self.num_steps + 1):
-            q_stand[i][0] = self.quat_stance.w()
-            q_stand[i][1] = self.quat_stance.x()
-            q_stand[i][2] = self.quat_stance.y()
-            q_stand[i][3] = self.quat_stance.z()
+
+            # increment orientation
+            quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
+            q_stand[i][0] = quat_delta.w()
+            q_stand[i][1] = quat_delta.x()
+            q_stand[i][2] = quat_delta.y()
+            q_stand[i][3] = quat_delta.z()
             
+            # increment position
             p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
             q_stand[i][4] = q0[4] + p_increment[0][0]
             q_stand[i][5] = q0[5] + p_increment[1][0]
+            q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
             v_stand[i][3] = v_des_W[0][0]
             v_stand[i][4] = v_des_W[1][0]
 
         print("------------------------------------------------------------")
         print(f"t_current: {self.t_current}")
+
         # get a new reference trajectory
         q_HLIP, v_HLIP, meshcat_horizon = self.traj_gen_HLIP.generate_trajectory(
                                                                 q0 = q0,
                                                                 v0 = v0,
                                                                 v_des = v_des,
+                                                                z_com_des = z_com_des,
                                                                 t_phase = self.t_phase,
                                                                 initial_swing_foot_pos = self.p_swing_init_W,
                                                                 stance_foot_pos = self.p_stance_W,
                                                                 stance_foot_yaw = self.control_stance_yaw,
                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
-        print(f"q_HLIP: {q_HLIP[0][6]}")
         # replace HLIP floating base reference trajectory
         for i in range(self.num_steps + 1):
-            q_HLIP[i][0] = self.quat_stance.w()
-            q_HLIP[i][1] = self.quat_stance.x()
-            q_HLIP[i][2] = self.quat_stance.y()
-            q_HLIP[i][3] = self.quat_stance.z()
             
+            # increment orientation
+            quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
+            q_HLIP[i][0] = quat_delta.w()
+            q_HLIP[i][1] = quat_delta.x()
+            q_HLIP[i][2] = quat_delta.y()
+            q_HLIP[i][3] = quat_delta.z()
+            
+            # increment position
             p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
             q_HLIP[i][4] = q0[4] + p_increment[0][0]
             q_HLIP[i][5] = q0[5] + p_increment[1][0]
+            q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
             v_HLIP[i][3] = v_des_W[0][0]
             v_HLIP[i][4] = v_des_W[1][0]
-
 
         # draw the meshcat horizon
         self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
 
         # compute alpha 
-        v_norm = np.linalg.norm(v_des)
-        a = self.alpha(v_norm)
+        # v_norm = np.linalg.norm([vx_des, vy_des, wz_des])
+        # a = self.alpha(v_norm)
 
-        # clamp a to [0, 1]
-        a = np.clip(a, 0, 1) # TODO: alpha is not mapping joystick vel to [0,1], do this more intelligently
-        print(f"alpha: {a}")
+        # # clamp a to [0, 1]
+        # a = np.clip(a, 0, 1) # TODO: alpha is not mapping joystick vel to [0,1], do this more intelligently
+        # print(f"alpha: {a}")
 
-        # convex combination of the standing position and the nominal trajectory
-        q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
-        v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
-        for i in range(self.optimizer.num_steps() + 1):
-            q_nom[i][self.idx_no_arms_q] = (1 - a) * q_stand[i][self.idx_no_arms_q] + a * q_HLIP[i]
-            v_nom[i][self.idx_no_arms_v] = (1 - a) * v_stand[i][self.idx_no_arms_v] + a * v_HLIP[i]
+        # # convex combination of the standing position and the nominal trajectory
+        # q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
+        # v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
+        # for i in range(self.optimizer.num_steps() + 1):
+        #     q_nom[i][self.idx_no_arms_q] = (1 - a) * q_stand[i][self.idx_no_arms_q] + a * q_HLIP[i]
+        #     v_nom[i][self.idx_no_arms_v] = (1 - a) * v_stand[i][self.idx_no_arms_v] + a * v_HLIP[i]
 
-        # q_nom = q_stand
-        # v_nom = v_stand
+        q_nom = q_stand
+        v_nom = v_stand
         # q_nom = q_HLIP
         # v_nom = v_HLIP
 

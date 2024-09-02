@@ -314,7 +314,7 @@ class AchillesMPC(ModelPredictiveController):
                 self.swing_foot_frame = self.right_foot_frame
             
             # compute the stance foot yaw angle and the 2D rotation matrix
-            self.control_stance_yaw = RollPitchYaw(self.R_stance_W).yaw_angle()
+            self.control_stance_yaw = RollPitchYaw(self.R_stance_W).yaw_angle()  # NOTE: could cause singularity
             self.quat_stance = RollPitchYaw([0,0,self.control_stance_yaw]).ToQuaternion()
             self.R_satnce_W = RotationMatrix(self.quat_stance).matrix()
             self.R_stance_W_2D = np.array([[np.cos(self.control_stance_yaw), -np.sin(self.control_stance_yaw)],
@@ -372,11 +372,9 @@ class AchillesMPC(ModelPredictiveController):
             v_stand[i][3] = v_des_W[0][0]
             v_stand[i][4] = v_des_W[1][0]
 
-        print("------------------------------------------------------------")
-        print(f"t_current: {self.t_current}")
-
         # get a new reference trajectory
-        q_HLIP, v_HLIP, meshcat_horizon = self.traj_gen_HLIP.generate_trajectory(q0 = q0,
+        q_HLIP, v_HLIP, meshcat_horizon = self.traj_gen_HLIP.generate_trajectory(
+                                                                q0 = q0,
                                                                 v0 = v0,
                                                                 v_des = v_des,
                                                                 z_com_des = z_com_des,
@@ -385,7 +383,7 @@ class AchillesMPC(ModelPredictiveController):
                                                                 stance_foot_pos = self.p_stance_W,
                                                                 stance_foot_yaw = self.control_stance_yaw,
                                                                 initial_stance_foot_name = self.stance_foot_frame.name())
-        # throw away HLIP floating base reference trajectory
+        # replace HLIP floating base reference trajectory
         for i in range(self.num_steps + 1):
             
             # increment orientation
@@ -412,7 +410,6 @@ class AchillesMPC(ModelPredictiveController):
 
         # clamp a to [0, 1]
         a = np.clip(a, 0, 1) # TODO: alpha is not mapping joystick vel to [0,1], do this more intelligently
-        print(f"alpha: {a}")
 
         # convex combination of the standing position and the nominal trajectory
         q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]

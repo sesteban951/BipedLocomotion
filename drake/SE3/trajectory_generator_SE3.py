@@ -354,23 +354,23 @@ class HLIPTrajectoryGeneratorSE3():
     # solve the inverse kinematics problem
     def solve_ik(self, p_com_pos_W, p_stance_W, p_swing_W, stance_name):
 
-        # get the torso position in world frame
-        p_torso_W = p_com_pos_W + self.p_torso_com
+        # compute the torso position in world frame
+        p_torso_W = p_com_pos_W + self.R_control_stance_W_mat @ self.p_torso_com
 
-        # get the position of the feet relative to the torso
-        p_stance_torso =  self.R_control_stance_W_mat.T @ (p_stance_W - p_torso_W)
-        p_swing_torso =  self.R_control_stance_W_mat.T @ (p_swing_W - p_torso_W)
+        # get the position of the feet relative to the CoM
+        p_stance_com = self.R_control_stance_W_mat.T @ (p_stance_W - p_com_pos_W)
+        p_swing_com = self.R_control_stance_W_mat.T @ (p_swing_W - p_com_pos_W)
 
         # convert to list for the IK solver
         if stance_name == "left_foot":
-            p_left_torso  = p_stance_torso.T[0].tolist()
-            p_right_torso = p_swing_torso.T[0].tolist()
+            p_left_com  = p_stance_com.T[0].tolist()
+            p_right_com = p_swing_com.T[0].tolist()
         elif stance_name == "right_foot":
-            p_left_torso  = p_swing_torso.T[0].tolist()
-            p_right_torso = p_stance_torso.T[0].tolist()
+            p_left_com  = p_swing_com.T[0].tolist()
+            p_right_com = p_stance_com.T[0].tolist()
 
         # solve the IK problem -- returned as list
-        q_sol = self.ik.Solve_InvKin(p_left_torso, p_right_torso, stance_name)
+        q_sol = self.ik.Solve_InvKin(p_left_com, p_right_com, stance_name)
 
         # check if the solution si valid
         if (np.linalg.norm(q_sol) < 1e-6):
@@ -378,17 +378,18 @@ class HLIPTrajectoryGeneratorSE3():
 
         # repopulate to match the original whole body coordinates
         else:
+        
             q_sol = np.array([self.quat_control_stance.w(),                        # quaternion orientation
-                            self.quat_control_stance.x(), 
-                            self.quat_control_stance.y(), 
-                            self.quat_control_stance.z(),
-                            q_sol[4] + p_torso_W[0][0],                          # base position, x
-                            q_sol[5] + p_torso_W[1][0],                          # base position, y
-                            q_sol[6] + p_torso_W[2][0],                          # base position, z
-                            q_sol[7], q_sol[8], q_sol[9],q_sol[10], q_sol[11],   # left leg
-                            q_sol[16], q_sol[17], q_sol[18],q_sol[19], q_sol[20] # right leg
-                            ])
-
+                              self.quat_control_stance.x(), 
+                              self.quat_control_stance.y(), 
+                              self.quat_control_stance.z(),
+                              q_sol[4] + p_torso_W[0][0],                          # base position, x
+                              q_sol[5] + p_torso_W[1][0],                          # base position, y
+                              q_sol[6] + p_torso_W[2][0],                          # base position, z
+                              q_sol[7], q_sol[8], q_sol[9],q_sol[10], q_sol[11],   # left leg
+                              q_sol[16], q_sol[17], q_sol[18],q_sol[19], q_sol[20] # right leg
+                              ])
+                
         return q_sol
 
     # -------------------------------------------------------------------------------------------------- #        
@@ -664,6 +665,7 @@ if __name__ == "__main__":
 
     # model file
     model_file = "../../models/achilles_SE3_drake.urdf"
+    # model_file = "../../models/achilles_drake.urdf"
 
     # create a plant model for testing
     plant = MultibodyPlant(0)
@@ -694,6 +696,14 @@ if __name__ == "__main__":
         0.0000,  0.0200, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
         0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
     ])
+    # q0 = np.array([
+    #     quat.w(), quat.x(), quat.y(), quat.z(),            # base orientation, (w, x, y, z)
+    #     0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
+    #     0.0000,  0.0200, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+    #     0.0000, 0.0000, 0.0000, 0.0000,            # left arm
+    #     0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+    #     0.0000, 0.0000, 0.0000, 0.0000             # right arm
+    # ])
     v0 = np.zeros(plant.num_velocities())
     plant.SetPositions(plant_context, q0)
     plant.SetVelocities(plant_context, v0)
@@ -727,7 +737,28 @@ if __name__ == "__main__":
                                                                    stance_foot_yaw=yaw,
                                                                    initial_stance_foot_name="right_foot")
     tf = time.time()
-    print("Time to solve 3D prop: ", tf - t0)
+
+    # for i in range(len(q_HLIP)):
+    #     q = q_HLIP[i]
+    #     quat = q[:4]
+    #     pos = q[4:7]
+    #     left_leg = q[7:12]
+    #     right_leg = q[12:17]
+
+    #     #  add zero for arm indeces
+    #     q = np.concatenate((quat, pos, left_leg, np.zeros(4), right_leg, np.zeros(4)))
+    #     q_HLIP[i] = q
+
+    #     # same for the velocity
+    #     v = v_HLIP[i]
+    #     omega = v[:3]
+    #     vel = v[3:6]
+    #     left_leg_vel = v[6:11]
+    #     right_leg_vel = v[11:16]
+
+    #     # add zero for arm velocities
+    #     v = np.concatenate((omega, vel, left_leg_vel, np.zeros(4), right_leg_vel, np.zeros(4)))
+    #     v_HLIP[i] = v
 
     # start meshcat
     meshcat = StartMeshcat()
