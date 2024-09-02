@@ -1,10 +1,26 @@
 #!/usr/bin/env python3
 
-from pydrake.all import *
+from pydrake.all import (
+        StartMeshcat,
+        DiagramBuilder,
+        AddMultibodyPlantSceneGraph,
+        AddDefaultVisualization,
+        Parser,
+        RigidTransform,
+        MultibodyPlant,
+        RollPitchYaw,
+        RotationMatrix,
+        Rgba, Sphere,
+        Cylinder,
+        BezierCurve,
+        JacobianWrtVariable
+)
 import numpy as np
 import scipy as sp
 import time
 
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'bin'))
 import AchillesKinematicsPy as ak
 
 class HLIPTrajectoryGeneratorSE3():
@@ -83,6 +99,9 @@ class HLIPTrajectoryGeneratorSE3():
         # instantiate the IK object
         self.ik = ak.AchillesKinematics()
         self.ik.Initialize("../../models/achilles_drake.urdf")  # whole
+        
+        # last known IK solution
+        self.q_ik_sol = None
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -353,17 +372,22 @@ class HLIPTrajectoryGeneratorSE3():
         # solve the IK problem -- returned as list
         q_sol = self.ik.Solve_InvKin(p_left_torso, p_right_torso, stance_name)
 
+        # check if the solution si valid
+        if (np.linalg.norm(q_sol) < 1e-6):
+            q_sol = self.q_ik_sol
+
         # repopulate to match the original whole body coordinates
-        q_sol = np.array([self.quat_control_stance.w(),                        # quaternion orientation
-                          self.quat_control_stance.x(), 
-                          self.quat_control_stance.y(), 
-                          self.quat_control_stance.z(),
-                          q_sol[4] + p_torso_W[0][0],                          # base position, x
-                          q_sol[5] + p_torso_W[1][0],                          # base position, y
-                          q_sol[6] + p_torso_W[2][0],                          # base position, z
-                          q_sol[7], q_sol[8], q_sol[9],q_sol[10], q_sol[11],   # left leg
-                          q_sol[16], q_sol[17], q_sol[18],q_sol[19], q_sol[20] # right leg
-                          ])
+        else:
+            q_sol = np.array([self.quat_control_stance.w(),                        # quaternion orientation
+                            self.quat_control_stance.x(), 
+                            self.quat_control_stance.y(), 
+                            self.quat_control_stance.z(),
+                            q_sol[4] + p_torso_W[0][0],                          # base position, x
+                            q_sol[5] + p_torso_W[1][0],                          # base position, y
+                            q_sol[6] + p_torso_W[2][0],                          # base position, z
+                            q_sol[7], q_sol[8], q_sol[9],q_sol[10], q_sol[11],   # left leg
+                            q_sol[16], q_sol[17], q_sol[18],q_sol[19], q_sol[20] # right leg
+                            ])
 
         return q_sol
 
@@ -581,15 +605,19 @@ class HLIPTrajectoryGeneratorSE3():
                 elif stance_foot_name == "right_foot":
                     meshcat_horizon.append((p_com_pos, p_swing_target_W, p_stance))
 
+                # solve the IK problem and save
                 q_ik = self.solve_ik(p_com_pos, p_stance, p_swing_target_W, stance_foot_name)
                 q_ref.append(q_ik)
+
+                # save the last IK solution (for when Ik fails)
+                self.q_ik_sol = q_ik
 
         # get the velocity reference
         v_ref = self.compute_velocity_reference(q_ref, v0)
 
-        tf = time.time()
-        print("Time to solve IK: ", tf - t0)
-        print("Average time per IK: ", (tf - t0) / len(q_ref))
+        # tf = time.time()
+        # print("Time to solve IK: ", tf - t0)
+        # print("Average time per IK: ", (tf - t0) / len(q_ref))
 
         # return the trajectory
         return q_ref, v_ref, meshcat_horizon
