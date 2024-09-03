@@ -60,9 +60,9 @@ def standing_position():
         1.0000, 0.0000, 0.0000, 0.0000,            # base orientation, (w, x, y, z)
         0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
         0.0000, 0.0209, -0.5515, 1.0239,-0.4725,   # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        0.0900, 0.0300, 0.0000, -2.0000,           # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
+        0.0900, 0.000, 0.0000, -0.0000,           # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
         0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        0.0900, 0.0300, 0.0000, -2.0000,           # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
+        0.0900, 0.000, 0.0000, -0.0000,           # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
     ])
 
     return q_stand
@@ -436,6 +436,7 @@ class AchillesMPC(ModelPredictiveController):
         # compute alpha 
         v_command = np.array([[vx_des], [vy_des], [wz_des]])
         v_norm = (v_command.T @ self.P @ v_command)[0][0]  # NOTE: this is 1 if any of the axis sees its respective max velocity, otherwise can exceed 1.0 easily
+        print(v_norm)
         a = self.alpha(v_norm)                             # NOTE: activation function should be bounded [0,1]
 
         # convex combination of the standing position and the nominal trajectory
@@ -562,7 +563,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(15.0)
+    simulator.AdvanceTo(5.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
@@ -583,7 +584,7 @@ if __name__=="__main__":
             writer.writerow([times[i]] + list(states[i]))
 
     # save the joystick data to a CSV file
-    with open('./data/joy_data.csv', mode='w') as file:
+    with open('./data/data_joystick.csv', mode='w') as file:
         writer = csv.writer(file)
         for i in range(len(times)):
-            writer.writerow([times[i]] + list(joystick_commands[i]))
+            writer.writerow(list(joystick_commands[i]))
