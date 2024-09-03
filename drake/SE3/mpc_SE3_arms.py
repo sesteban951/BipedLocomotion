@@ -99,7 +99,7 @@ def create_optimizer(model_file):
     # leg indeces: hip yaw, hip_roll, hip_pitch, knee, ankle
     # arm indeces: shoulder pitch, shoulder roll, shoulder yaw, elbow
     problem.Qq = np.diag([
-        1e0, 1e0, 1e0, 1e0,       # base orientation
+        1e1, 1e1, 1e1, 1e1,       # base orientation
         1e0, 1e0, 1e0,             # base position
         3e-1, 3e-1, 3e-1, 3e-1, 3e-1, # left leg
         3e-2, 3e-2, 3e-2, 3e-2,       # left arm
@@ -107,7 +107,7 @@ def create_optimizer(model_file):
         3e-2, 3e-2, 3e-2, 3e-2        # right arm
     ])
     problem.Qv = np.diag([
-        1e-1, 1e-1, 1e-1,               # base orientation
+        1e0, 1e0, 1e0,               # base orientation
         1e-1, 1e-1, 1e-1,               # base position
         3e-2, 3e-2, 3e-2, 3e-2, 3e-2,   # left leg
         3e-3, 3e-3, 3e-3, 3e-3,         # left arm
@@ -139,7 +139,7 @@ def create_optimizer(model_file):
     params.num_threads = 8
     params.contact_stiffness = 2_000
     params.dissipation_velocity = 0.1
-    params.smoothing_factor = 0.01
+    params.smoothing_factor = 0.005
     params.friction_coefficient = 0.5
     params.stiction_velocity = 0.5
     params.verbose = False
