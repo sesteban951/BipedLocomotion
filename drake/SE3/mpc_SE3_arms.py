@@ -99,28 +99,28 @@ def create_optimizer(model_file):
     # leg indeces: hip yaw, hip_roll, hip_pitch, knee, ankle
     # arm indeces: shoulder pitch, shoulder roll, shoulder yaw, elbow
     problem.Qq = np.diag([
-        1.0, 1.0, 1.0, 1.0,      # base orientation
-        1.0, 1.0, 1.0,           # base position
-        0.1, 1.0, 0.1, 0.1, 0.1, # left leg
-        0.05, 0.05, 0.05, 0.05,  # left arm
-        0.1, 1.0, 0.1, 0.1, 0.1, # left leg
-        0.05, 0.05, 0.05, 0.05   # left arm
+        1e00, 1e00, 1e00, 1e00,       # base orientation
+        1e00, 1e00, 1e00,             # base position
+        1e-1, 1e00, 1e-1, 1e-1, 1e-1, # left leg
+        1e-1, 1e-1, 1e-2, 1e-2,       # left arm
+        1e-1, 1e00, 1e-1, 1e-1, 1e-1, # right leg
+        1e-1, 1e-1, 1e-2, 1e-2        # right arm
     ])
     problem.Qv = np.diag([
-        0.1, 0.1, 0.1,               # base orientation
-        0.1, 0.1, 0.1,               # base position
-        0.01, 0.1, 0.01, 0.01, 0.01, # left leg
-        0.01, 0.01, 0.01, 0.01,      # left arm
-        0.01, 0.1, 0.01, 0.01, 0.01, # right leg
-        0.01, 0.01, 0.01, 0.01       # right arm
+        1e-1, 1e-1, 1e-1,               # base orientation
+        1e-1, 1e-1, 1e-1,               # base position
+        1e-2, 1e-1, 1e-2, 1e-2, 1e-2,   # left leg
+        1e-3, 1e-3, 1e-3, 1e-3,         # left arm
+        1e-2, 1e-1, 1e-2, 1e-2, 1e-2,   # right leg
+        1e-3, 1e-3, 1e-3, 1e-3          # right arm
     ])
     problem.R = np.diag([
         50.0, 50.0, 50.0,                       # base orientation
         50.0, 50.0, 50.0,                       # base position
-        0.0001, 0.0001, 0.0001, 0.0001, 0.0001, # left leg
-        0.0001, 0.0001, 0.0001, 0.0001,         # left arm
-        0.0001, 0.0001, 0.0001, 0.0001, 0.0001, # right leg
-        0.0001, 0.0001, 0.0001, 0.0001          # right arm
+        0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2, # left leg
+        0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2,         # left arm
+        0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2, # right leg
+        0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2          # right arm
     ])
     problem.Qf_q = 10.0 * np.copy(problem.Qq)
     problem.Qf_v = 10.0 * np.copy(problem.Qv)
@@ -136,7 +136,7 @@ def create_optimizer(model_file):
     params.equality_constraints = False
     params.Delta0 = 1e1
     params.Delta_max = 1e5
-    params.num_threads = 10
+    params.num_threads = 8
     params.contact_stiffness = 5_000
     params.dissipation_velocity = 0.1
     params.smoothing_factor = 0.01
