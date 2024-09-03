@@ -1,9 +1,27 @@
 #!/usr/bin/env python3
 
-from pydrake.all import *
+from pydrake.all import (
+        StartMeshcat,
+        DiagramBuilder,
+        AddMultibodyPlantSceneGraph,
+        AddDefaultVisualization,
+        Parser,
+        RigidTransform,
+        MultibodyPlant,
+        RollPitchYaw,
+        RotationMatrix,
+        Rgba, Sphere,
+        Cylinder,
+        BezierCurve,
+        JacobianWrtVariable
+)
 import numpy as np
 import scipy as sp
 import time
+
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'bin'))
+import AchillesKinematicsPy as ak
 
 class HLIPTrajectoryGeneratorSE3():
 
@@ -20,14 +38,23 @@ class HLIPTrajectoryGeneratorSE3():
         self.static_com_frame = self.plant.GetFrameByName("static_com") # nominal is 0.734 z in world frame
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
         self.right_foot_frame = self.plant.GetFrameByName("right_foot")
+        torso_frame = self.plant.GetFrameByName("torso")
         self.stance_foot_frame = None
         self.swing_foot_frame = None
 
+        # important containers to keep track of positions
         self.control_stance_yaw = None
         self.p_swing_init_W = None
         self.p_control_stance_W = None
         self.R_control_satnce_W = None
         self.R_control_stance_W_mat = None
+        self.quat_control_stance = None
+
+        # get the constant offset of the torso frame in the CoM frame
+        self.p_torso_com = self.plant.CalcPointsPositions(self.plant_context,
+                                                          torso_frame,
+                                                          [0, 0, 0],
+                                                          self.static_com_frame)
 
         # total horizon parameters, number S2S steps
         self.dt = None
@@ -69,70 +96,12 @@ class HLIPTrajectoryGeneratorSE3():
         # bezier curve
         self.bez_order = 7  # 5 or 7
 
-        # create a solver and configure the options
-        self.solver = SnoptSolver()
-        self.solver_options = SolverOptions()
-        self.solver_options.SetOption(self.solver.solver_id(), "Major feasibility tolerance", 1e-6)
-        self.solver_options.SetOption(self.solver.solver_id(), "Major optimality tolerance", 1e-6)
-        # self.solver_options.SetOption(self.solver.solver_id(), "Iterations limit", 10000)
-        # self.solver_options.SetOption(self.solver.solver_id(), "Objective tolerance", 1e-5)
-        # self.solver_options.SetOption(self.solver.solver_id(), "Constraint tolerance", 1e-5)
-        # self.solver_options.SetOption(self.solver.solver_id(), "Step size limit", 1.0)
-        # self.solver_options.SetOption(self.solver.solver_id(), "Scaling", "automatic")
+        # instantiate the IK object
+        self.ik = ak.AchillesKinematics()
+        self.ik.Initialize("../../models/achilles_drake.urdf")  # whole
         
-        # instantiate the inverse kinematics solver
-        self.ik = InverseKinematics(self.plant, with_joint_limits=True)
-
-        # add an error quadratic cost
-        q_nom = np.array([
-            1,0,0,0,                                   # base orientation, (w, x, y, z)
-            0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
-            0.0000,  0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-            0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        ])
-        # w_qw, w_qx, w_qy, w_qz = 0.1, 0.1, 0.1, 0.1
-        # w_px, w_py, w_pz = 0.1, 0.1, 0.1
-        # w_q1, w_q2, w_q3, w_q4, w_q5 = 1, 1, 1, 1, 1
-        # w_q6, w_q7, w_q8, w_q9, w_q10 = 1, 1, 1, 1, 1
-        # Qq = np.diag([w_qw, w_qx, w_qy, w_qz, 
-        #               w_px, w_py, w_pz, 
-        #               w_q1, w_q2, w_q3, w_q4, w_q5, 
-        #               w_q6, w_q7, w_q8, w_q9, w_q10])
-        # self.ik.prog().AddQuadraticErrorCost(Q=Qq, 
-        #                                      x_desired=q_nom, 
-        #                                      vars=self.ik.q())
-
-        # inverse kinematics solver settings
-        epsilon_feet = 0.00         # foot position tolerance      [m]
-        epsilon_base = 0.00         # base position tolerance      [m]
-        self.foot_epsilon_orient = 0.0   # foot orientation tolerance   [deg]
-        self.base_epsilon_orient = 0.0   # torso orientation tolerance  [deg]
-        self.tol_base = np.array([[epsilon_base], [epsilon_base], [epsilon_base]])
-        self.tol_feet = np.array([[epsilon_feet], [epsilon_feet], [epsilon_feet]]) 
-
-        # Add com position constraint (continusously update the lower and upper bounds)
-        self.p_com_cons = self.ik.AddPositionConstraint(self.static_com_frame, [0, 0, 0], 
-                                                        self.plant.world_frame(), 
-                                                        [0, 0, 0], [0, 0, 0])
-
-        # Add foot position constraints (continuously update the lower and upper bounds)
-        self.p_left_cons =  self.ik.AddPositionConstraint(self.left_foot_frame, [0, 0, 0],
-                                                          self.plant.world_frame(), 
-                                                          [0, 0, 0], [0, 0, 0])
-        self.p_right_cons = self.ik.AddPositionConstraint(self.right_foot_frame, [0, 0, 0],
-                                                          self.plant.world_frame(), 
-                                                          [0, 0, 0], [0, 0, 0]) 
-        
-        # Add foot and com orientation constraints, aligns toe directions (updated once at every trajectory gen query)
-        self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(), 
-                                                           self.plant.world_frame(), RotationMatrix(), 
-                                                           0.0)
-        self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
-                                                                    self.plant.world_frame(), [1, 0, 0],
-                                                                    0, 0)
-        self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
-                                                                    self.plant.world_frame(), [1, 0, 0],
-                                                                    0, 0)
+        # last known IK solution
+        self.q_ik_sol = None
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -192,6 +161,17 @@ class HLIPTrajectoryGeneratorSE3():
         b = BezierCurve(0, self.T_SSP, ctrl_pts)
 
         return b
+    
+    # -------------------------------------------------------------------------------------------------- #
+
+    # project the foot target position to the half space constraint
+    def FootTargetProjection(self, ux, uy):
+
+        # TODO: complete the projection
+        
+
+        return ux, uy
+
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -299,6 +279,11 @@ class HLIPTrajectoryGeneratorSE3():
             # clip the swing foot target position
             ux = max(-self.ux_max, min(ux, self.ux_max))
             uy = max(-self.uy_max, min(uy, self.uy_max))
+
+
+            # TODO: apply half space projection herre
+            ux, uy = self.FootTargetProjection(ux, uy)
+
             ux_W, uy_W = self.RotateVectorToWorld(ux, uy)
 
             # populate foot position information
@@ -367,25 +352,45 @@ class HLIPTrajectoryGeneratorSE3():
     # -------------------------------------------------------------------------------------------------- #
 
     # solve the inverse kinematics problem
-    def solve_ik(self, p_com_pos, p_stance, p_swing, stance_name, initial_guess):
+    def solve_ik(self, p_com_pos_W, p_stance_W, p_swing_W, stance_name):
 
-        # update the COM target position
-        self.p_com_cons.evaluator().set_bounds(p_com_pos - self.tol_base, p_com_pos + self.tol_base)
-        
+        # compute the torso position in world frame
+        p_torso_W = p_com_pos_W + self.R_control_stance_W_mat @ self.p_torso_com
+
+        # get the position of the feet relative to the CoM
+        p_stance_com = self.R_control_stance_W_mat.T @ (p_stance_W - p_com_pos_W)
+        p_swing_com = self.R_control_stance_W_mat.T @ (p_swing_W - p_com_pos_W)
+
+        # convert to list for the IK solver
         if stance_name == "left_foot":
-            self.p_left_cons.evaluator().set_bounds(p_stance - self.tol_feet, p_stance + self.tol_feet)
-            self.p_right_cons.evaluator().set_bounds(p_swing - self.tol_feet, p_swing + self.tol_feet)
-
+            p_left_com  = p_stance_com.T[0].tolist()
+            p_right_com = p_swing_com.T[0].tolist()
         elif stance_name == "right_foot":
-            self.p_right_cons.evaluator().set_bounds(p_stance - self.tol_feet, p_stance + self.tol_feet)
-            self.p_left_cons.evaluator().set_bounds(p_swing - self.tol_feet, p_swing + self.tol_feet)
+            p_left_com  = p_swing_com.T[0].tolist()
+            p_right_com = p_stance_com.T[0].tolist()
 
-        # solve the IK problem
-        self.ik.prog().SetInitialGuess(self.ik.q(), initial_guess)
-        # res = SnoptSolver().Solve(self.ik.prog())
-        res = self.solver.Solve(self.ik.prog(), initial_guess, self.solver_options)
+        # solve the IK problem -- returned as list
+        q_sol = self.ik.Solve_InvKin(p_left_com, p_right_com, stance_name)
 
-        return res
+        # check if the solution si valid
+        if (np.linalg.norm(q_sol) < 1e-6):
+            q_sol = self.q_ik_sol
+
+        # repopulate to match the original whole body coordinates
+        else:
+        
+            q_sol = np.array([self.quat_control_stance.w(),                        # quaternion orientation
+                              self.quat_control_stance.x(), 
+                              self.quat_control_stance.y(), 
+                              self.quat_control_stance.z(),
+                              q_sol[4] + p_torso_W[0][0],                          # base position, x
+                              q_sol[5] + p_torso_W[1][0],                          # base position, y
+                              q_sol[6] + p_torso_W[2][0],                          # base position, z
+                              q_sol[7], q_sol[8], q_sol[9],q_sol[10], q_sol[11],   # left leg
+                              q_sol[16], q_sol[17], q_sol[18],q_sol[19], q_sol[20] # right leg
+                              ])
+                
+        return q_sol
 
     # -------------------------------------------------------------------------------------------------- #        
 
@@ -471,7 +476,7 @@ class HLIPTrajectoryGeneratorSE3():
     # -------------------------------------------------------------------------------------------------- #
 
     # set the trajectory generation problem parameters
-    def set_parameters(self, z_nom, z_apex, z_offset, hip_bias, bezier_order, T_SSP, dt, N):
+    def set_parameters(self, z_apex, z_offset, hip_bias, bezier_order, T_SSP, dt, N):
 
         # make sure that N is non-zero
         assert N >= 1, "N must be an integer >= 1."
@@ -494,25 +499,14 @@ class HLIPTrajectoryGeneratorSE3():
 
         # set variables that depend on z com nominal
         self.z_apex = z_apex
-        self.z_nom = z_nom
         self.z_offset = z_offset
-        g = 9.81
-        self.lam = np.sqrt(g/self.z_nom)       # natural frequency
-        self.A = np.array([[0,           1],   # LIP drift matrix
-                           [self.lam**2, 0]])
-
-        # define the deadbeat gains and orbital slopes
-        self.Kp_db = 1
-        self.Kd_db = self.T_DSP + (1/self.lam) * self.coth(self.lam * self.T_SSP)  # deadbeat gains
-        self.sigma_P1 = self.lam * self.coth(0.5 * self.lam * self.T_SSP)          # orbital slope (P1)
-        self.sigma_P2 = self.lam * self.tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
 
         return "Parameters set successfully."
 
     # -------------------------------------------------------------------------------------------------- #
 
     # main function that updates the whole problem
-    def generate_trajectory(self, q0, v0, v_des, t_phase, initial_swing_foot_pos, stance_foot_pos, stance_foot_yaw, initial_stance_foot_name):
+    def generate_trajectory(self, q0, v0, v_des, z_com_des, t_phase, initial_swing_foot_pos, stance_foot_pos, stance_foot_yaw, initial_stance_foot_name):
 
         # set the robot state
         self.plant.SetPositions(self.plant_context, q0)
@@ -525,6 +519,19 @@ class HLIPTrajectoryGeneratorSE3():
         # set the P2 orbit bias
         self.u_L = self.u_L_bias + self.vy_des * (self.T_SSP + self.T_DSP)
         self.u_R = self.u_R_bias + self.vy_des * (self.T_SSP + self.T_DSP)
+
+        # set varibles dependent on the nominal z_com
+        self.z_nom = z_com_des
+        g = 9.81
+        self.lam = np.sqrt(g/self.z_nom)       # natural frequency
+        self.A = np.array([[0,           1],   # LIP drift matrix
+                           [self.lam**2, 0]])
+
+        # define the deadbeat gains and orbital slopes
+        self.Kp_db = 1
+        self.Kd_db = self.T_DSP + (1/self.lam) * self.coth(self.lam * self.T_SSP)  # deadbeat gains
+        self.sigma_P1 = self.lam * self.coth(0.5 * self.lam * self.T_SSP)          # orbital slope (P1)
+        self.sigma_P2 = self.lam * self.tanh(0.5 * self.lam * self.T_SSP)          # orbital slope (P2)
 
         # P2 orbit shifting
         self.d2 = self.lam**2 * (self.sech(0.5 * self.lam * self.T_SSP))**2 * (self.T * self.vy_des) / (self.lam**2 * self.T_DSP + 2 * self.sigma_P2)
@@ -546,26 +553,13 @@ class HLIPTrajectoryGeneratorSE3():
         self.p_control_stance_W = np.array([stance_foot_pos[0], stance_foot_pos[1], [self.z_offset]])
         self.R_control_stance_W = RotationMatrix(RollPitchYaw(0, 0, stance_foot_yaw))
         self.R_control_stance_W_mat = self.R_control_stance_W.matrix()
+        self.quat_control_stance = self.R_control_stance_W.ToQuaternion()
 
         # set the stance foot yaw
         self.control_stance_yaw = stance_foot_yaw
 
         # set the initial swing foot position in world frame
         self.p_swing_init_ground = initial_swing_foot_pos           # swing foot pos when it takes off from the ground
-
-        # update the foot and torso orientation constraints
-        self.ik.prog().RemoveConstraint(self.r_com_cons)
-        self.ik.prog().RemoveConstraint(self.r_left_cons)
-        self.ik.prog().RemoveConstraint(self.r_right_cons)
-        self.r_com_cons = self.ik.AddOrientationConstraint(self.static_com_frame, RotationMatrix(),
-                                                           self.plant.world_frame(), self.R_control_stance_W,
-                                                           self.base_epsilon_orient * np.pi / 180)
-        self.r_left_cons = self.ik.AddAngleBetweenVectorsConstraint(self.left_foot_frame, [1, 0, 0],
-                                                                    self.plant.world_frame(), self.R_control_stance_W_mat @ [1, 0, 0],
-                                                                    0, self.foot_epsilon_orient * np.pi / 180)
-        self.r_right_cons = self.ik.AddAngleBetweenVectorsConstraint(self.right_foot_frame, [1, 0, 0],
-                                                                    self.plant.world_frame(), self.R_control_stance_W_mat @ [1, 0, 0],
-                                                                    0, self.foot_epsilon_orient * np.pi / 180)
 
         # compute the LIP execution in world frame, X = (Lambda, I, C)
         # t0 = time.time()
@@ -576,8 +570,8 @@ class HLIPTrajectoryGeneratorSE3():
 
         # for every swing foot configuration solve the IK problem
         q_ref = []
-        q_ik_sol = q0
-        # t0 = time.time()
+        meshcat_horizon = []   # takes in tuple (p_com_W, p_left_W, p_right_W)
+        t0 = time.time()
         for i in L:
 
             # unpack the foot position information tuple
@@ -606,13 +600,18 @@ class HLIPTrajectoryGeneratorSE3():
                 px_R_W, py_R_W = self.RotateVectorToWorld(px_R, py_R)
                 p_com_pos =  p_stance + np.array([px_R_W, py_R_W, self.z_nom]).reshape(3,1)
 
-                res = self.solve_ik(p_com_pos, p_stance, p_swing_target_W, stance_foot_name, q_ik_sol)
-                if res.is_success():
-                    q_ik_sol = res.GetSolution(self.ik.q())
-                    q_ref.append(q_ik_sol)
-                else:
-                    q_ref.append(q_ik_sol)
-                    print("IK problem failed at time: {}, index {}".format(t, i))
+                # save the meshcat horizon point
+                if stance_foot_name == "left_foot":
+                    meshcat_horizon.append((p_com_pos, p_stance, p_swing_target_W))
+                elif stance_foot_name == "right_foot":
+                    meshcat_horizon.append((p_com_pos, p_swing_target_W, p_stance))
+
+                # solve the IK problem and save
+                q_ik = self.solve_ik(p_com_pos, p_stance, p_swing_target_W, stance_foot_name)
+                q_ref.append(q_ik)
+
+                # save the last IK solution (for when Ik fails)
+                self.q_ik_sol = q_ik
 
         # get the velocity reference
         v_ref = self.compute_velocity_reference(q_ref, v0)
@@ -622,14 +621,51 @@ class HLIPTrajectoryGeneratorSE3():
         # print("Average time per IK: ", (tf - t0) / len(q_ref))
 
         # return the trajectory
-        return q_ref, v_ref
+        return q_ref, v_ref, meshcat_horizon
 
 ####################################################################################################
+
+def rotation_matrix_from_points(p1, p2):
+    """
+    Returns a 3D rotation matrix that aligns with the line segment connecting two points.
+    
+    Parameters:
+    p1: numpy array of shape (3, 1) - starting point
+    p2: numpy array of shape (3, 1) - ending point
+    
+    Returns:
+    R: 3x3 numpy array representing the rotation matrix
+    """
+    # Calculate the direction vector between p1 and p2
+    v = p2 - p1
+    # Normalize the vector to get the unit vector along the line segment
+    v_hat = v / np.linalg.norm(v)
+
+    # Choose a reference vector (not aligned with v_hat). We'll choose the x-axis unit vector [1, 0, 0].
+    # If v_hat is aligned with the x-axis, choose another arbitrary vector like [0, 1, 0].
+    if np.allclose(v_hat.flatten(), np.array([1, 0, 0])):  # if aligned with x-axis
+        e_ref = np.array([0, 1, 0])  # pick y-axis as reference
+    else:
+        e_ref = np.array([1, 0, 0])  # pick x-axis as reference
+
+    # Compute the first orthogonal vector by taking the cross product
+    u1 = np.cross(v_hat.flatten(), e_ref)
+    u1 = u1 / np.linalg.norm(u1)  # normalize the vector to get unit vector u1
+
+    # Compute the second orthogonal vector as the cross product of v_hat and u1
+    u2 = np.cross(v_hat.flatten(), u1)
+    u2 = u2 / np.linalg.norm(u2)  # normalize the vector to get unit vector u2
+
+    # Construct the rotation matrix using u1, u2, and v_hat
+    R = np.column_stack((u1, u2, v_hat.flatten()))
+
+    return R
 
 if __name__ == "__main__":
 
     # model file
     model_file = "../../models/achilles_SE3_drake.urdf"
+    # model_file = "../../models/achilles_drake.urdf"
 
     # create a plant model for testing
     plant = MultibodyPlant(0)
@@ -641,16 +677,15 @@ if __name__ == "__main__":
     traj_gen = HLIPTrajectoryGeneratorSE3(model_file)
 
     # set the parameters
-    traj_gen.set_parameters(z_nom=0.64, 
-                            z_apex=0.07, 
-                            z_offset=0.05,
+    traj_gen.set_parameters(z_apex=0.07, 
+                            z_offset=0.01,
                             hip_bias=0.2,
                             bezier_order=7, 
                             T_SSP=0.3, 
-                            dt=0.04, 
-                            N=50)
+                            dt=0.05, 
+                            N=40)
 
-    deg = 45
+    deg = -45.0
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
     quat = orient.ToQuaternion()
 
@@ -658,12 +693,18 @@ if __name__ == "__main__":
     q0 = np.array([
         quat.w(), quat.x(), quat.y(), quat.z(),            # base orientation, (w, x, y, z)
         0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
-        0.0000,  0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+        0.0000,  0.0200, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+        0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
     ])
+    # q0 = np.array([
+    #     quat.w(), quat.x(), quat.y(), quat.z(),            # base orientation, (w, x, y, z)
+    #     0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
+    #     0.0000,  0.0200, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+    #     0.0000, 0.0000, 0.0000, 0.0000,            # left arm
+    #     0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+    #     0.0000, 0.0000, 0.0000, 0.0000             # right arm
+    # ])
     v0 = np.zeros(plant.num_velocities())
-    v0[3] = 0.0 # x velocity
-    v0[4] = 0.0 # forward velocity
     plant.SetPositions(plant_context, q0)
     plant.SetVelocities(plant_context, v0)
 
@@ -686,19 +727,101 @@ if __name__ == "__main__":
     t_phase = 0.0
 
     t0 = time.time()
-    q_HLIP, v_HLIP = traj_gen.generate_trajectory(q0=q0,
-                                                  v0=v0,
-                                                  v_des=v_des,
-                                                  t_phase=t_phase,
-                                                  initial_swing_foot_pos=p_swing,
-                                                  stance_foot_pos=p_stance,
-                                                  stance_foot_yaw=yaw,
-                                                  initial_stance_foot_name="right_foot")
+    q_HLIP, v_HLIP, meshcat_horizon = traj_gen.generate_trajectory(q0=q0,
+                                                                   v0=v0,
+                                                                   v_des=v_des,
+                                                                   z_com_des=0.64,
+                                                                   t_phase=t_phase,
+                                                                   initial_swing_foot_pos=p_swing,
+                                                                   stance_foot_pos=p_stance,
+                                                                   stance_foot_yaw=yaw,
+                                                                   initial_stance_foot_name="right_foot")
     tf = time.time()
-    print("Time to solve 3D prop: ", tf - t0)
-    
+
+    # for i in range(len(q_HLIP)):
+    #     q = q_HLIP[i]
+    #     quat = q[:4]
+    #     pos = q[4:7]
+    #     left_leg = q[7:12]
+    #     right_leg = q[12:17]
+
+    #     #  add zero for arm indeces
+    #     q = np.concatenate((quat, pos, left_leg, np.zeros(4), right_leg, np.zeros(4)))
+    #     q_HLIP[i] = q
+
+    #     # same for the velocity
+    #     v = v_HLIP[i]
+    #     omega = v[:3]
+    #     vel = v[3:6]
+    #     left_leg_vel = v[6:11]
+    #     right_leg_vel = v[11:16]
+
+    #     # add zero for arm velocities
+    #     v = np.concatenate((omega, vel, left_leg_vel, np.zeros(4), right_leg_vel, np.zeros(4)))
+    #     v_HLIP[i] = v
+
     # start meshcat
     meshcat = StartMeshcat()
+
+    # create object to visualize the trajectory
+    red_color = Rgba(1, 0, 0, 1)
+    green_color = Rgba(0, 1, 0, 1)
+    blue_color = Rgba(0, 0, 1, 1)
+    red_color_faint = Rgba(1, 0, 0, 0.25)
+    blue_color_faint = Rgba(0, 0, 1, 0.25)
+    
+    sphere_com = Sphere(0.02)
+    sphere_foot = Sphere(0.01)
+
+    # CSV file location directory
+    import csv
+    import os
+    csv_dir = "/home/sergio/projects/achilles-ik/example_data"
+    csv_file_path = os.path.join(csv_dir, 'data.csv')
+    data = np.zeros((len(q_HLIP), 9))
+
+    for i in range(len(q_HLIP)):
+        
+        # unpack the data
+        O = meshcat_horizon[i]
+        p_com, p_left, p_right = O
+
+        # append this to data array
+        P = np.concatenate((p_com.flatten(), p_left.flatten(), p_right.flatten()))
+        data[i,:] = P
+
+        # plot the foot and com positions
+        meshcat.SetObject("com_{}".format(i), sphere_com, green_color)
+        meshcat.SetObject("left_{}".format(i), sphere_foot, blue_color)
+        meshcat.SetObject("right_{}".format(i), sphere_foot, red_color)
+        meshcat.SetTransform("com_{}".format(i), RigidTransform(p_com))
+        meshcat.SetTransform("left_{}".format(i), RigidTransform(p_left))
+        meshcat.SetTransform("right_{}".format(i), RigidTransform(p_right))
+
+        # compute left leg rigid ttransform
+        p_left_leg = 0.5 * (p_left + p_com)
+        R_left_leg = RotationMatrix(rotation_matrix_from_points(p_left_leg, p_com))
+        p_left_leg_len = np.linalg.norm(p_left - p_com)
+
+        # compute right leg rigid transform
+        p_right_leg = 0.5 * (p_right + p_com)
+        R_right_leg = RotationMatrix(rotation_matrix_from_points(p_right_leg, p_com))
+        p_right_leg_len = np.linalg.norm(p_right - p_com)
+
+        # create a cylinder for the left leg
+        cyl_left = Cylinder(0.005, p_left_leg_len)
+        meshcat.SetObject("left_leg_{}".format(i), cyl_left, blue_color_faint)
+        meshcat.SetTransform("left_leg_{}".format(i), RigidTransform(R_left_leg, p_left_leg))
+
+        # create a cylinder for the right leg
+        cyl_right = Cylinder(0.005, p_right_leg_len)
+        meshcat.SetObject("right_leg_{}".format(i), cyl_right, red_color_faint)
+        meshcat.SetTransform("right_leg_{}".format(i), RigidTransform(R_right_leg, p_right_leg))
+
+    # write the data to a csv file
+    with open(csv_file_path, mode='w') as file:
+        writer = csv.writer(file)
+        writer.writerows(data)
 
     # Set up a system diagram that includes a plant, scene graph, and meshcat
     builder = DiagramBuilder()
