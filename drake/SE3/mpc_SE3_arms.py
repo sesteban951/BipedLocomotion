@@ -115,12 +115,12 @@ def create_optimizer(model_file):
         1e-3, 1e-3, 1e-3, 1e-3          # right arm
     ])
     problem.R = np.diag([
-        50.0, 50.0, 50.0,                       # base orientation
-        50.0, 50.0, 50.0,                       # base position
-        0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2, # left leg
-        0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2,         # left arm
-        0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2, # right leg
-        0.1e-2, 0.1e-2, 0.1e-2, 0.1e-2          # right arm
+        100.0, 100.0, 100.0,                       # base orientation
+        100.0, 100.0, 100.0,                       # base position
+        1e-3, 1e-3, 1e-3, 1e-3, 1e-3, # left leg
+        1e-3, 1e-3, 1e-3, 1e-3,         # left arm
+        1e-3, 1e-3, 1e-3, 1e-3, 1e-3, # right leg
+        1e-3, 1e-3, 1e-3, 1e-3          # right arm
     ])
     problem.Qf_q = 10.0 * np.copy(problem.Qq)
     problem.Qf_v = 10.0 * np.copy(problem.Qv)
