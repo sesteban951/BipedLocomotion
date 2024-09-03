@@ -60,9 +60,9 @@ def standing_position():
         1.0000, 0.0000, 0.0000, 0.0000,            # base orientation, (w, x, y, z)
         0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
         0.0000, 0.0209, -0.5515, 1.0239,-0.4725,   # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        0.0000, 0.0000, 0.0000, 0.0000,            # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
+        0.0900, 0.0300, 0.0000, -2.0000,           # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
         0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        0.0000, 0.0000, 0.0000, 0.0000             # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
+        0.0900, 0.0300, 0.0000, -2.0000,           # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
     ])
 
     return q_stand
@@ -95,7 +95,9 @@ def create_optimizer(model_file):
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
-    # no arms
+    # arms
+    # leg indeces: hip yaw, hip_roll, hip_pitch, knee, ankle
+    # arm indeces: shoulder pitch, shoulder roll, shoulder yaw, elbow
     problem.Qq = np.diag([
         1.0, 1.0, 1.0, 1.0,      # base orientation
         1.0, 1.0, 1.0,           # base position
@@ -176,20 +178,30 @@ class AchillesMPC(ModelPredictiveController):
         # time parameters
         self.t_current = 0.0       # current sim time
         self.t_phase = 0.0         # current phase time
-        self.T_SSP = 0.3           # swing phase duration
+        self.T_SSP = 0.35           # swing phase duration
         self.number_of_steps = -1   # number of individual swing foot steps taken
 
         # z height parameters
-        self.z_com_upper = 0.64   # upper CoM height
+        self.z_com_upper = 0.65   # upper CoM height
         self.z_com_lower = 0.45   # lower CoM height
-        z_apex = 0.06           # apex height
-        z_foot_offset = 0.01    # foot offset from the ground
-        bezier_order = 7        # 5 or 7
-        hip_bias = 0.28          # bias between the foot-to-foot distance in y-direction
+        z_apex = 0.06             # apex height
+        z_foot_offset = 0.01      # foot offset from the ground
+        bezier_order = 7          # 5 or 7
+        hip_bias = 0.28           # bias between the foot-to-foot distance in y-direction
 
         # maximum velocity for the robot
-        self.v_max = 0.2  # [m/s]
-        self.w_max = 25   # [deg/s]
+        self.vx_max = 0.4  # [m/s]
+        self.vy_max = 0.3  # [m/s]
+        w_max = 25   # [deg/s]
+        self.w_max = w_max * (np.pi / 180)  # [rad/s]
+        P_half = np.diag([1/self.vx_max, 1/self.vy_max, 1/self.w_max]) 
+        self.P = P_half.T @ P_half
+
+        # tanh avtication function for blending https://www.desmos.com/calculator/bwpmzor4og
+        a = 5   # a in [0, inf], how steep the steep the transisiton is. NOTE: too steep at transition is bad
+        p = 0.5 # p in [0,1], where the transition is located at in [0,1]
+        tanh = lambda x: (np.exp(2*x) -1 ) / (np.exp(2*x) + 1)
+        self.alpha = lambda v_des: 0.5 * tanh(a * (v_des - p)) + 0.5  
 
         # foot info variables
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
@@ -223,10 +235,6 @@ class AchillesMPC(ModelPredictiveController):
         
         # nominal standing configuration for MPC
         self.q_stand = standing_position()
-
-        # computing the alpha value based on speed
-        p = 2.0
-        self.alpha = lambda v_des: ((1/self.v_max) * v_des) ** p
 
         # index of whole body that are leg joints
         self.idx_no_arms_q = [0, 1, 2, 3,         # quat coords
@@ -356,16 +364,16 @@ class AchillesMPC(ModelPredictiveController):
 
         # Quit if the robot has fallen down
         base_height = q0[6]
-        assert base_height > 0.4, "Oh no, the robot fell over!"
+        assert base_height > 0.1, "Oh no, the robot fell over!"
 
         # Get the current time
         self.t_current = context.get_time()
 
         # unpack the joystick commands
         joy_command = self.joystick_port.Eval(context)
-        vx_des = joy_command[1] * self.v_max  
-        vy_des = joy_command[0] * self.v_max
-        wz_des = joy_command[2] * self.w_max * (np.pi / 180)
+        vx_des = joy_command[1] * self.vx_max  
+        vy_des = joy_command[0] * self.vy_max
+        wz_des = joy_command[2] * self.w_max
         z_com_des = joy_command[4] * (self.z_com_lower - self.z_com_upper) + self.z_com_upper
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
 
@@ -426,11 +434,9 @@ class AchillesMPC(ModelPredictiveController):
         self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
 
         # compute alpha 
-        v_norm = np.linalg.norm([vx_des, vy_des, wz_des])
-        a = self.alpha(v_norm)
-
-        # clamp a to [0, 1]
-        a = np.clip(a, 0, 1) # TODO: alpha is not mapping joystick vel to [0,1], do this more intelligently
+        v_command = np.array([[vx_des], [vy_des], [wz_des]])
+        v_norm = (v_command.T @ self.P @ v_command)[0][0]  # NOTE: this is 1 if any of the axis sees its respective max velocity, otherwise can exceed 1.0 easily
+        a = self.alpha(v_norm)                             # NOTE: activation function should be bounded [0,1]
 
         # convex combination of the standing position and the nominal trajectory
         q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
@@ -509,10 +515,14 @@ if __name__=="__main__":
     interpolator = builder.AddSystem(Interpolator(Bq.T, Bv.T))
 
     # Logger to record the robot state
-    logger = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
+    logger_state = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
+    logger_joy = builder.AddSystem(VectorLogSink(5))
     builder.Connect(
             plant.get_state_output_port(), 
-            logger.get_input_port())
+            logger_state.get_input_port())
+    builder.Connect(
+            joystick.get_output_port(),
+            logger_joy.get_input_port())
     
     # Wire the systems together
     builder.Connect(
@@ -560,12 +570,20 @@ if __name__=="__main__":
     meshcat.PublishRecording()
 
     # unpack recorded data from the logger
-    log = logger.FindLog(diagram_context)
-    times = log.sample_times()
-    states = log.data().T
+    state_log = logger_state.FindLog(diagram_context)
+    joy_log = logger_joy.FindLog(diagram_context)
+    times = state_log.sample_times()
+    states = state_log.data().T
+    joystick_commands = joy_log.data().T
 
     # save the data to a CSV file
     with open('./data/data_SE3_arms.csv', mode='w') as file:
         writer = csv.writer(file)
         for i in range(len(times)):
             writer.writerow([times[i]] + list(states[i]))
+
+    # save the joystick data to a CSV file
+    with open('./data/joy_data.csv', mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(times)):
+            writer.writerow([times[i]] + list(joystick_commands[i]))
