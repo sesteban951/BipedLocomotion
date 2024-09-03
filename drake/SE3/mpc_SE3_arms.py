@@ -137,10 +137,10 @@ def create_optimizer(model_file):
     params.Delta0 = 1e1
     params.Delta_max = 1e5
     params.num_threads = 8
-    params.contact_stiffness = 5_000
+    params.contact_stiffness = 2_000
     params.dissipation_velocity = 0.1
     params.smoothing_factor = 0.01
-    params.friction_coefficient = 0.9
+    params.friction_coefficient = 0.5
     params.stiction_velocity = 0.5
     params.verbose = False
 
