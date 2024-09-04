@@ -469,12 +469,35 @@ if __name__=="__main__":
     plant.set_discrete_contact_approximation(DiscreteContactApproximation.kLagged)
 
     models = Parser(plant).AddModels(model_file)  # robot model
-    
+   
+    ground_color = np.array([0.5, 0.5, 0.5, 1.0])
     plant.RegisterCollisionGeometry(  # ground
         plant.world_body(), 
         RigidTransform(p=[0, 0, -25]), 
         Box(50, 50, 50), "ground", 
         CoulombFriction(0.7, 0.7))
+    plant.RegisterVisualGeometry(  # ground
+        plant.world_body(), 
+        RigidTransform(p=[0, 0, -25]), 
+        Box(50, 50, 50), "ground", 
+        ground_color)
+   
+    # Add rough terrain
+    np.random.seed(0)
+    for i in range(50):
+        px = np.random.uniform(1.0, 2.0)
+        py = np.random.uniform(-0.5, 0.5)
+        radius = np.random.uniform(0.1, 0.15)
+        plant.RegisterVisualGeometry(
+            plant.world_body(), 
+            RigidTransform(p=[px, py, -0.1]), 
+            Sphere(radius), f"terrain_{i}", 
+            ground_color)
+        plant.RegisterCollisionGeometry(
+            plant.world_body(), 
+            RigidTransform(p=[px, py, -0.1]), 
+            Sphere(radius), f"terrain_{i}", 
+            CoulombFriction(0.7, 0.7))
 
     # Add implicit PD controllers (must use kLagged or kSimilar)
     kp_hip = 900
@@ -588,7 +611,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(5.0)
+    simulator.AdvanceTo(20.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
