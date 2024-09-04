@@ -24,7 +24,8 @@ from pydrake.all import (
     VectorLogSink,
     RollPitchYaw,
     RotationMatrix,
-    Rgba, Sphere
+    Rgba, Sphere,
+    ContactResults
 )
 
 import time
@@ -527,8 +528,13 @@ if __name__=="__main__":
     duration = 0.5
     dist_gen = builder.AddSystem(DisturbanceGenerator(plant, 
                                                       meshcat, 
-                                                      disturbance_tau, time_applied, duration))  # time, duration
+                                                      disturbance_tau, time_applied, duration))
     
+    print(plant.num_collision_geometries())
+    contact_results_output_port = plant.get_contact_results_output_port()
+    reaction_forces_output_port = plant.get_reaction_forces_output_port()
+    contact = ContactResults()
+
     # Logger to record the robot state
     logger_state = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
     logger_joy = builder.AddSystem(VectorLogSink(5))
