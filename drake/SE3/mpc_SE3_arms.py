@@ -47,6 +47,7 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 from mpc_utils import Interpolator, ModelPredictiveController
 from joystick import GamepadCommand
+from disturbance_generator import DisturbanceGenerator
 
 #--------------------------------------------------------------------------------------------------------------------------#
 
@@ -376,6 +377,7 @@ class AchillesMPC(ModelPredictiveController):
         wz_des = joy_command[2] * self.w_max
         z_com_des = joy_command[4] * (self.z_com_lower - self.z_com_upper) + self.z_com_upper
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
+        v_base = np.array([[v0[3]], [v0[4]], [v0[5]]]) # in world frame
 
         # Get the desired MPC standing trajectory
         q_stand = [np.copy(self.q_stand) for i in range(self.optimizer.num_steps() + 1)]
@@ -435,9 +437,10 @@ class AchillesMPC(ModelPredictiveController):
 
         # compute alpha 
         v_command = np.array([[vx_des], [vy_des], [wz_des]])
-        v_norm = (v_command.T @ self.P @ v_command)[0][0]  # NOTE: this is 1 if any of the axis sees its respective max velocity, otherwise can exceed 1.0 easily
-        print(v_norm)
-        a = self.alpha(v_norm)                             # NOTE: activation function should be bounded [0,1]
+        v_command_norm = (v_command.T @ self.P @ v_command)[0][0] # NOTE: this is 1 if any of the axis sees its respective max velocity, otherwise can exceed 1.0 easily
+        v_base_norm = np.linalg.norm(v_base)
+        v = np.max([v_base_norm, v_command_norm])
+        a = self.alpha(v)                                         # NOTE: activation function should be bounded [0,1]
 
         # convex combination of the standing position and the nominal trajectory
         q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
@@ -514,18 +517,34 @@ if __name__=="__main__":
     N = plant.MakeVelocityToQDotMap(plant.CreateDefaultContext())
     Bq = N@Bv
     interpolator = builder.AddSystem(Interpolator(Bq.T, Bv.T))
-
+    
+    # distubance generator
+    disturbance_tau = np.zeros(plant.num_velocities())
+    disturbance_tau[3] = 0.0   # base x
+    disturbance_tau[4] = 0.0    # base y
+    disturbance_tau[5] = 0.0    # base z
+    time_applied = 2.0
+    duration = 0.5
+    dist_gen = builder.AddSystem(DisturbanceGenerator(plant, 
+                                                      meshcat, 
+                                                      disturbance_tau, time_applied, duration))  # time, duration
+    
     # Logger to record the robot state
     logger_state = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
     logger_joy = builder.AddSystem(VectorLogSink(5))
+    logger_distrubances = builder.AddSystem(VectorLogSink(plant.num_velocities()))
     builder.Connect(
             plant.get_state_output_port(), 
             logger_state.get_input_port())
     builder.Connect(
             joystick.get_output_port(),
             logger_joy.get_input_port())
-    
+    builder.Connect(
+            dist_gen.get_output_port(),
+            logger_distrubances.get_input_port())
+
     # Wire the systems together
+    # MPC
     builder.Connect(
         plant.get_state_output_port(), 
         controller.GetInputPort("state"))
@@ -537,12 +556,18 @@ if __name__=="__main__":
         plant.get_actuation_input_port())
     builder.Connect(
         interpolator.GetOutputPort("state"), 
-        plant.get_desired_state_input_port(models[0])
-    )
+        plant.get_desired_state_input_port(models[0]))
+    # joystick
     builder.Connect(
         joystick.get_output_port(), 
-        controller.GetInputPort("joy_command")
-    )
+        controller.GetInputPort("joy_command"))
+    # disturbances
+    builder.Connect(
+        dist_gen.get_output_port(),
+        plant.get_applied_generalized_force_input_port())
+    builder.Connect(
+        plant.get_state_output_port(),
+        dist_gen.GetInputPort("state"))
     
     # Connect the plant to meshcat for visualization
     AddDefaultVisualization(builder, meshcat)
@@ -573,9 +598,11 @@ if __name__=="__main__":
     # unpack recorded data from the logger
     state_log = logger_state.FindLog(diagram_context)
     joy_log = logger_joy.FindLog(diagram_context)
+    disturbance_log = logger_distrubances.FindLog(diagram_context)
     times = state_log.sample_times()
     states = state_log.data().T
     joystick_commands = joy_log.data().T
+    disturbances = disturbance_log.data().T
 
     # save the data to a CSV file
     with open('./data/data_SE3_arms.csv', mode='w') as file:
@@ -588,3 +615,9 @@ if __name__=="__main__":
         writer = csv.writer(file)
         for i in range(len(times)):
             writer.writerow(list(joystick_commands[i]))
+
+    # save the disturbance data to a CSV file
+    with open('./data/data_disturbances.csv', mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(times)):
+            writer.writerow(list(disturbances[i]))

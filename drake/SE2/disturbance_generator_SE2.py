@@ -2,6 +2,7 @@ import numpy as np
 from pydrake.all import (LeafSystem, BasicVector, Cylinder, Rgba, 
                         RigidTransform, RotationMatrix)   
 
+
 class DisturbanceGenerator(LeafSystem):
     """
     A simple Drake system that generates a fixed disturbance. 
@@ -35,7 +36,7 @@ class DisturbanceGenerator(LeafSystem):
         self.duration = duration
         self.meshcat = meshcat
 
-        self.f_base_W = np.array([self.tau[3], self.tau[4], self.tau[5]])
+        self.f_base_W = np.array([self.tau[0], 0, self.tau[1]])
         self.f_norm = np.linalg.norm(self.f_base_W)
 
         # visual vector scaling factor
@@ -98,13 +99,16 @@ class DisturbanceGenerator(LeafSystem):
             q = state[:self.nq]
 
             # get the base adn force positions
-            p_base_W = np.array([q[4], q[5], q[6]])
+            p_base_W = np.array([q[0], 0, q[1]])
             f_base_W_scaled = self.f_base_W * self.visual_scaling
             
             # compute the position of the force for visualization
             p_cyl = (f_base_W_scaled + 2 * p_base_W) / 2
             R_cyl = self.rotation_matrix_from_points(np.array([0,0,0]), self.f_base_W)
+            print(R_cyl)
             transform = RigidTransform(RotationMatrix(R_cyl), p_cyl)
+
+            print(self.f_norm)
 
             # set the force position and scale
             self.meshcat.SetProperty("force", "scale", (1, 1, self.f_norm * self.visual_scaling), t)

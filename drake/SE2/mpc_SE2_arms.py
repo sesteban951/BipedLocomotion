@@ -21,7 +21,10 @@ from pydrake.all import (
     PdControllerGains,
     BasicVector,
     MultibodyPlant,
-    VectorLogSink
+    VectorLogSink,
+    ContactVisualizer,
+    ContactVisualizerParams,
+    Rgba
 )
 
 import time
@@ -38,13 +41,13 @@ from pyidto import (
 )
 
 from trajectory_generator_SE2 import HLIPTrajectoryGeneratorSE2
+from disturbance_generator_SE2 import DisturbanceGenerator
 
 import sys, os
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 from mpc_utils import Interpolator, ModelPredictiveController
 from joystick import GamepadCommand
-from disturbance_generator import DisturbanceGenerator
 
 #--------------------------------------------------------------------------------------------------------------------------#
 
@@ -347,7 +350,7 @@ if __name__=="__main__":
         RigidTransform(p=[0.8, 0, 0.0]),
         Box(0.5, 5.0, 5.0),
         "wbox",
-        [0.5, 0.5, 0.5, 1.0]
+        [0.5, 0.5, 0.5, 0.75]
     )
     plant.RegisterCollisionGeometry(
         plant.world_body(),
@@ -403,9 +406,10 @@ if __name__=="__main__":
     
     # Disturbance generator
     disturbance_tau = np.zeros(plant.num_velocities())
-    disturbance_tau[0] = 20.0
+    disturbance_tau[0] = 15.0
+    disturbance_tau[1] = 0.0
     dist_gen = builder.AddSystem(DisturbanceGenerator(
-        plant, disturbance_tau, 5.0, 2.0))  # time, duration
+        plant, meshcat, disturbance_tau, 3.0, 3.0))  # time, duration
 
     # Wire the systems together
     builder.Connect(
@@ -428,6 +432,10 @@ if __name__=="__main__":
     builder.Connect(
         dist_gen.get_output_port(),
         plant.get_applied_generalized_force_input_port(),
+    )
+    builder.Connect(
+        plant.get_state_output_port(),
+        dist_gen.GetInputPort("state")
     )
     
     # Connect the plant to meshcat for visualization
