@@ -11,6 +11,7 @@ from pydrake.all import (
     DiagramBuilder,
     AddMultibodyPlantSceneGraph,
     AddDefaultVisualization,
+    LeafSystem,
     Parser,
     Box,
     RigidTransform,
@@ -24,7 +25,9 @@ from pydrake.all import (
     VectorLogSink,
     RollPitchYaw,
     RotationMatrix,
-    Rgba, Sphere
+    Rgba, Sphere,
+    ContactResults,
+    PublishEvent, TriggerType
 )
 
 import time
@@ -193,13 +196,13 @@ class AchillesMPC(ModelPredictiveController):
         # maximum velocity for the robot
         self.vx_max = 0.4  # [m/s]
         self.vy_max = 0.3  # [m/s]
-        w_max = 25   # [deg/s]
+        w_max = 35   # [deg/s]
         self.w_max = w_max * (np.pi / 180)  # [rad/s]
         P_half = np.diag([1/self.vx_max, 1/self.vy_max, 1/self.w_max]) 
         self.P = P_half.T @ P_half
 
         # tanh avtication function for blending https://www.desmos.com/calculator/bwpmzor4og
-        a = 5   # a in [0, inf], how steep the steep the transisiton is. NOTE: too steep at transition is bad
+        a = 5   # a in [0, inf], how steep the steep the transisiton is.
         p = 0.5 # p in [0,1], where the transition is located at in [0,1]
         tanh = lambda x: (np.exp(2*x) -1 ) / (np.exp(2*x) + 1)
         self.alpha = lambda v_des: 0.5 * tanh(a * (v_des - p)) + 0.5  
@@ -449,12 +452,75 @@ class AchillesMPC(ModelPredictiveController):
             q_nom[i][self.idx_no_arms_q] = (1 - a) * q_stand[i][self.idx_no_arms_q] + a * q_HLIP[i]
             v_nom[i][self.idx_no_arms_v] = (1 - a) * v_stand[i][self.idx_no_arms_v] + a * v_HLIP[i]
 
-        # q_nom = q_stand
-        # v_nom = v_stand
-        # q_nom = q_HLIP
-        # v_nom = v_HLIP
-
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
+
+############################################################################################################################
+
+class ContactLogger(LeafSystem):
+    
+    def __init__(self, plant, update_interval, file_name):
+        LeafSystem.__init__(self)
+        
+        # Store the plant to know the bodies
+        self.plant = plant
+
+        # Declare input port for ContactResults
+        self.DeclareAbstractInputPort(
+            "contact_results", plant.get_contact_results_output_port().Allocate())
+
+        # Declare a periodic event to log ContactResults every update_interval seconds
+        self.DeclarePeriodicEvent(
+            period_sec=update_interval, 
+            offset_sec=0.0, 
+            event=PublishEvent(
+                trigger_type=TriggerType.kPeriodic, 
+                callback=self.DoCalcDiscreteVariableUpdates))
+        
+        # Initialize CSV file and writer
+        self.file_name = file_name
+        with open(self.file_name, mode='w', newline='') as file:
+            self.writer = csv.writer(file)
+            self.writer.writerow(["Time", "BodyA", "BodyB", "ContactPoint", "NormalForce"])
+
+    def LogContactResults(self, contact_results, current_time):
+
+        # cap the floating poitn for time
+        current_time = round(current_time, 5)
+
+        # get the number of contact pairs
+        num_contact_pairs = contact_results.num_point_pair_contacts()
+        
+        # Process contacts
+        if num_contact_pairs > 0:
+            for i in range(num_contact_pairs):
+
+                # extract contact info
+                contact_info = contact_results.point_pair_contact_info(i)
+                contact_point = contact_info.contact_point()
+                normal_force = contact_info.contact_force()
+                bodyA_id = contact_info.bodyA_index()
+                bodyB_id = contact_info.bodyB_index()
+                bodyA_name = self.plant.get_body(bodyA_id).name()
+                bodyB_name = self.plant.get_body(bodyB_id).name()
+
+                # log the entry        
+                log_entry = [current_time, bodyA_name, bodyB_name, contact_point, normal_force]
+                self._append_to_csv(log_entry)
+
+        # No contacts
+        else:
+            log_entry = [current_time, "None", "None", np.array([0,0,0]), np.array([0,0,0])]
+            self._append_to_csv(log_entry)
+        
+    def _append_to_csv(self, log_entry):
+        with open(self.file_name, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(log_entry)
+
+    def DoCalcDiscreteVariableUpdates(self, context, event=None):
+        contact_results = self.get_input_port(0).Eval(context)
+        current_time = context.get_time()
+        self.LogContactResults(contact_results, current_time)
 
 ############################################################################################################################
 
@@ -463,9 +529,12 @@ if __name__=="__main__":
     meshcat = StartMeshcat()
     model_file = "../../models/achilles_drake.urdf"
 
+    logging = True
+
     # Set up a Drake diagram for simulation
     builder = DiagramBuilder()
-    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=5e-3)
+    sim_time_step = 5e-3
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=sim_time_step)
     plant.set_discrete_contact_approximation(DiscreteContactApproximation.kLagged)
 
     models = Parser(plant).AddModels(model_file)  # robot model
@@ -543,28 +612,43 @@ if __name__=="__main__":
     
     # distubance generator
     disturbance_tau = np.zeros(plant.num_velocities())
-    disturbance_tau[3] = 0.0   # base x
-    disturbance_tau[4] = 0.0    # base y
-    disturbance_tau[5] = 0.0    # base z
+    disturbance_tau[3] = 10.0   # base x
+    disturbance_tau[4] = 5.0    # base y
+    disturbance_tau[5] = 5.0    # base z
     time_applied = 2.0
     duration = 0.5
     dist_gen = builder.AddSystem(DisturbanceGenerator(plant, 
                                                       meshcat, 
-                                                      disturbance_tau, time_applied, duration))  # time, duration
-    
-    # Logger to record the robot state
-    logger_state = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
-    logger_joy = builder.AddSystem(VectorLogSink(5))
-    logger_distrubances = builder.AddSystem(VectorLogSink(plant.num_velocities()))
-    builder.Connect(
-            plant.get_state_output_port(), 
-            logger_state.get_input_port())
-    builder.Connect(
-            joystick.get_output_port(),
-            logger_joy.get_input_port())
-    builder.Connect(
-            dist_gen.get_output_port(),
-            logger_distrubances.get_input_port())
+                                                      disturbance_tau, time_applied, duration))
+
+    # Add logging
+    if logging==True:
+        # logger state
+        logger_state = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
+        builder.Connect(
+                plant.get_state_output_port(), 
+                logger_state.get_input_port())
+        # logger torque input
+        logger_torque = builder.AddSystem(VectorLogSink(plant.num_actuators()))
+        builder.Connect(
+                interpolator.GetOutputPort("control"),  
+                logger_torque.get_input_port())
+        # logger joystick
+        logger_joy = builder.AddSystem(VectorLogSink(5))
+        builder.Connect(
+                joystick.get_output_port(),
+                logger_joy.get_input_port())
+        # logger disturbances
+        logger_distrubances = builder.AddSystem(VectorLogSink(plant.num_velocities()))
+        builder.Connect(
+                dist_gen.get_output_port(),
+                logger_distrubances.get_input_port())
+        # logger contact forces
+        csv_file_name = "./data/data_contacts.csv"
+        logger_contact = builder.AddSystem(ContactLogger(plant, sim_time_step, csv_file_name))    
+        builder.Connect(
+            plant.get_contact_results_output_port(),
+            logger_contact.get_input_port(0))
 
     # Wire the systems together
     # MPC
@@ -618,29 +702,45 @@ if __name__=="__main__":
     meshcat.StopRecording()
     meshcat.PublishRecording()
 
-    # unpack recorded data from the logger
-    state_log = logger_state.FindLog(diagram_context)
-    joy_log = logger_joy.FindLog(diagram_context)
-    disturbance_log = logger_distrubances.FindLog(diagram_context)
-    times = state_log.sample_times()
-    states = state_log.data().T
-    joystick_commands = joy_log.data().T
-    disturbances = disturbance_log.data().T
+    if logging==True:
+        # unpack recorded data from the logger
+        state_log = logger_state.FindLog(diagram_context)
+        torque_log = logger_torque.FindLog(diagram_context)
+        joy_log = logger_joy.FindLog(diagram_context)
+        disturbance_log = logger_distrubances.FindLog(diagram_context)
+        
+        times = state_log.sample_times()
+        states = state_log.data().T
+        torques = torque_log.data().T
+        joystick_commands = joy_log.data().T
+        disturbances = disturbance_log.data().T
 
-    # save the data to a CSV file
-    with open('./data/data_SE3_arms.csv', mode='w') as file:
-        writer = csv.writer(file)
-        for i in range(len(times)):
-            writer.writerow([times[i]] + list(states[i]))
+        # save the time data to a CSV file
+        with open('./data/data_times.csv', mode='w') as file:
+            writer = csv.writer(file)
+            for i in range(len(times)):
+                writer.writerow([times[i]])
 
-    # save the joystick data to a CSV file
-    with open('./data/data_joystick.csv', mode='w') as file:
-        writer = csv.writer(file)
-        for i in range(len(times)):
-            writer.writerow(list(joystick_commands[i]))
+        # save the state data to a CSV file
+        with open('./data/data_states.csv', mode='w') as file:
+            writer = csv.writer(file)
+            for i in range(len(times)):
+                writer.writerow(states[i])
 
-    # save the disturbance data to a CSV file
-    with open('./data/data_disturbances.csv', mode='w') as file:
-        writer = csv.writer(file)
-        for i in range(len(times)):
-            writer.writerow(list(disturbances[i]))
+        # save the torque data to a CSV file
+        with open('./data/data_torques.csv', mode='w') as file:
+            writer = csv.writer(file)
+            for i in range(len(times)):
+                writer.writerow(list(torques[i]))
+
+        # save the joystick data to a CSV file
+        with open('./data/data_joystick.csv', mode='w') as file:
+            writer = csv.writer(file)
+            for i in range(len(times)):
+                writer.writerow(list(joystick_commands[i]))
+
+        # save the disturbance data to a CSV file
+        with open('./data/data_disturbances.csv', mode='w') as file:
+            writer = csv.writer(file)
+            for i in range(len(times)):
+                writer.writerow(list(disturbances[i]))
