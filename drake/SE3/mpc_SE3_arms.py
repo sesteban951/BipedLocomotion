@@ -11,6 +11,7 @@ from pydrake.all import (
     DiagramBuilder,
     AddMultibodyPlantSceneGraph,
     AddDefaultVisualization,
+    LeafSystem,
     Parser,
     Box,
     RigidTransform,
@@ -25,7 +26,8 @@ from pydrake.all import (
     RollPitchYaw,
     RotationMatrix,
     Rgba, Sphere,
-    ContactResults
+    ContactResults,
+    PublishEvent, TriggerType
 )
 
 import time
@@ -459,6 +461,55 @@ class AchillesMPC(ModelPredictiveController):
 
 ############################################################################################################################
 
+class ContactLogger(LeafSystem):
+    
+    def __init__(self, update_interval):
+        
+        LeafSystem.__init__(self)
+        
+        # Declare input port for ContactResults
+        self.DeclareAbstractInputPort(
+            "contact_results", plant.get_contact_results_output_port().Allocate())
+
+        # Declare a periodic event to print ContactResults every update_interval seconds
+        self.DeclarePeriodicEvent(
+            period_sec=update_interval, 
+            offset_sec=0.0, 
+            event=PublishEvent(
+                trigger_type=TriggerType.kPeriodic, 
+                callback=self.DoCalcDiscreteVariableUpdates))
+
+    def DoCalcDiscreteVariableUpdates(self, context, event=None):
+        # Get the ContactResults from the input port
+        contact_results = self.get_input_port(0).Eval(context)
+        current_time = context.get_time()
+
+        # Print the current time
+        print(f"Time: {current_time:.3f}s")
+
+        # Number of point contacts
+        num_contacts = contact_results.num_point_pair_contacts()
+        print(f"Number of contacts: {num_contacts}")
+
+        # Loop through each contact and print relevant information
+        for i in range(num_contacts):
+            contact_info = contact_results.point_pair_contact_info(i)
+            
+            # Access information about the contact
+            contact_point = contact_info.contact_point()
+            normal_force = contact_info.contact_force()  # Correct way to get the contact force
+            bodyA_id = contact_info.bodyA_index()
+            bodyB_id = contact_info.bodyB_index()
+
+            print(f"  Contact {i + 1}:")
+            print(f"    Contact point: {contact_point}")
+            print(f"    Normal force: {normal_force}")  # Normal force vector
+            print(f"    Body A ID: {bodyA_id}")
+            print(f"    Body B ID: {bodyB_id}")
+
+        if num_contacts == 0:
+            print("  No contact detected.")
+
 if __name__=="__main__":
 
     meshcat = StartMeshcat()
@@ -466,7 +517,8 @@ if __name__=="__main__":
 
     # Set up a Drake diagram for simulation
     builder = DiagramBuilder()
-    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=5e-3)
+    sim_time_step = 5e-3
+    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=sim_time_step)
     plant.set_discrete_contact_approximation(DiscreteContactApproximation.kLagged)
 
     models = Parser(plant).AddModels(model_file)  # robot model
@@ -529,25 +581,30 @@ if __name__=="__main__":
     dist_gen = builder.AddSystem(DisturbanceGenerator(plant, 
                                                       meshcat, 
                                                       disturbance_tau, time_applied, duration))
-    
-    print(plant.num_collision_geometries())
-    contact_results_output_port = plant.get_contact_results_output_port()
-    reaction_forces_output_port = plant.get_reaction_forces_output_port()
-    contact = ContactResults()
 
-    # Logger to record the robot state
+    # logger state
     logger_state = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
-    logger_joy = builder.AddSystem(VectorLogSink(5))
-    logger_distrubances = builder.AddSystem(VectorLogSink(plant.num_velocities()))
     builder.Connect(
             plant.get_state_output_port(), 
             logger_state.get_input_port())
+
+    # logger joystick
+    logger_joy = builder.AddSystem(VectorLogSink(5))
     builder.Connect(
             joystick.get_output_port(),
             logger_joy.get_input_port())
+    
+    # logger disturbances
+    logger_distrubances = builder.AddSystem(VectorLogSink(plant.num_velocities()))
     builder.Connect(
             dist_gen.get_output_port(),
             logger_distrubances.get_input_port())
+
+    # logger contact forces
+    logger_contact = builder.AddSystem(ContactLogger(update_interval=sim_time_step))
+    builder.Connect(
+        plant.get_contact_results_output_port(),
+        logger_contact.get_input_port(0))
 
     # Wire the systems together
     # MPC
@@ -594,7 +651,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(5.0)
+    simulator.AdvanceTo(3.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
