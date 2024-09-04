@@ -196,7 +196,7 @@ class AchillesMPC(ModelPredictiveController):
         # maximum velocity for the robot
         self.vx_max = 0.4  # [m/s]
         self.vy_max = 0.3  # [m/s]
-        w_max = 25   # [deg/s]
+        w_max = 35   # [deg/s]
         self.w_max = w_max * (np.pi / 180)  # [rad/s]
         P_half = np.diag([1/self.vx_max, 1/self.vy_max, 1/self.w_max]) 
         self.P = P_half.T @ P_half
@@ -463,10 +463,13 @@ class AchillesMPC(ModelPredictiveController):
 
 class ContactLogger(LeafSystem):
     
-    def __init__(self, update_interval):
+    def __init__(self, plant, update_interval):
         
         LeafSystem.__init__(self)
         
+        # Store the plant to know the bodies
+        self.plant = plant
+
         # Declare input port for ContactResults
         self.DeclareAbstractInputPort(
             "contact_results", plant.get_contact_results_output_port().Allocate())
@@ -480,6 +483,7 @@ class ContactLogger(LeafSystem):
                 callback=self.DoCalcDiscreteVariableUpdates))
 
     def DoCalcDiscreteVariableUpdates(self, context, event=None):
+        print("-"*50)
         # Get the ContactResults from the input port
         contact_results = self.get_input_port(0).Eval(context)
         current_time = context.get_time()
@@ -488,11 +492,11 @@ class ContactLogger(LeafSystem):
         print(f"Time: {current_time:.3f}s")
 
         # Number of point contacts
-        num_contacts = contact_results.num_point_pair_contacts()
-        print(f"Number of contacts: {num_contacts}")
+        num_contact_pairs = contact_results.num_point_pair_contacts()
+        print(f"Number of contacts: {num_contact_pairs}")
 
         # Loop through each contact and print relevant information
-        for i in range(num_contacts):
+        for i in range(num_contact_pairs):
             contact_info = contact_results.point_pair_contact_info(i)
             
             # Access information about the contact
@@ -500,14 +504,16 @@ class ContactLogger(LeafSystem):
             normal_force = contact_info.contact_force()  # Correct way to get the contact force
             bodyA_id = contact_info.bodyA_index()
             bodyB_id = contact_info.bodyB_index()
+            bodyA_name = self.plant.get_body(bodyA_id).name()
+            bodyB_name = self.plant.get_body(bodyB_id).name()
 
             print(f"  Contact {i + 1}:")
             print(f"    Contact point: {contact_point}")
             print(f"    Normal force: {normal_force}")  # Normal force vector
-            print(f"    Body A ID: {bodyA_id}")
-            print(f"    Body B ID: {bodyB_id}")
+            print(f"    Body A: {bodyA_name} (ID: {bodyA_id})")
+            print(f"    Body B: {bodyB_name} (ID: {bodyB_id})")
 
-        if num_contacts == 0:
+        if num_contact_pairs == 0:
             print("  No contact detected.")
 
 if __name__=="__main__":
@@ -601,7 +607,7 @@ if __name__=="__main__":
             logger_distrubances.get_input_port())
 
     # logger contact forces
-    logger_contact = builder.AddSystem(ContactLogger(update_interval=sim_time_step))
+    logger_contact = builder.AddSystem(ContactLogger(plant, update_interval=sim_time_step))
     builder.Connect(
         plant.get_contact_results_output_port(),
         logger_contact.get_input_port(0))
@@ -651,7 +657,7 @@ if __name__=="__main__":
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(3.0)
+    simulator.AdvanceTo(10.0)
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
