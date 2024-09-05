@@ -1,4 +1,10 @@
 ##################################################################################################
+# CONTROLLER
+##################################################################################################
+
+controller: 'HLIP'  # choose between 'MPC' or 'HLIP'
+
+##################################################################################################
 # MPC PARAMETERS
 ##################################################################################################
 
@@ -79,10 +85,15 @@ HLIP:
     wz_max: 35           # [deg/s], max yaw rate
 
 ##################################################################################################
-# SOLVER PARAMETERS
+# SIMULATION PARAMETERS
 ##################################################################################################
 
+# drake simulation parameters
+sim:
 
+    duration: 30.0       # [sec], simulation duration
+    real_time_rate: 1.0  # real-time rate of the simulation
+    time_step: 0.005     # [sec], simulation time step
 
 ##################################################################################################
 # DISTURBANCES
@@ -108,14 +119,13 @@ disturbance:
 terrain:
     
     # choose whether or not to enable the rough terrain
-    enabled: True
+    enabled: False
 
     # parameters for generating the terrain
     num_entities: 50  # number of entities
     x_range: [1.0, 2.0]   # [m], range of the x-axis
     y_range: [-0.5, 0.5]  # [m], range of the y-axis
     r_range: [0.1, 0.15]  # [m], range of the sphere radius
-
 
 ##################################################################################################
 # ACTIVATION FUNCTION
@@ -135,7 +145,7 @@ blending:
 
 # parallel legs, slighlty bent
 q0: [1.0000, 0.0000, 0.0000, 0.0000,            # base orientation, (w, x, y, z)
-     0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
+     0.0000, 0.0000, 0.9500,                    # base position, (x,y,z)
      0.0000, 0.0209, -0.5515, 1.0239,-0.4725,   # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
      0.0900, 0.000, 0.0000, -0.0000,            # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
      0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
@@ -154,25 +164,14 @@ v0: [0.0000, 0.0000, 0.0000,
 
 gains:
 
-  Kp: [900, 900, 900, 1000, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+  Kp: [800, 800, 800, 900, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        100, 100, 100, 100,       # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-       900, 900, 900, 1000, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       800, 800, 800, 900, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        100, 100, 100, 100]       # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
   Kd: [10, 10, 10, 10, 1,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        1, 1, 1, 1,               # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
        10, 10, 10, 10, 1,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        1, 1, 1, 1]               # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-
-##################################################################################################
-# SIMULATION PARAMETERS
-##################################################################################################
-
-# drake simulation parameters
-sim:
-
-    duration: 15.0       # [sec], simulation duration
-    real_time_rate: 1.0  # real-time rate of the simulation
-    time_step: 0.005     # [sec], simulation time step
 
 ##################################################################################################
 # LOGGING

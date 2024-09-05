@@ -18,6 +18,7 @@ from pydrake.all import (
     DiagramBuilder,
     AddMultibodyPlantSceneGraph,
     AddDefaultVisualization,
+    LeafSystem,
     Parser,
     Box,
     RigidTransform,
@@ -144,7 +145,7 @@ class AchillesMPC(ModelPredictiveController):
         self.joystick_port = self.DeclareVectorInputPort("joy_command",
                                                          BasicVector(5))  # LS_x, LS_y, RS_x, A button, RT (Xbox)
         
-        # create internal model of the robot, TODO: there has to be a better way to do this!!!!!!!!!!!
+        # create internal model of the robot
         self.plant = MultibodyPlant(0)
         Parser(self.plant).AddModels(model_file)
         self.plant.Finalize()
@@ -424,6 +425,217 @@ class AchillesMPC(ModelPredictiveController):
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 
+#--------------------------------------------------------------------------------------------------------------------------#
+
+class HLIP(LeafSystem):
+
+    # constructor
+    def __init__(self, model_file, meshcat):
+
+        # init leaf system 
+        LeafSystem.__init__(self)
+
+        # meshcat
+        self.meshcat = meshcat
+
+        # create internal model of the robot
+        self.plant = MultibodyPlant(0)
+        Parser(self.plant).AddModels(model_file)
+        self.plant.Finalize()
+        self.plant_context = self.plant.CreateDefaultContext()
+
+        self.nq = self.plant.num_positions()
+        self.nv = self.plant.num_velocities()
+
+        # create input port for the joystick command
+        self.state_input_port = self.DeclareVectorInputPort("state",
+                                                            BasicVector(self.nq + self.nv))
+        self.joystick_port = self.DeclareVectorInputPort("joy_command",
+                                                         BasicVector(5))  # LS_x, LS_y, RS_x, A button, RT (Xbox)
+        self.DeclareVectorOutputPort("x_des",
+                                     BasicVector(2 * self.plant.num_actuators()),
+                                     self.CalcOutput)    
+
+        # time parameters
+        self.t_current = 0.0                 # current sim time
+        self.t_phase = 0.0                   # current phase time
+        self.T_SSP = config['HLIP']['T_SSP'] # swing phase duration
+        self.number_of_steps = -1            # number of individual swing foot steps taken
+
+        # maximum velocity for the robot
+        self.vx_max = config['HLIP']['vx_max']  # [m/s]
+        self.vy_max = config['HLIP']['vy_max']  # [m/s]
+
+        # z height parameters
+        self.z_com_upper = config['HLIP']['z_com_upper']  # upper CoM height
+        self.z_com_lower = config['HLIP']['z_com_lower']  # lower CoM height
+        z_apex = config['HLIP']['z_apex']                 # apex height
+        z_foot_offset = config['HLIP']['z_foot_offset']   # foot offset from the ground
+        bezier_order = config['HLIP']['bezier_order']     # 5 or 7
+        hip_bias = config['HLIP']['hip_bias']             # bias between the foot-to-foot distance in y-direction
+
+        # foot info variables
+        self.left_foot_frame = self.plant.GetFrameByName("left_foot")
+        self.right_foot_frame = self.plant.GetFrameByName("right_foot")
+        self.stance_foot_frame = self.right_foot_frame
+        self.swing_foot_frame  = self.left_foot_frame
+        self.p_stance_W = None
+        self.R_stance_W = None
+        self.R_stance_W_2D = None
+        self.p_swing_init_W = None
+        self.quat_stance = None
+        self.control_stance_yaw = None
+
+        # get the constant offset of the torso frame in the CoM frame
+        torso_frame = self.plant.GetFrameByName("torso")
+        static_com_frame = self.plant.GetFrameByName("static_com")
+        self.p_torso_com = self.plant.CalcPointsPositions(self.plant_context,
+                                                          torso_frame,
+                                                          [0, 0, 0],
+                                                          static_com_frame)
+        
+        # create an HLIP trajectory generator object and set the parameters
+        self.traj_gen_HLIP = HLIPTrajectoryGenerator(model_file)
+        self.traj_gen_HLIP.set_parameters(z_apex = z_apex,
+                                          z_offset = z_foot_offset,
+                                          hip_bias = hip_bias,
+                                          bezier_order = bezier_order,
+                                          T_SSP = self.T_SSP,
+                                          dt = 0.005,
+                                          N = 2)
+
+    # update the meshcat plot with the HLIP horizon
+    def plot_meshcat_horizon(self, meshcat_horizon, t):
+
+        for i in range(self.optimizer.num_steps() + 1):
+            
+            # unpack the horizon data
+            O = meshcat_horizon[i]
+            p_com, p_left, p_right = O
+
+            # plot the foot and com positions
+            self.meshcat.SetTransform(f"com_{i}", RigidTransform(p_com), t)
+            self.meshcat.SetTransform(f"left_{i}", RigidTransform(p_left), t)
+            self.meshcat.SetTransform(f"right_{i}", RigidTransform(p_right), t)
+
+    # update the foot info for the HLIP traj gen
+    def UpdateFootInfo(self):
+
+        # check if entered new step period
+        if (self.t_phase >= self.T_SSP) or (self.p_stance_W is None):
+
+            # increment the number of steps
+            self.number_of_steps += 1
+
+            # left foot is swing foot, right foot is stance foot
+            if self.number_of_steps % 2 == 0:
+
+                # set the initial swing foot position
+                self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                                    self.left_foot_frame,
+                                                                    [0,0,0],
+                                                                    self.plant.world_frame())
+                # set the current stance foot position
+                self.p_stance_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                                self.right_foot_frame,
+                                                                [0,0,0],
+                                                                self.plant.world_frame())
+                # get the current stance yaw position of the robot
+                self.R_stance_W = self.plant.CalcRelativeRotationMatrix(self.plant_context,
+                                                                        self.plant.world_frame(),
+                                                                        self.right_foot_frame)
+                # switch the foot roles
+                self.stance_foot_frame = self.right_foot_frame
+                self.swing_foot_frame = self.left_foot_frame
+
+            # right foot is swing foot, left foot is stance foot
+            else:
+
+                # set the initial swing foot position
+                self.p_swing_init_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                                     self.right_foot_frame,
+                                                                     [0,0,0],
+                                                                     self.plant.world_frame())
+                # set the current stance foot position
+                self.p_stance_W = self.plant.CalcPointsPositions(self.plant_context,
+                                                                 self.left_foot_frame,
+                                                                 [0,0,0],
+                                                                 self.plant.world_frame())
+                # get the current stance yaw position of the robot
+                self.R_stance_W = self.plant.CalcRelativeRotationMatrix(self.plant_context,
+                                                                        self.plant.world_frame(),
+                                                                        self.left_foot_frame)
+                # switch the foot roles
+                self.stance_foot_frame = self.left_foot_frame
+                self.swing_foot_frame = self.right_foot_frame
+            
+            # compute the stance foot yaw angle and the 2D rotation matrix
+            self.control_stance_yaw = RollPitchYaw(self.R_stance_W).yaw_angle()  # NOTE: could cause singularity
+            self.quat_stance = RollPitchYaw([0,0,self.control_stance_yaw]).ToQuaternion()
+            self.R_satnce_W = RotationMatrix(self.quat_stance).matrix()
+            self.R_stance_W_2D = np.array([[np.cos(self.control_stance_yaw), -np.sin(self.control_stance_yaw)],
+                                           [np.sin(self.control_stance_yaw),  np.cos(self.control_stance_yaw)]])
+
+        # update the phase time
+        self.t_phase = self.t_current - self.number_of_steps * self.T_SSP
+
+    def CalcOutput(self, context, output):
+
+        # Get the current state
+        x0 = self.state_input_port.Eval(context)
+        self.plant.SetPositionsAndVelocities(self.plant_context, x0)
+        q0 = x0[:self.nq]
+        v0 = x0[self.nq:]
+
+        # Update the foot info
+        self.UpdateFootInfo()
+
+        # Quit if the robot has fallen down
+        base_height = q0[6]
+        assert base_height > 0.1, "Oh no, the robot fell over!"
+
+        # Get the current time
+        self.t_current = context.get_time()
+
+        # unpack the joystick commands
+        joy_command = self.joystick_port.Eval(context)
+        vx_des = joy_command[1] * self.vx_max  
+        vy_des = joy_command[0] * self.vy_max
+        z_com_des = joy_command[4] * (self.z_com_lower - self.z_com_upper) + self.z_com_upper
+        v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
+
+        # get a new reference trajectory
+        q_HLIP, v_HLIP, meshcat_horizon = self.traj_gen_HLIP.generate_trajectory(
+                                                                q0 = q0,
+                                                                v0 = v0,
+                                                                v_des = v_des,
+                                                                z_com_des = z_com_des,
+                                                                t_phase = self.t_phase,
+                                                                initial_swing_foot_pos = self.p_swing_init_W,
+                                                                stance_foot_pos = self.p_stance_W,
+                                                                stance_foot_yaw = self.control_stance_yaw,
+                                                                initial_stance_foot_name = self.stance_foot_frame.name())
+        if config['HLIP_vis']==True:
+            self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
+        
+        # extract the first trajectory point
+        q_des = q_HLIP[0]
+        v_des = v_HLIP[0]
+
+        # insert the arms
+        q_des = np.array([q_des[7], q_des[8], q_des[9], q_des[10], q_des[11],
+                          0.0, 0.0, 0.0, 0.0,
+                          q_des[12], q_des[13], q_des[14], q_des[15], q_des[16],
+                          0.0, 0.0, 0.0, 0.0])
+        v_des = np.array([v_des[6], v_des[7], v_des[8], v_des[9], v_des[10],
+                          0.0, 0.0, 0.0, 0.0,
+                          v_des[11], v_des[12], v_des[13], v_des[14], v_des[15],
+                          0.0, 0.0, 0.0, 0.0])
+        v_des = np.zeros(18)
+        x_des = np.block([q_des, v_des])
+
+        output.SetFromVector(x_des)
+
 ############################################################################################################################
 
 if __name__=="__main__":
@@ -439,9 +651,9 @@ if __name__=="__main__":
     sim_time_step = config['sim']['time_step']
     plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=sim_time_step)
     plant.set_discrete_contact_approximation(DiscreteContactApproximation.kLagged)
-
     models = Parser(plant).AddModels(model_file)  # robot model
    
+    # Add ground
     ground_color = np.array(config['color']['ground'])
     plant.RegisterCollisionGeometry(  # ground
         plant.world_body(), 
@@ -476,8 +688,7 @@ if __name__=="__main__":
 
     # Add implicit PD controllers (must use kLagged or kSimilar)
     Kp = np.array(config['gains']['Kp'])
-    Kd = np.array(config['gains']['Kd'])
-    
+    Kd = np.array(config['gains']['Kd'])    
     actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
     for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):
         plant.get_joint_actuator(actuator_index).set_controller_gains(
@@ -494,13 +705,20 @@ if __name__=="__main__":
     joystick = builder.AddSystem(GamepadCommand(deadzone=0.05))
 
     # Create the MPC controller and interpolator systems
-    mpc_rate = config['MPC']['mpc_rate']  # Hz
-    controller = builder.AddSystem(AchillesMPC(optimizer, q_guess, mpc_rate, model_file, meshcat))
+    if config['controller']=='MPC':
+    
+        mpc_rate = config['MPC']['mpc_rate']  # Hz
+        controller = builder.AddSystem(AchillesMPC(optimizer, q_guess, mpc_rate, model_file, meshcat))
 
-    Bv = plant.MakeActuationMatrix()
-    N = plant.MakeVelocityToQDotMap(plant.CreateDefaultContext())
-    Bq = N@Bv
-    interpolator = builder.AddSystem(Interpolator(Bq.T, Bv.T))
+        Bv = plant.MakeActuationMatrix()
+        N = plant.MakeVelocityToQDotMap(plant.CreateDefaultContext())
+        Bq = N@Bv
+        interpolator = builder.AddSystem(Interpolator(Bq.T, Bv.T))
+    
+    # Create the HLIP controller
+    elif config['controller']=='HLIP':
+
+        controller = builder.AddSystem(HLIP(model_file, meshcat))
     
     # distubance generator
     disturbance_tau = np.zeros(plant.num_velocities())
@@ -513,6 +731,44 @@ if __name__=="__main__":
                                                       meshcat, 
                                                       disturbance_tau, time_applied, duration))
 
+    # Wire the systems together
+    if config['controller']=='MPC':
+        
+        # MPC
+        builder.Connect(
+            plant.get_state_output_port(), 
+            controller.GetInputPort("state"))
+        builder.Connect(
+            controller.GetOutputPort("optimal_trajectory"), 
+            interpolator.GetInputPort("trajectory"))
+        builder.Connect(
+            interpolator.GetOutputPort("control"), 
+            plant.get_actuation_input_port())
+        builder.Connect(
+            interpolator.GetOutputPort("state"), 
+            plant.get_desired_state_input_port(models[0]))
+        
+    elif config['controller']=='HLIP':
+
+        # HLIP
+        builder.Connect(plant.get_state_output_port(), 
+                controller.GetInputPort("state"))
+        builder.Connect(controller.GetOutputPort("x_des"),
+                plant.get_desired_state_input_port(models[0]))
+
+    # joystick
+    builder.Connect(
+        joystick.get_output_port(), 
+        controller.GetInputPort("joy_command"))
+    
+    # disturbances
+    builder.Connect(
+        dist_gen.get_output_port(),
+        plant.get_applied_generalized_force_input_port())
+    builder.Connect(
+        plant.get_state_output_port(),
+        dist_gen.GetInputPort("state"))
+    
     # Add logging
     if config['logging']==True:
         # logger state
@@ -521,10 +777,11 @@ if __name__=="__main__":
                 plant.get_state_output_port(), 
                 logger_state.get_input_port())
         # logger torque input
-        logger_torque = builder.AddSystem(VectorLogSink(plant.num_actuators()))
-        builder.Connect(
-                interpolator.GetOutputPort("control"),  
-                logger_torque.get_input_port())
+        if config['controller']=='MPC':
+            logger_torque = builder.AddSystem(VectorLogSink(plant.num_actuators()))
+            builder.Connect(
+                    interpolator.GetOutputPort("control"),  
+                    logger_torque.get_input_port())
         # logger joystick
         logger_joy = builder.AddSystem(VectorLogSink(5))
         builder.Connect(
@@ -541,32 +798,6 @@ if __name__=="__main__":
         builder.Connect(
             plant.get_contact_results_output_port(),
             logger_contact.get_input_port(0))
-
-    # Wire the systems together
-    # MPC
-    builder.Connect(
-        plant.get_state_output_port(), 
-        controller.GetInputPort("state"))
-    builder.Connect(
-        controller.GetOutputPort("optimal_trajectory"), 
-        interpolator.GetInputPort("trajectory"))
-    builder.Connect(
-        interpolator.GetOutputPort("control"), 
-        plant.get_actuation_input_port())
-    builder.Connect(
-        interpolator.GetOutputPort("state"), 
-        plant.get_desired_state_input_port(models[0]))
-    # joystick
-    builder.Connect(
-        joystick.get_output_port(), 
-        controller.GetInputPort("joy_command"))
-    # disturbances
-    builder.Connect(
-        dist_gen.get_output_port(),
-        plant.get_applied_generalized_force_input_port())
-    builder.Connect(
-        plant.get_state_output_port(),
-        dist_gen.GetInputPort("state"))
     
     # Connect the plant to meshcat for visualization
     AddDefaultVisualization(builder, meshcat)
@@ -597,13 +828,11 @@ if __name__=="__main__":
     if config['logging']==True:
         # unpack recorded data from the logger
         state_log = logger_state.FindLog(diagram_context)
-        torque_log = logger_torque.FindLog(diagram_context)
         joy_log = logger_joy.FindLog(diagram_context)
         disturbance_log = logger_distrubances.FindLog(diagram_context)
         
         times = state_log.sample_times()
         states = state_log.data().T
-        torques = torque_log.data().T
         joystick_commands = joy_log.data().T
         disturbances = disturbance_log.data().T
 
@@ -619,12 +848,6 @@ if __name__=="__main__":
             for i in range(len(times)):
                 writer.writerow(states[i])
 
-        # save the torque data to a CSV file
-        with open('./data/data_torques.csv', mode='w') as file:
-            writer = csv.writer(file)
-            for i in range(len(times)):
-                writer.writerow(list(torques[i]))
-
         # save the joystick data to a CSV file
         with open('./data/data_joystick.csv', mode='w') as file:
             writer = csv.writer(file)
@@ -636,3 +859,12 @@ if __name__=="__main__":
             writer = csv.writer(file)
             for i in range(len(times)):
                 writer.writerow(list(disturbances[i]))
+
+        # save the torque data to a CSV file
+        if config['controller']=='MPC':
+            torque_log = logger_torque.FindLog(diagram_context)
+            torques = torque_log.data().T
+            with open('./data/data_torques.csv', mode='w') as file:
+                writer = csv.writer(file)
+                for i in range(len(times)):
+                    writer.writerow(list(torques[i]))
