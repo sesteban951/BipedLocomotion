@@ -107,12 +107,12 @@ disturbance:
 
     # force to be applied on the base frame
     fx: 0.0  # [N], force in x-direction
-    fy: 0.0  # [N], force in y-direction
+    fy: 50.0  # [N], force in y-direction
     fz: 0.0  # [N], force in z-direction
 
     # time parameters
     time_applied: 2.0  # [sec], time when the disturbance is applied
-    duration: 0.5      # [sec], duration of the disturbance
+    duration: 0.3      # [sec], duration of the disturbance
 
 ##################################################################################################
 # Terrain
@@ -181,7 +181,7 @@ gains:
 ##################################################################################################
 
 # choose to log new data from simulation
-logging: True
+logging: False
 
 ##################################################################################################
 # VISUALIZATION
@@ -200,3 +200,17 @@ color:
 
     ground: [0.0, 0.0, 0.0, 0.0]
     terrain: [0.5, 0.5, 0.5, 1.0]
+
+##################################################################################################
+# WALL
+##################################################################################################
+
+# Extra wall for the robot to brace itself against
+wall: 
+    enabled: True
+
+    # Size and position
+    length: 2.0  # [m]
+    height: 0.6  # [m]
+    x: 0.0  # [m]
+    y: 0.6  # [m] 

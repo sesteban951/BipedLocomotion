@@ -74,11 +74,22 @@ def create_optimizer(model_file):
     builder = DiagramBuilder()
     plant, _ = AddMultibodyPlantSceneGraph(builder, time_step=config['MPC']['dt'])
     Parser(plant).AddModels(model_file)
+
     plant.RegisterCollisionGeometry(
         plant.world_body(), 
         RigidTransform(p=[0, 0, -25]), 
         Box(50, 50, 50), "ground", 
         CoulombFriction(0.7, 0.7))
+
+    if config['wall']['enabled']==True:
+        # Add a wall to the controller's model, if enabled
+        R_wall = RigidTransform(
+            p=[config['wall']['x'], config['wall']['y'], config['wall']['height']/2])
+        wall_geom = Box(config['wall']['length'], 0.2, config['wall']['height'])
+        plant.RegisterCollisionGeometry(
+            plant.world_body(), 
+            R_wall, wall_geom, "wall", CoulombFriction(0.7, 0.7))
+
     plant.Finalize()
     diagram = builder.Build()
 
@@ -685,6 +696,21 @@ if __name__=="__main__":
                 RigidTransform(p=[px, py, -0.1]), 
                 Sphere(radius), f"terrain_{i}", 
                 CoulombFriction(0.7, 0.7))
+            
+    # Add a wall
+    if config['wall']['enabled']==True:
+        R_wall = RigidTransform(
+            p=[config['wall']['x'], config['wall']['y'], config['wall']['height']/2])
+        wall_geom = Box(config['wall']['length'], 0.2, config['wall']['height'])
+        plant.RegisterVisualGeometry(
+            plant.world_body(), 
+            R_wall, 
+            wall_geom, 
+            "wall", 
+            terrain_color)
+        plant.RegisterCollisionGeometry(
+            plant.world_body(), 
+            R_wall, wall_geom, "wall", CoulombFriction(0.7, 0.7))
 
     # Add implicit PD controllers (must use kLagged or kSimilar)
     Kp = np.array(config['gains']['Kp'])
