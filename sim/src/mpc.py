@@ -72,7 +72,7 @@ def create_optimizer(model_file):
 
     # Create the system diagram that the optimizer uses
     builder = DiagramBuilder()
-    plant, _ = AddMultibodyPlantSceneGraph(builder, time_step=0.05)
+    plant, _ = AddMultibodyPlantSceneGraph(builder, time_step=config['MPC']['dt'])
     Parser(plant).AddModels(model_file)
     plant.RegisterCollisionGeometry(
         plant.world_body(), 

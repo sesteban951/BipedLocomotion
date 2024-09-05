@@ -2,7 +2,7 @@
 # CONTROLLER
 ##################################################################################################
 
-controller: 'HLIP'  # choose between 'MPC' or 'HLIP'
+controller: 'MPC'  # choose between 'MPC' or 'HLIP'
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -41,6 +41,7 @@ MPC:
     # standard parameters
     num_steps: 20  # number of nodes
     mpc_rate: 50   # Hz
+    dt: 0.05       # time step
 
     # solver parameters
     max_iterations: 2
@@ -91,9 +92,11 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 30.0       # [sec], simulation duration
+    duration: 5.0       # [sec], simulation duration
     real_time_rate: 1.0  # real-time rate of the simulation
-    time_step: 0.005     # [sec], simulation time step
+    time_step: 0.001     # [sec], simulation time step
+
+    # NOTE: 75 controlls the dt of the MPC
 
 ##################################################################################################
 # DISTURBANCES
@@ -152,11 +155,11 @@ q0: [1.0000, 0.0000, 0.0000, 0.0000,            # base orientation, (w, x, y, z)
      0.0900, 0.000, 0.0000, -0.0000]            # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
 
 v0: [0.0000, 0.0000, 0.0000,            
-     0.0000, 0.0000, 0.9300,                   
-     0.0000, 0.0209, -0.5515, 1.0239,-0.4725,  
-     0.0900, 0.000, 0.0000, -0.0000,           
-     0.0000, -0.0209, -0.5515, 1.0239,-0.4725, 
-     0.0900, 0.000, 0.0000, -0.0000]           
+     0.0000, 0.0000, 0.0000,                   
+     0.0000, 0.0000, 0.0000, 0.0000, 0.0000,  
+     0.0000, 0.0000, 0.0000, 0.0000,           
+     0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+     0.0000, 0.0000, 0.0000, 0.0000]    
 
 ##################################################################################################
 # PD GAINS
