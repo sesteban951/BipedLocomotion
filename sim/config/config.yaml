@@ -1,0 +1,200 @@
+##################################################################################################
+# MPC PARAMETERS
+##################################################################################################
+
+MPC:
+
+    # position weights
+    Qq: [10.0, 10.0, 10.0, 10.0,           # base orientation
+         1.0, 1.0, 1.0,                    # base position
+         0.3, 0.3, 0.3, 0.3, 0.3,          # left leg
+         0.1, 0.1, 0.01, 0.01,             # left arm
+         0.3, 0.3, 0.3, 0.3, 0.3,          # right leg
+         0.1, 0.1, 0.01, 0.01]             # right arm
+
+    # velocity weights
+    Qv: [1.0, 1.0, 1.0,                    # base orientation
+         0.1, 0.1, 0.1,                    # base position
+         0.03, 0.03, 0.03, 0.03, 0.03,     # left leg
+         0.01, 0.01, 0.001, 0.003,         # left arm
+         0.03, 0.03, 0.03, 0.03, 0.03,     # right leg
+         0.01, 0.01, 0.001, 0.003]         # right arm
+
+    # input weights
+    R: [100.0, 100.0, 100.0,       # base orientation
+        100.0, 100.0, 100.0,       # base position
+        0.001, 0.001, 0.001, 0.001, 0.001, # left leg
+        0.001, 0.001, 0.001, 0.001,       # left arm
+        0.001, 0.001, 0.001, 0.001, 0.001, # right leg
+        0.001, 0.001, 0.001, 0.001]        # right arm
+    
+    # terminal scaling
+    Qf_q_scaling: 10.0
+    Qf_v_scaling: 10.0
+
+    # standard parameters
+    num_steps: 20  # number of nodes
+    mpc_rate: 50   # Hz
+
+    # solver parameters
+    max_iterations: 2
+    scaling: True
+    equality_constraints: False
+    Delta0: 10.0
+    Delta_max: 100_000
+    num_threads: 8
+    contact_stiffness: 2_000
+    dissipation_velocity: 0.1
+    smoothing_factor: 0.005
+    friction_coefficient: 0.5
+    stiction_velocity: 0.5
+    verbose: False
+
+##################################################################################################
+# HLIP PARAMETERS
+##################################################################################################
+
+HLIP:
+
+    # single support time
+    T_SSP: 0.35   # [sec], single support phase duration
+
+    # CoM height range
+    z_com_upper: 0.65 # [m], upper bound for the CoM height
+    z_com_lower: 0.45 # [m], lower bound for the CoM height
+
+    # foor parameters
+    z_apex: 0.06         # [m], apex height of the foot trajectory
+    z_foot_offset: 0.01  # [m], overall traj offset of the foot from the ground
+    bezier_order: 7      # 5 or 7, order of the bezier curve for foot traj
+    hip_bias: 0.28       # [m], bias of the hip, distance foot to foot
+
+    # maximum step lengths
+    ux_max: 0.5  # [m], max forward step length
+    uy_max: 0.4  # [m], max lateral step length
+
+    # command parameters
+    vx_max: 0.5          # [m/s], max forward velocity
+    vy_max: 0.3          # [m/s], max lateral velocity
+    wz_max: 35           # [deg/s], max yaw rate
+
+##################################################################################################
+# SOLVER PARAMETERS
+##################################################################################################
+
+
+
+##################################################################################################
+# DISTURBANCES
+##################################################################################################
+
+# single disturbance on teh base frame
+disturbance:
+
+    # force to be applied on the base frame
+    fx: 0.0  # [N], force in x-direction
+    fy: 0.0  # [N], force in y-direction
+    fz: 0.0  # [N], force in z-direction
+
+    # time parameters
+    time_applied: 2.0  # [sec], time when the disturbance is applied
+    duration: 0.5      # [sec], duration of the disturbance
+
+##################################################################################################
+# Terrain
+##################################################################################################
+
+# for testing the random terrain
+terrain:
+    
+    # choose whether or not to enable the rough terrain
+    enabled: True
+
+    # parameters for generating the terrain
+    num_entities: 50  # number of entities
+    x_range: [1.0, 2.0]   # [m], range of the x-axis
+    y_range: [-0.5, 0.5]  # [m], range of the y-axis
+    r_range: [0.1, 0.15]  # [m], range of the sphere radius
+
+
+##################################################################################################
+# ACTIVATION FUNCTION
+##################################################################################################
+
+# tanh avtication function for blending https://www.desmos.com/calculator/bwpmzor4og
+# a in [0, inf], how steep the steep the transisiton is.
+# p in [0,1], where the transition is located at in [0,1]
+
+blending:
+    a: 5
+    p: 0.5
+
+##################################################################################################
+# INITIAL CONFIGURATION
+##################################################################################################
+
+# parallel legs, slighlty bent
+q0: [1.0000, 0.0000, 0.0000, 0.0000,            # base orientation, (w, x, y, z)
+     0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
+     0.0000, 0.0209, -0.5515, 1.0239,-0.4725,   # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+     0.0900, 0.000, 0.0000, -0.0000,            # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
+     0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+     0.0900, 0.000, 0.0000, -0.0000]            # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
+
+v0: [0.0000, 0.0000, 0.0000,            
+     0.0000, 0.0000, 0.9300,                   
+     0.0000, 0.0209, -0.5515, 1.0239,-0.4725,  
+     0.0900, 0.000, 0.0000, -0.0000,           
+     0.0000, -0.0209, -0.5515, 1.0239,-0.4725, 
+     0.0900, 0.000, 0.0000, -0.0000]           
+
+##################################################################################################
+# PD GAINS
+##################################################################################################
+
+gains:
+
+  Kp: [900, 900, 900, 1000, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       100, 100, 100, 100,       # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+       900, 900, 900, 1000, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       100, 100, 100, 100]       # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+  Kd: [10, 10, 10, 10, 1,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       1, 1, 1, 1,               # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+       10, 10, 10, 10, 1,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       1, 1, 1, 1]               # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+
+##################################################################################################
+# SIMULATION PARAMETERS
+##################################################################################################
+
+# drake simulation parameters
+sim:
+
+    duration: 15.0       # [sec], simulation duration
+    real_time_rate: 1.0  # real-time rate of the simulation
+    time_step: 0.005     # [sec], simulation time step
+
+##################################################################################################
+# LOGGING
+##################################################################################################
+
+# choose to log new data from simulation
+logging: True
+
+##################################################################################################
+# VISUALIZATION
+##################################################################################################
+
+# visluaze the HLIP trajectory
+HLIP_vis: False
+
+# colors to use throughout the simulation
+color:
+
+    # transparent: [0.0, 0.0, 0.0, 0.0]
+    # white: [1.0, 1.0, 1.0, 1.0]
+    # gray: [0.5, 0.5, 0.5, 1.0]
+    # caltech orange: [0.9200, 0.3896, 0.0433, 1.0] 
+
+    ground: [0.0, 0.0, 0.0, 0.0]
+    terrain: [0.5, 0.5, 0.5, 1.0]

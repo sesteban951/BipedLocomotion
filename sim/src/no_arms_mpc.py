@@ -6,6 +6,13 @@
 #
 ##
 
+# import standard libraries
+import time
+import numpy as np
+import csv
+import yaml
+
+# import the pydrake modules
 from pydrake.all import (
     StartMeshcat,
     DiagramBuilder,
@@ -27,22 +34,20 @@ from pydrake.all import (
     Rgba, Sphere
 )
 
-import time
-import numpy as np
-import csv
-
+# import the pyidto modules
 from pyidto import (
     TrajectoryOptimizer,
     SolverParameters,
     ProblemDefinition
 )
 
+# import the custom modules
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../utils'))
-from mpc_utils import Interpolator, ModelPredictiveController
-from joystick import GamepadCommand
-from disturbance_generator import DisturbanceGenerator
-from trajectory_generator import HLIPTrajectoryGenerator
+from mpc_utils import Interpolator, ModelPredictiveController # type: ignore
+from joystick import GamepadCommand                           # type: ignore
+from disturbance_generator import DisturbanceGenerator        # type: ignore
+from trajectory_generator import HLIPTrajectoryGenerator      # type: ignore
 
 #--------------------------------------------------------------------------------------------------------------------------#
 

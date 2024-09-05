@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+import numpy as np
+import scipy as sp
+import time
+import yaml
+
 from pydrake.all import (
         StartMeshcat,
         DiagramBuilder,
@@ -15,13 +20,15 @@ from pydrake.all import (
         BezierCurve,
         JacobianWrtVariable
 )
-import numpy as np
-import scipy as sp
-import time
 
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../bin'))
-import AchillesKinematicsPy as ak
+import AchillesKinematicsPy as ak  # type: ignore
+
+# import the yaml config
+config_path = "../config/config.yaml"
+with open(config_path, 'r') as file:
+    config = yaml.safe_load(file)
 
 class HLIPTrajectoryGenerator():
 
@@ -77,8 +84,8 @@ class HLIPTrajectoryGenerator():
         self.z_offset = None   # offset of the swing foot from the ground
 
         # clip the swing foot target position
-        self.ux_max = 0.5
-        self.uy_max = 0.4
+        self.ux_max = config['HLIP']['ux_max']
+        self.uy_max = config['HLIP']['uy_max']
 
         # maximum velocity
         self.vx_des = None
@@ -94,7 +101,7 @@ class HLIPTrajectoryGenerator():
         self.lam = None
 
         # bezier curve
-        self.bez_order = 7  # 5 or 7
+        self.bez_order = None
 
         # instantiate the IK object
         self.ik = ak.AchillesKinematics()

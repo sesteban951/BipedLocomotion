@@ -6,12 +6,18 @@
 #
 ##
 
+# import standard libraries
+import time
+import numpy as np
+import csv
+import yaml
+
+# import the pydrake modules
 from pydrake.all import (
     StartMeshcat,
     DiagramBuilder,
     AddMultibodyPlantSceneGraph,
     AddDefaultVisualization,
-    LeafSystem,
     Parser,
     Box,
     RigidTransform,
@@ -25,26 +31,29 @@ from pydrake.all import (
     VectorLogSink,
     RollPitchYaw,
     RotationMatrix,
-    Rgba, Sphere,
-    PublishEvent, TriggerType
+    Rgba, Sphere
 )
 
-import time
-import numpy as np
-import csv
-
+# import the pyidto modules
 from pyidto import (
     TrajectoryOptimizer,
     SolverParameters,
     ProblemDefinition
 )
 
+# import the custom modules
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../utils'))
-from mpc_utils import Interpolator, ModelPredictiveController
-from joystick import GamepadCommand
-from disturbance_generator import DisturbanceGenerator
-from trajectory_generator import HLIPTrajectoryGenerator
+from mpc_utils import Interpolator, ModelPredictiveController # type: ignore
+from joystick import GamepadCommand                           # type: ignore
+from disturbance_generator import DisturbanceGenerator        # type: ignore
+from trajectory_generator import HLIPTrajectoryGenerator      # type: ignore
+from contact_logger import ContactLogger                      # type: ignore
+
+# import the yaml config
+config_path = "../config/config.yaml"
+with open(config_path, 'r') as file:
+    config = yaml.safe_load(file)
 
 #--------------------------------------------------------------------------------------------------------------------------#
 
@@ -52,18 +61,8 @@ def standing_position():
     """
     Return a reasonable default standing position for the Achilles humanoid. 
     """
-
-    # no arms (parallel legs, bent knees)
-    q_stand = np.array([
-        1.0000, 0.0000, 0.0000, 0.0000,            # base orientation, (w, x, y, z)
-        0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
-        0.0000, 0.0209, -0.5515, 1.0239,-0.4725,   # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        0.0900, 0.000, 0.0000, -0.0000,           # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
-        0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        0.0900, 0.000, 0.0000, -0.0000,           # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
-    ])
-
-    return q_stand
+    q_standing = np.array(config['q0'])
+    return q_standing
 
 def create_optimizer(model_file):
     """
@@ -72,7 +71,7 @@ def create_optimizer(model_file):
 
     # Create the system diagram that the optimizer uses
     builder = DiagramBuilder()
-    plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.05)
+    plant, _ = AddMultibodyPlantSceneGraph(builder, time_step=0.05)
     Parser(plant).AddModels(model_file)
     plant.RegisterCollisionGeometry(
         plant.world_body(), 
@@ -89,39 +88,16 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = 20
+    problem.num_steps = config['MPC']['num_steps']
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
-    # arms
-    # leg indeces: hip yaw, hip_roll, hip_pitch, knee, ankle
-    # arm indeces: shoulder pitch, shoulder roll, shoulder yaw, elbow
-    problem.Qq = np.diag([
-        1e1, 1e1, 1e1, 1e1,       # base orientation
-        1e0, 1e0, 1e0,             # base position
-        3e-1, 3e-1, 3e-1, 3e-1, 3e-1, # left leg
-        1e-1, 1e-1, 1e-2, 1e-2,       # left arm
-        3e-1, 3e-1, 3e-1, 3e-1, 3e-1, # right leg
-        1e-1, 1e-1, 1e-2, 1e-2        # right arm
-    ])
-    problem.Qv = np.diag([
-        1e0, 1e0, 1e0,               # base orientation
-        1e-1, 1e-1, 1e-1,               # base position
-        3e-2, 3e-2, 3e-2, 3e-2, 3e-2,   # left leg
-        1e-2, 1e-2, 1e-3, 3e-3,         # left arm
-        3e-2, 3e-2, 3e-2, 3e-2, 3e-2,   # right leg
-        1e-2, 1e-2, 1e-3, 3e-3          # right arm
-    ])
-    problem.R = np.diag([
-        100.0, 100.0, 100.0,                       # base orientation
-        100.0, 100.0, 100.0,                       # base position
-        1e-3, 1e-3, 1e-3, 1e-3, 1e-3, # left leg
-        1e-3, 1e-3, 1e-3, 1e-3,         # left arm
-        1e-3, 1e-3, 1e-3, 1e-3, 1e-3, # right leg
-        1e-3, 1e-3, 1e-3, 1e-3          # right arm
-    ])
-    problem.Qf_q = 10.0 * np.copy(problem.Qq)
-    problem.Qf_v = 10.0 * np.copy(problem.Qv)
+    # weights
+    problem.Qq = np.diag(config['MPC']['Qq'])
+    problem.Qv = np.diag(config['MPC']['Qv'])
+    problem.R = np.diag(config['MPC']['R'])
+    problem.Qf_q = config['MPC']['Qf_q_scaling'] * np.copy(problem.Qq)
+    problem.Qf_v = config['MPC']['Qf_v_scaling'] * np.copy(problem.Qv)
 
     v_nom = np.zeros(nv)
     problem.q_nom = [np.copy(q_stand) for i in range(problem.num_steps + 1)]
@@ -129,24 +105,25 @@ def create_optimizer(model_file):
 
     # Set the solver parameters
     params = SolverParameters()
-    params.max_iterations = 2
-    params.scaling = True
-    params.equality_constraints = False
-    params.Delta0 = 1e1
-    params.Delta_max = 1e5
-    params.num_threads = 8
-    params.contact_stiffness = 2_000
-    params.dissipation_velocity = 0.1
-    params.smoothing_factor = 0.005
-    params.friction_coefficient = 0.5
-    params.stiction_velocity = 0.5
-    params.verbose = False
+    params.max_iterations = config['MPC']['max_iterations']
+    params.scaling = config['MPC']['scaling']
+    params.equality_constraints = config['MPC']['equality_constraints']
+    params.Delta0 = config['MPC']['Delta0']
+    params.Delta_max = config['MPC']['Delta_max']
+    params.num_threads = config['MPC']['num_threads']
+    params.contact_stiffness = config['MPC']['contact_stiffness']
+    params.dissipation_velocity = config['MPC']['dissipation_velocity']
+    params.smoothing_factor = config['MPC']['smoothing_factor']
+    params.friction_coefficient = config['MPC']['friction_coefficient']
+    params.stiction_velocity = config['MPC']['stiction_velocity']
+    params.verbose = config['MPC']['verbose']
 
     # Create the optimizer
     optimizer = TrajectoryOptimizer(diagram, plant, problem, params)
 
     # Return the optimizer, along with the diangram and plant, which must
     # stay in scope along with the optimizer
+
     return optimizer, diagram, plant
 
 #--------------------------------------------------------------------------------------------------------------------------#
@@ -174,30 +151,30 @@ class AchillesMPC(ModelPredictiveController):
         self.plant_context = self.plant.CreateDefaultContext()
 
         # time parameters
-        self.t_current = 0.0       # current sim time
-        self.t_phase = 0.0         # current phase time
-        self.T_SSP = 0.35           # swing phase duration
-        self.number_of_steps = -1   # number of individual swing foot steps taken
+        self.t_current = 0.0                 # current sim time
+        self.t_phase = 0.0                   # current phase time
+        self.T_SSP = config['HLIP']['T_SSP'] # swing phase duration
+        self.number_of_steps = -1            # number of individual swing foot steps taken
 
         # z height parameters
-        self.z_com_upper = 0.65   # upper CoM height
-        self.z_com_lower = 0.45   # lower CoM height
-        z_apex = 0.06             # apex height
-        z_foot_offset = 0.01      # foot offset from the ground
-        bezier_order = 7          # 5 or 7
-        hip_bias = 0.28           # bias between the foot-to-foot distance in y-direction
+        self.z_com_upper = config['HLIP']['z_com_upper']  # upper CoM height
+        self.z_com_lower = config['HLIP']['z_com_lower']  # lower CoM height
+        z_apex = config['HLIP']['z_apex']                 # apex height
+        z_foot_offset = config['HLIP']['z_foot_offset']   # foot offset from the ground
+        bezier_order = config['HLIP']['bezier_order']     # 5 or 7
+        hip_bias = config['HLIP']['hip_bias']             # bias between the foot-to-foot distance in y-direction
 
         # maximum velocity for the robot
-        self.vx_max = 0.4  # [m/s]
-        self.vy_max = 0.3  # [m/s]
-        w_max = 35   # [deg/s]
-        self.w_max = w_max * (np.pi / 180)  # [rad/s]
+        self.vx_max = config['HLIP']['vx_max']  # [m/s]
+        self.vy_max = config['HLIP']['vy_max']  # [m/s]
+        w_max = config['HLIP']['wz_max']        # [deg/s]
+        self.w_max = w_max * (np.pi / 180)      # [rad/s]
         P_half = np.diag([1/self.vx_max, 1/self.vy_max, 1/self.w_max]) 
         self.P = P_half.T @ P_half
 
-        # tanh avtication function for blending https://www.desmos.com/calculator/bwpmzor4og
-        a = 5   # a in [0, inf], how steep the steep the transisiton is.
-        p = 0.5 # p in [0,1], where the transition is located at in [0,1]
+        # avtication function for blending
+        a = config['blending']['a']  
+        p = config['blending']['p']  
         tanh = lambda x: (np.exp(2*x) -1 ) / (np.exp(2*x) + 1)
         self.alpha = lambda v_des: 0.5 * tanh(a * (v_des - p)) + 0.5  
 
@@ -244,18 +221,19 @@ class AchillesMPC(ModelPredictiveController):
                               6, 7, 8, 9, 10,     # left leg
                               15, 16, 17, 18, 19] # right leg
 
-        # create someobjects for the meshcat plot
-        red_color = Rgba(1, 0, 0, 1)
-        green_color = Rgba(0, 1, 0, 1)
-        blue_color = Rgba(0, 0, 1, 1)
-        sphere_com = Sphere(0.018)
-        sphere_foot = Sphere(0.015)
+        if config['HLIP_vis']==True:
+            # create someobjects for the meshcat plot
+            red_color = Rgba(1, 0, 0, 1)
+            green_color = Rgba(0, 1, 0, 1)
+            blue_color = Rgba(0, 0, 1, 1)
+            sphere_com = Sphere(0.018)
+            sphere_foot = Sphere(0.015)
 
-        # create separate objects for the CoM and the feet visualization
-        for i in range(self.optimizer.num_steps() + 1):
-            self.meshcat.SetObject(f"com_{i}", sphere_com, green_color)
-            self.meshcat.SetObject(f"left_{i}", sphere_foot, blue_color)
-            self.meshcat.SetObject(f"right_{i}", sphere_foot, red_color)
+            # create separate objects for the CoM and the feet visualization
+            for i in range(self.optimizer.num_steps() + 1):
+                self.meshcat.SetObject(f"com_{i}", sphere_com, green_color)
+                self.meshcat.SetObject(f"left_{i}", sphere_foot, blue_color)
+                self.meshcat.SetObject(f"right_{i}", sphere_foot, red_color)
 
     #----------------------------------------------------------------------------------------------------------------------#
 
@@ -427,7 +405,8 @@ class AchillesMPC(ModelPredictiveController):
             v_HLIP[i][4] = v_des_W[1][0]
 
         # draw the meshcat horizon
-        self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
+        if config['HLIP_vis']==True:
+            self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
 
         # compute alpha 
         v_command = np.array([[vx_des], [vy_des], [wz_des]])
@@ -447,90 +426,23 @@ class AchillesMPC(ModelPredictiveController):
 
 ############################################################################################################################
 
-class ContactLogger(LeafSystem):
-    
-    def __init__(self, plant, update_interval, file_name):
-        LeafSystem.__init__(self)
-        
-        # Store the plant to know the bodies
-        self.plant = plant
-
-        # Declare input port for ContactResults
-        self.DeclareAbstractInputPort(
-            "contact_results", plant.get_contact_results_output_port().Allocate())
-
-        # Declare a periodic event to log ContactResults every update_interval seconds
-        self.DeclarePeriodicEvent(
-            period_sec=update_interval, 
-            offset_sec=0.0, 
-            event=PublishEvent(
-                trigger_type=TriggerType.kPeriodic, 
-                callback=self.DoCalcDiscreteVariableUpdates))
-        
-        # Initialize CSV file and writer
-        self.file_name = file_name
-        with open(self.file_name, mode='w', newline='') as file:
-            self.writer = csv.writer(file)
-            self.writer.writerow(["Time", "BodyA", "BodyB", "ContactPoint", "NormalForce"])
-
-    def LogContactResults(self, contact_results, current_time):
-
-        # cap the floating poitn for time
-        current_time = round(current_time, 5)
-
-        # get the number of contact pairs
-        num_contact_pairs = contact_results.num_point_pair_contacts()
-        
-        # Process contacts
-        if num_contact_pairs > 0:
-            for i in range(num_contact_pairs):
-
-                # extract contact info
-                contact_info = contact_results.point_pair_contact_info(i)
-                contact_point = contact_info.contact_point()
-                normal_force = contact_info.contact_force()
-                bodyA_id = contact_info.bodyA_index()
-                bodyB_id = contact_info.bodyB_index()
-                bodyA_name = self.plant.get_body(bodyA_id).name()
-                bodyB_name = self.plant.get_body(bodyB_id).name()
-
-                # log the entry        
-                log_entry = [current_time, bodyA_name, bodyB_name, contact_point, normal_force]
-                self._append_to_csv(log_entry)
-
-        # No contacts
-        else:
-            log_entry = [current_time, "None", "None", np.array([0,0,0]), np.array([0,0,0])]
-            self._append_to_csv(log_entry)
-        
-    def _append_to_csv(self, log_entry):
-        with open(self.file_name, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(log_entry)
-
-    def DoCalcDiscreteVariableUpdates(self, context, event=None):
-        contact_results = self.get_input_port(0).Eval(context)
-        current_time = context.get_time()
-        self.LogContactResults(contact_results, current_time)
-
-############################################################################################################################
-
 if __name__=="__main__":
 
+    # start meshcat
     meshcat = StartMeshcat()
-    model_file = "../../models/achilles_drake.urdf"
 
-    logging = True
+    # set up the model file
+    model_file = "../../models/achilles_drake.urdf"
 
     # Set up a Drake diagram for simulation
     builder = DiagramBuilder()
-    sim_time_step = 5e-3
+    sim_time_step = config['sim']['time_step']
     plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=sim_time_step)
     plant.set_discrete_contact_approximation(DiscreteContactApproximation.kLagged)
 
     models = Parser(plant).AddModels(model_file)  # robot model
    
-    ground_color = np.array([0.5, 0.5, 0.5, 1.0])
+    ground_color = np.array(config['color']['ground'])
     plant.RegisterCollisionGeometry(  # ground
         plant.world_body(), 
         RigidTransform(p=[0, 0, -25]), 
@@ -543,39 +455,28 @@ if __name__=="__main__":
         ground_color)
    
     # Add rough terrain
-    np.random.seed(0)
-    for i in range(50):
-        px = np.random.uniform(1.0, 2.0)
-        py = np.random.uniform(-0.5, 0.5)
-        radius = np.random.uniform(0.1, 0.15)
-        plant.RegisterVisualGeometry(
-            plant.world_body(), 
-            RigidTransform(p=[px, py, -0.1]), 
-            Sphere(radius), f"terrain_{i}", 
-            ground_color)
-        plant.RegisterCollisionGeometry(
-            plant.world_body(), 
-            RigidTransform(p=[px, py, -0.1]), 
-            Sphere(radius), f"terrain_{i}", 
-            CoulombFriction(0.7, 0.7))
+    terrain_color = np.array(config['color']['terrain'])
+    if config['terrain']['enabled']==True:
+        np.random.seed(0)
+        for i in range(config['terrain']['num_entities']):
+            
+            px = np.random.uniform(config['terrain']['x_range'][0], config['terrain']['x_range'][1])
+            py = np.random.uniform(config['terrain']['y_range'][0], config['terrain']['y_range'][1])
+            radius = np.random.uniform(config['terrain']['r_range'][0], config['terrain']['r_range'][1])
+            plant.RegisterVisualGeometry(
+                plant.world_body(), 
+                RigidTransform(p=[px, py, -0.1]), 
+                Sphere(radius), f"terrain_{i}", 
+                terrain_color)
+            plant.RegisterCollisionGeometry(
+                plant.world_body(), 
+                RigidTransform(p=[px, py, -0.1]), 
+                Sphere(radius), f"terrain_{i}", 
+                CoulombFriction(0.7, 0.7))
 
     # Add implicit PD controllers (must use kLagged or kSimilar)
-    kp_hip = 900
-    kp_knee = 1000
-    kp_ankle = 150
-    kp_arm = 100
-    kd_hip = 10
-    kd_knee = 10
-    kd_ankle = 1
-    kd_arm = 1
-    Kp = np.array([kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle, 
-                   kp_arm, kp_arm, kp_arm, kp_arm,
-                   kp_hip, kp_hip, kp_hip, kp_knee, kp_ankle,
-                   kp_arm, kp_arm, kp_arm, kp_arm])
-    Kd = np.array([kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle, 
-                   kd_arm, kd_arm, kd_arm, kd_arm,
-                   kd_hip, kd_hip, kd_hip, kd_knee, kd_ankle,
-                   kd_arm, kd_arm, kd_arm, kd_arm])
+    Kp = np.array(config['gains']['Kp'])
+    Kd = np.array(config['gains']['Kd'])
     
     actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
     for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):
@@ -593,7 +494,7 @@ if __name__=="__main__":
     joystick = builder.AddSystem(GamepadCommand(deadzone=0.05))
 
     # Create the MPC controller and interpolator systems
-    mpc_rate = 50  # Hz
+    mpc_rate = config['MPC']['mpc_rate']  # Hz
     controller = builder.AddSystem(AchillesMPC(optimizer, q_guess, mpc_rate, model_file, meshcat))
 
     Bv = plant.MakeActuationMatrix()
@@ -603,17 +504,17 @@ if __name__=="__main__":
     
     # distubance generator
     disturbance_tau = np.zeros(plant.num_velocities())
-    disturbance_tau[3] = 10.0   # base x
-    disturbance_tau[4] = 5.0    # base y
-    disturbance_tau[5] = 5.0    # base z
-    time_applied = 2.0
-    duration = 0.5
+    disturbance_tau[3] = config['disturbance']['fx']  # base x
+    disturbance_tau[4] = config['disturbance']['fy']  # base y
+    disturbance_tau[5] = config['disturbance']['fz']  # base z
+    time_applied = config['disturbance']['time_applied']
+    duration = config['disturbance']['duration']
     dist_gen = builder.AddSystem(DisturbanceGenerator(plant, 
                                                       meshcat, 
                                                       disturbance_tau, time_applied, duration))
 
     # Add logging
-    if logging==True:
+    if config['logging']==True:
         # logger state
         logger_state = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
         builder.Connect(
@@ -677,7 +578,7 @@ if __name__=="__main__":
 
     # Set the initial state
     q0 = standing_position()
-    v0 = np.zeros(plant.num_velocities())
+    v0 = np.array(config['v0'])
     plant.SetPositions(plant_context, q0)
     plant.SetVelocities(plant_context, v0)
 
@@ -685,15 +586,15 @@ if __name__=="__main__":
     meshcat.StartRecording()
     st = time.time()
     simulator = Simulator(diagram, diagram_context)
-    simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(20.0)
+    simulator.set_target_realtime_rate(config['sim']['real_time_rate'])
+    simulator.AdvanceTo(config['sim']['duration'])
     wall_time = time.time() - st
     print(f"sim time: {simulator.get_context().get_time():.4f}, "
            f"wall time: {wall_time:.4f}")
     meshcat.StopRecording()
     meshcat.PublishRecording()
 
-    if logging==True:
+    if config['logging']==True:
         # unpack recorded data from the logger
         state_log = logger_state.FindLog(diagram_context)
         torque_log = logger_torque.FindLog(diagram_context)
