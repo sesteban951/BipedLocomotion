@@ -11,12 +11,17 @@ joystick_data = csvread('data_joystick.csv');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% import the yaml file
+yaml_file = '../../config/config.yaml';
+config = yaml.loadFile(yaml_file);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % choose what to plot
 plot_state = 0;
 plot_torque = 0;
 plot_joy = 0;
 plot_phase = 1;
-plot_phase_movie = 0;
 save_phase_movie = 0;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -33,42 +38,38 @@ tau_data = torque_data;
 t0 = 0;
 tf = t_data(end);
 idx = find(t_data >= t0 & t_data <= tf);
-
 t_data = t_data(idx);
 q_data = q_data(idx,:);
 v_data = v_data(idx,:);
-tau_data = tau_data(idx,:);
-
-q_base_data = q_data(:,1:7);
-q_joint_data = q_data(:,8:end);
-v_base_data = v_data(:,1:6);
-v_joint_data = v_data(:,7:end);
-
-leg_idx = [1, 2, 3, 4, 5, 10, 11, 12, 13, 14];
-arm_idx = [6, 7, 8, 9, 15, 16, 17, 18];
-
-% plot labels
-q_base_labels = ["q_{w}", "q_{x}", "q_{y}", "q_{z}", ...
-                "p_x", "p_y", "p_z"];
-q_joint_labels = ["q_{LHY}", "q_{LHR}", "q_{LHP}", "q_{LKP}", "q_{LAP}", ...
-                "q_{LSP}", "q_{LSR}", "q_{LSY}", "q_{LEP}", ...
-                "q_{RHY}", "q_{RHR}", "q_{RHP}", "q_{RKP}", "q_{RAP}",...
-                "q_{RSP}", "q_{RSR}", "q_{RSY}", "q_{REP}"]; 
-v_base_labels = ["\omega_x", "\omega_y", "\omega_y",...
-                "v_x", "v_y", "v_z"];
-v_joint_labels = ["\dot{q}_{LHY}", "\dot{q}_{LHR}", "\dot{q}_{LHP}", "\dot{q}_{LKP}", "\dot{q}_{LAP}", ...
-                "\dot{q}_{LSP}", "\dot{q}_{LSR}", "\dot{q}_{LSY}", "\dot{q}_{LEP}", ...
-                "\dot{q}_{RHY}", "\dot{q}_{RHR}", "\dot{q}_{RHP}", "\dot{q}_{RKP}", "\dot{q}_{RAP}",...
-                "\dot{q}_{RSP}", "\dot{q}_{RSR}", "\dot{q}_{RSY}", "\dot{q}_{REP}"];
-q_base_labels = strcat("$", q_base_labels, "$");
-q_joint_labels = strcat("$", q_joint_labels, "$");
-v_base_labels = strcat("$", v_base_labels, "$");
-v_joint_labels = strcat("$", v_joint_labels, "$");
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % plot the states
 if plot_state == 1
+
+    % state data
+    q_base_data = q_data(:,1:7);
+    q_joint_data = q_data(:,8:end);
+    v_base_data = v_data(:,1:6);
+    v_joint_data = v_data(:,7:end);
+
+    % plot y labels
+    q_base_labels = ["q_{w}", "q_{x}", "q_{y}", "q_{z}", ...
+                    "p_x", "p_y", "p_z"];
+    q_joint_labels = ["q_{LHY}", "q_{LHR}", "q_{LHP}", "q_{LKP}", "q_{LAP}", ...
+                    "q_{LSP}", "q_{LSR}", "q_{LSY}", "q_{LEP}", ...
+                    "q_{RHY}", "q_{RHR}", "q_{RHP}", "q_{RKP}", "q_{RAP}",...
+                    "q_{RSP}", "q_{RSR}", "q_{RSY}", "q_{REP}"]; 
+    v_base_labels = ["\omega_x", "\omega_y", "\omega_y",...
+                    "v_x", "v_y", "v_z"];
+    v_joint_labels = ["\dot{q}_{LHY}", "\dot{q}_{LHR}", "\dot{q}_{LHP}", "\dot{q}_{LKP}", "\dot{q}_{LAP}", ...
+                    "\dot{q}_{LSP}", "\dot{q}_{LSR}", "\dot{q}_{LSY}", "\dot{q}_{LEP}", ...
+                    "\dot{q}_{RHY}", "\dot{q}_{RHR}", "\dot{q}_{RHP}", "\dot{q}_{RKP}", "\dot{q}_{RAP}",...
+                    "\dot{q}_{RSP}", "\dot{q}_{RSR}", "\dot{q}_{RSY}", "\dot{q}_{REP}"];
+    q_base_labels = strcat("$", q_base_labels, "$");
+    q_joint_labels = strcat("$", q_joint_labels, "$");
+    v_base_labels = strcat("$", v_base_labels, "$");
+    v_joint_labels = strcat("$", v_joint_labels, "$");
 
     figure('Name', 'State Data');
     tabgp = uitabgroup;
@@ -120,8 +121,10 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% plot the torques
 if plot_torque == 1
+    % extract the data
+    leg_idx = [1, 2, 3, 4, 5, 10, 11, 12, 13, 14];
+    arm_idx = [6, 7, 8, 9, 15, 16, 17, 18];
 
     % torque labels
     tau_joint_labels = ["\tau_{LHY}", "\tau_{LHR}", "\tau_{LHP}", "\tau_{LKP}", "\tau_{LAP}", ...
@@ -163,11 +166,11 @@ end
 % plot the joystick commands
 if plot_joy == 1
 
-    vx_max = 0.4;
-    vy_max = 0.3;
-    wz_max = (25.0) * (pi/180);
-    z_upper = 0.65;
-    z_lower = 0.45;
+    vx_max = config.HLIP.vx_max;
+    vy_max = config.HLIP.vy_max;
+    wz_max = (config.HLIP.wz_max) * (pi/180);
+    z_upper = config.HLIP.z_com_upper;
+    z_lower = config.HLIP.z_com_lower;
 
     vx_command = joystick_data(:,2) * vx_max;
     vy_command = joystick_data(:,1) * vy_max;
@@ -191,40 +194,8 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if plot_phase == 1
-
-    % plot all joint phase plots
-    figure('Name', 'Phase Plots');
-    tabgp = uitabgroup;
-
-    % plot leg phase plots
-    tab = uitab(tabgp, 'Title', 'Legs');
-    axes('Parent', tab);
-    for i = 1:length(leg_idx)
-        subplot(2,5,i)
-        plot(q_joint_data(:,leg_idx(i)), v_joint_data(:,leg_idx(i)), 'b', 'LineWidth', 1.5);
-        xlabel(q_joint_labels(leg_idx(i)), 'FontSize', 14, 'Interpreter', 'latex');
-        ylabel(v_joint_labels(leg_idx(i)), 'FontSize', 14, 'Interpreter', 'latex');
-        grid on;
-    end
-
-    % plot arm phase plots
-    tab = uitab(tabgp, 'Title', 'Arms');
-    axes('Parent', tab);
-    for i = 1:length(arm_idx)
-        subplot(2,4,i)
-        plot(q_joint_data(:,arm_idx(i)), v_joint_data(:,arm_idx(i)), 'b', 'LineWidth', 1.5);
-        xlabel(q_joint_labels(arm_idx(i)), 'FontSize', 14, 'Interpreter', 'latex');
-        ylabel(v_joint_labels(arm_idx(i)), 'FontSize', 14, 'Interpreter', 'latex');
-        grid on;
-    end
-
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % plot individual phase plots
-if plot_phase_movie == 1
+if plot_phase == 1
     
     figure('Name', 'Phase Plot', 'Position', [100, 100, 560, 420]);
     joint_idx = 12;  % Left Hip Yaw (8), Left Hip Roll (9), Left Hip Pitch (10), Left Knee Pitch (11), Left ankle Pitch (12)
