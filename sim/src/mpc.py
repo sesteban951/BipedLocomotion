@@ -777,11 +777,10 @@ if __name__=="__main__":
                 plant.get_state_output_port(), 
                 logger_state.get_input_port())
         # logger torque input
-        if config['controller']=='MPC':
-            logger_torque = builder.AddSystem(VectorLogSink(plant.num_actuators()))
-            builder.Connect(
-                    interpolator.GetOutputPort("control"),  
-                    logger_torque.get_input_port())
+        logger_torque = builder.AddSystem(VectorLogSink(plant.num_actuators()))
+        builder.Connect(
+                plant.get_net_actuation_output_port(),  
+                logger_torque.get_input_port())
         # logger joystick
         logger_joy = builder.AddSystem(VectorLogSink(5))
         builder.Connect(
@@ -828,11 +827,13 @@ if __name__=="__main__":
     if config['logging']==True:
         # unpack recorded data from the logger
         state_log = logger_state.FindLog(diagram_context)
+        torque_log = logger_torque.FindLog(diagram_context)
         joy_log = logger_joy.FindLog(diagram_context)
         disturbance_log = logger_distrubances.FindLog(diagram_context)
         
         times = state_log.sample_times()
         states = state_log.data().T
+        torques = torque_log.data().T
         joystick_commands = joy_log.data().T
         disturbances = disturbance_log.data().T
 
@@ -848,6 +849,12 @@ if __name__=="__main__":
             for i in range(len(times)):
                 writer.writerow(states[i])
 
+        # save the torque data to a CSV file
+        with open('./data/data_torques.csv', mode='w') as file:
+            writer = csv.writer(file)
+            for i in range(len(times)):
+                writer.writerow(list(torques[i]))
+
         # save the joystick data to a CSV file
         with open('./data/data_joystick.csv', mode='w') as file:
             writer = csv.writer(file)
@@ -859,12 +866,3 @@ if __name__=="__main__":
             writer = csv.writer(file)
             for i in range(len(times)):
                 writer.writerow(list(disturbances[i]))
-
-        # save the torque data to a CSV file
-        if config['controller']=='MPC':
-            torque_log = logger_torque.FindLog(diagram_context)
-            torques = torque_log.data().T
-            with open('./data/data_torques.csv', mode='w') as file:
-                writer = csv.writer(file)
-                for i in range(len(times)):
-                    writer.writerow(list(torques[i]))

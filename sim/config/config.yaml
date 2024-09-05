@@ -2,7 +2,7 @@
 # CONTROLLER
 ##################################################################################################
 
-controller: 'MPC'  # choose between 'MPC' or 'HLIP'
+controller: 'HLIP'  # choose between 'MPC' or 'HLIP'
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -92,7 +92,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 5.0       # [sec], simulation duration
+    duration: 10.0       # [sec], simulation duration
     real_time_rate: 1.0  # real-time rate of the simulation
     time_step: 0.001     # [sec], simulation time step
 
