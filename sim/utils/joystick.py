@@ -33,6 +33,7 @@ class GamepadCommand(LeafSystem):
             self.joysticks = []
             self.joysticks.append(pygame.joystick.Joystick(0))
             self.joysticks[0].init()  # just initialize the first joystick
+            self.num_axes = self.joysticks[0].get_numaxes()
 
     def CalcOutput(self, context, output):
         """
@@ -49,11 +50,19 @@ class GamepadCommand(LeafSystem):
             pygame.event.pump()  
 
             # map the joystick axes (XBOX One Controller)
-            LS_x = -self.joysticks[0].get_axis(0)             # Left Stick X-direction  (left = +1, right = -1)
-            LS_y = -self.joysticks[0].get_axis(1)             # Left Stick Y-direction  (up = -1, down = +1)
-            RS_x = -self.joysticks[0].get_axis(3)             # Right Stick X-direction (left = -1, right = +1)
-            A = self.joysticks[0].get_button(0)               # A button (unpressed = 0, pressed = 1)
-            RT = 0.5 * (self.joysticks[0].get_axis(5) + 1.0)  # Right Trigger (unpressed = 0, pressed = 1)
+            if self.num_axes == 4:  # switch controller
+                LS_x = -self.joysticks[0].get_axis(0)
+                LS_y = -self.joysticks[0].get_axis(1)
+                RS_x = -self.joysticks[0].get_axis(2)
+                A = self.joysticks[0].get_button(2)
+                RT = self.joysticks[0].get_button(7)
+
+            else: # Default XBOX One Controller
+                LS_x = -self.joysticks[0].get_axis(0)             # Left Stick X-direction  (left = +1, right = -1)
+                LS_y = -self.joysticks[0].get_axis(1)             # Left Stick Y-direction  (up = -1, down = +1)
+                RS_x = -self.joysticks[0].get_axis(3)             # Right Stick X-direction (left = -1, right = +1)
+                A = self.joysticks[0].get_button(0)               # A button (unpressed = 0, pressed = 1)
+                RT = 0.5 * (self.joysticks[0].get_axis(5) + 1.0)  # Right Trigger (unpressed = 0, pressed = 1)
 
             # set deadzone to combat the stick drift
             if abs(LS_x) < self.deadzone:
