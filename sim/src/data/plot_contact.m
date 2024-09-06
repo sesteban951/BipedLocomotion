@@ -13,18 +13,21 @@ config = yaml.loadFile(yaml_file);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% choose what to plot
-plot_foot_position = 0;
-plot_foot_boolean = 1;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % plot only a desired segments of the data
 dt = config.MPC.dt;
 t0 = min(data.Time);
 tf = max(data.Time);
 % t0 = 4;
 % tf = 6;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% choose what to plot
+plot_foot_position = 0;
+plot_foot_boolean = 1;
+
+% Set default properties for all axes
+set(0, 'DefaultAxesTickLabelInterpreter', 'latex');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -144,20 +147,18 @@ if plot_foot_boolean == 1
     red = [1, 0, 0];
     orange = [1, 0.5, 0];
     green = [0, 1, 0];
+    % Plot the subplots and remove y-axis ticks
     subplot(4,1,1)
-    area(time_unique, left_heel_contact_bool_signal, 'FaceColor',blue, 'EdgeColor', blue, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    area(time_unique, left_heel_contact_bool_signal, 'FaceColor', blue, 'EdgeColor', blue, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    set(gca, 'YTick', []);
     subplot(4,1,2)
     area(time_unique, left_toe_contact_bool_signal, 'FaceColor', orange, 'EdgeColor', orange, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    set(gca, 'YTick', []);
     subplot(4,1,3)
     area(time_unique, right_heel_contact_bool_signal, 'FaceColor', red, 'EdgeColor', red, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    set(gca, 'YTick', []);
     subplot(4,1,4)
     area(time_unique, right_toe_contact_bool_signal, 'FaceColor', green, 'EdgeColor', green, 'FaceAlpha', 0.5, 'LineWidth', 1);
-
-    % Customize the plot
-    xlabel('Time [s]');
-    ylabel('Contact (1 or 0)');
-    title('Left and Right Foot Heel Contact Boolean Signal');
-    legend('Left Contact', 'Right Contact');
-    grid on;
+    set(gca, 'YTick', []);
 
 end

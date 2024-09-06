@@ -17,12 +17,21 @@ config = yaml.loadFile(yaml_file);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% plot only a desired segments of the data
+t_data = time_data;
+% t0 = t_data(1);
+% tf = t_data(end);
+t0 = 5;
+tf = 10;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % state and input plots
 plot_state = 0;
 plot_torque = 0;
 
 % joystick commands plot
-plot_joy = 0;
+plot_joy = 1;
 
 % demo plots
 plot_phase = 0;
@@ -30,21 +39,17 @@ save_phase_movie = 0;
 plot_cot = 0;
 plot_ref_tracking = 0;
 
+% plot settings
+set(0, 'DefaultAxesTickLabelInterpreter', 'latex');
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Extract the data
 nq = 25;
 nv = 24;
-t_data = time_data;
 q_data = state_data(:,1:nq);
 v_data = state_data(:,nq+1:nq+nv);
 tau_data = torque_data;
-
-% plot only a desired segments of the data
-t0 = t_data(1);
-tf = t_data(end);
-% t0 = 2;
-% tf = 4;
 
 % data extraction with respect to time range
 idx = find(t_data >= t0 & t_data <= tf);
@@ -52,6 +57,7 @@ t_data = t_data(idx);
 q_data = q_data(idx,:);
 v_data = v_data(idx,:);
 tau_data = tau_data(idx,:);
+joystick_data = joystick_data(idx,:);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -189,7 +195,7 @@ if plot_joy == 1
     wz_command = joystick_data(:,3) * wz_max;
     z_command = joystick_data(:,5) * (z_lower - z_upper) + z_upper;
 
-    commands = [vx_command, vy_command, wz_command, z_command];
+    commands = [vx_command, vy_command, wz_command, z_command]
 
     command_labels = ["v_x", "v_y", "\omega_z", "z_{com}"];
     command_labels = strcat("$", command_labels, "$");
