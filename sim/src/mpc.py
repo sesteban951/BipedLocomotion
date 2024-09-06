@@ -864,7 +864,8 @@ if __name__=="__main__":
             mass = plant.get_body(body).default_mass()
             r = np.random.normal(
                 config['model_error']['mu'], config['model_error']['sigma'])
-            plant.get_body(body).SetMass(plant_context, mass * r)
+            new_mass = max(mass * r, 1e-4)
+            plant.get_body(body).SetMass(plant_context, new_mass)
 
 
     # Simulate and play back on meshcat
