@@ -68,7 +68,7 @@ HLIP:
 
     # CoM height range
     z_com_upper: 0.65 # [m], upper bound for the CoM height
-    z_com_lower: 0.45 # [m], lower bound for the CoM height
+    z_com_lower: 0.35 # [m], lower bound for the CoM height
 
     # foor parameters
     z_apex: 0.06         # [m], apex height of the foot trajectory
@@ -212,3 +212,27 @@ wall:
     height: 0.6  # [m]
     x: 0.0  # [m]
     y: 0.6  # [m] 
+
+##################################################################################################
+# VISUAL OBSTACLES
+##################################################################################################
+
+# Field of a bunch of cylinders that we can manually drive around
+obstacle_field:
+    enabled: False
+
+    # Number of obstacles
+    num_obstacles: 10
+
+    # Obstacle parameters
+    radius_range: [0.1, 0.2]
+    x_range: [1.0, 5.0]
+    y_range: [-2.0, 2.0]
+
+# A floating obstacle that we need to duck under
+overhang:
+    enabled: True
+
+    # Obstacle parameters
+    dimensions: [0.5, 2.0, 0.3]  # length, width, height
+    position: [1.5, 0.0, 1.3]  # x, y, z

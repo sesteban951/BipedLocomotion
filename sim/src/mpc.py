@@ -32,7 +32,7 @@ from pydrake.all import (
     VectorLogSink,
     RollPitchYaw,
     RotationMatrix,
-    Rgba, Sphere
+    Rgba, Sphere, Cylinder
 )
 
 # import the pyidto modules
@@ -711,6 +711,27 @@ if __name__=="__main__":
         plant.RegisterCollisionGeometry(
             plant.world_body(), 
             R_wall, wall_geom, "wall", CoulombFriction(0.7, 0.7))
+        
+    # Add obstacles (visual only) to drive around
+    if config["obstacle_field"]["enabled"]:
+        for i in range(config["obstacle_field"]["num_obstacles"]):
+            px = np.random.uniform(*config["obstacle_field"]["x_range"])
+            py = np.random.uniform(*config["obstacle_field"]["y_range"])
+            radius = np.random.uniform(*config["obstacle_field"]["radius_range"])
+            
+            plant.RegisterVisualGeometry(
+                plant.world_body(), 
+                RigidTransform(p=[px, py, 1.0]), 
+                Cylinder(radius, 2.0), f"obs_{i}", 
+                terrain_color)
+            
+    # Add an obstacle (visual only) to duck under
+    if config["overhang"]["enabled"]:
+        plant.RegisterVisualGeometry(
+            plant.world_body(), 
+            RigidTransform(p=config["overhang"]["position"]), 
+            Box(*config["overhang"]["dimensions"]), "overhang", 
+            terrain_color)
 
     # Add implicit PD controllers (must use kLagged or kSimilar)
     Kp = np.array(config['gains']['Kp'])
