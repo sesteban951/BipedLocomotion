@@ -673,10 +673,10 @@ class HLIP(LeafSystem):
                           0.0, 0.0, 0.0, 0.0,
                           q_des[12], q_des[13], q_des[14], q_des[15], q_des[16],
                           0.0, 0.0, 0.0, 0.0])
-        v_des = np.array([v_des[6], v_des[7], v_des[8], v_des[9], v_des[10],
-                          0.0, 0.0, 0.0, 0.0,
-                          v_des[11], v_des[12], v_des[13], v_des[14], v_des[15],
-                          0.0, 0.0, 0.0, 0.0])
+        # v_des = np.array([v_des[6], v_des[7], v_des[8], v_des[9], v_des[10],
+        #                   0.0, 0.0, 0.0, 0.0,
+        #                   v_des[11], v_des[12], v_des[13], v_des[14], v_des[15],
+        #                   0.0, 0.0, 0.0, 0.0])
         v_des = np.zeros(18)
         x_des = np.block([q_des, v_des])
 
