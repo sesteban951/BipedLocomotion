@@ -56,6 +56,9 @@ config_path = "../config/config.yaml"
 with open(config_path, 'r') as file:
     config = yaml.safe_load(file)
 
+# Fix the random seed for reproducibility        
+np.random.seed(0)
+
 #--------------------------------------------------------------------------------------------------------------------------#
 
 def standing_position():
@@ -680,7 +683,6 @@ if __name__=="__main__":
     # Add rough terrain
     terrain_color = np.array(config['color']['terrain'])
     if config['terrain']['enabled']==True:
-        np.random.seed(0)
         for i in range(config['terrain']['num_entities']):
             
             px = np.random.uniform(config['terrain']['x_range'][0], config['terrain']['x_range'][1])
@@ -837,6 +839,15 @@ if __name__=="__main__":
     v0 = np.array(config['v0'])
     plant.SetPositions(plant_context, q0)
     plant.SetVelocities(plant_context, v0)
+        
+    # Change link masses
+    if config['model_error']['enabled']:
+        for body in plant.GetBodyIndices(plant.GetModelInstanceByName("achilles")):
+            mass = plant.get_body(body).default_mass()
+            r = np.random.normal(
+                config['model_error']['mu'], config['model_error']['sigma'])
+            plant.get_body(body).SetMass(plant_context, mass * r)
+
 
     # Simulate and play back on meshcat
     meshcat.StartRecording()

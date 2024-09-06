@@ -2,7 +2,7 @@
 # CONTROLLER
 ##################################################################################################
 
-controller: 'HLIP'  # choose between 'MPC' or 'HLIP'
+controller: 'MPC'  # choose between 'MPC' or 'HLIP'
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -107,7 +107,7 @@ disturbance:
 
     # force to be applied on the base frame
     fx: 0.0  # [N], force in x-direction
-    fy: 150.0  # [N], force in y-direction
+    fy: 0.0  # [N], force in y-direction
     fz: 0.0  # [N], force in z-direction
 
     # time parameters
@@ -207,10 +207,23 @@ color:
 
 # Extra wall for the robot to brace itself against
 wall: 
-    enabled: True
+    enabled: False
 
     # Size and position
     length: 2.0  # [m]
     height: 0.6  # [m]
     x: 0.0  # [m]
     y: 0.6  # [m] 
+
+
+##################################################################################################
+# MODEL ERROR
+##################################################################################################
+
+model_error:
+    enabled: True
+
+    # Change link masses by m <-- m * r, 
+    # where r ~ N(mu, sigma) is a random scale factor
+    mu: 1.0
+    sigma: 0.2
