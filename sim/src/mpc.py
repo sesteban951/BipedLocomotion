@@ -724,6 +724,14 @@ if __name__=="__main__":
                 RigidTransform(p=[px, py, 1.0]), 
                 Cylinder(radius, 2.0), f"obs_{i}", 
                 terrain_color)
+            
+    # Add an obstacle (visual only) to duck under
+    if config["overhang"]["enabled"]:
+        plant.RegisterVisualGeometry(
+            plant.world_body(), 
+            RigidTransform(p=config["overhang"]["position"]), 
+            Box(*config["overhang"]["dimensions"]), "overhang", 
+            terrain_color)
 
     # Add implicit PD controllers (must use kLagged or kSimilar)
     Kp = np.array(config['gains']['Kp'])
