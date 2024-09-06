@@ -346,6 +346,15 @@ class AchillesMPC(ModelPredictiveController):
         """
         # Get the current state
         x0 = self.state_input_port.Eval(context)
+
+        # Simulate state estimation error
+        if config['estimation_error']['enabled']:
+            x0 += np.random.normal(
+                config['estimation_error']['mu'], 
+                config['estimation_error']['sigma'], 
+                len(x0))
+
+        # Update the internal model
         self.plant.SetPositionsAndVelocities(self.plant_context, x0)
         q0 = x0[:self.nq]
         v0 = x0[self.nq:]
@@ -597,6 +606,15 @@ class HLIP(LeafSystem):
 
         # Get the current state
         x0 = self.state_input_port.Eval(context)
+        
+        # Simulate state estimation error
+        if config['estimation_error']['enabled']:
+            x0 += np.random.normal(
+                config['estimation_error']['mu'], 
+                config['estimation_error']['sigma'], 
+                len(x0))
+            
+        # Update the internal model
         self.plant.SetPositionsAndVelocities(self.plant_context, x0)
         q0 = x0[:self.nq]
         v0 = x0[self.nq:]

@@ -93,7 +93,7 @@ HLIP:
 sim:
 
     duration: 20.0       # [sec], simulation duration
-    real_time_rate: 0  # real-time rate of the simulation
+    real_time_rate: 1.0  # real-time rate of the simulation
     time_step: 0.005     # [sec], simulation time step
 
     # NOTE: 75 controlls the dt of the MPC
@@ -221,9 +221,21 @@ wall:
 ##################################################################################################
 
 model_error:
-    enabled: True
+    enabled: False
 
     # Change link masses by m <-- m * r, 
     # where r ~ N(mu, sigma) is a random scale factor
     mu: 1.0
     sigma: 0.2
+
+##################################################################################################
+# STATE ESTIMATION ERROR
+##################################################################################################
+
+estimation_error:
+    enabled: False
+
+    # Add Gaussian noise to the state estimate at each timestep
+    # x <-- x + r, r ~ N(mu, sigma)
+    mu: 0.0
+    sigma: 0.01
