@@ -68,7 +68,7 @@ HLIP:
 
     # CoM height range
     z_com_upper: 0.65 # [m], upper bound for the CoM height
-    z_com_lower: 0.45 # [m], lower bound for the CoM height
+    z_com_lower: 0.35 # [m], lower bound for the CoM height
 
     # foor parameters
     z_apex: 0.06         # [m], apex height of the foot trajectory
@@ -236,5 +236,5 @@ overhang:
     enabled: True
 
     # Obstacle parameters
-    dimensions: [0.5, 2.0, 0.5]  # length, width, height
-    position: [1.0, 0.0, 1.3]  # x, y, z
+    dimensions: [0.5, 2.0, 0.3]  # length, width, height
+    position: [1.5, 0.0, 1.3]  # x, y, z
