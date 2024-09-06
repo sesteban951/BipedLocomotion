@@ -285,7 +285,7 @@ class AchillesMPC(ModelPredictiveController):
             # increment the number of steps
             self.number_of_steps += 1
 
-            # left foot is swing foot, right foot is stance foot
+            # left foot is swing foot, fright foot is stance foot
             if self.number_of_steps % 2 == 0:
 
                 # set the initial swing foot position
