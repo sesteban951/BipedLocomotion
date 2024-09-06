@@ -17,7 +17,8 @@ from pydrake.all import (
     StartMeshcat,
     DiagramBuilder,
     AddMultibodyPlantSceneGraph,
-    AddDefaultVisualization,
+    ApplyVisualizationConfig,
+    VisualizationConfig,
     LeafSystem,
     Parser,
     Box,
@@ -879,7 +880,9 @@ if __name__=="__main__":
             logger_contact.get_input_port(0))
     
     # Connect the plant to meshcat for visualization
-    AddDefaultVisualization(builder, meshcat)
+    vis_config = VisualizationConfig()
+    vis_config.publish_contacts = False
+    ApplyVisualizationConfig(config=vis_config, builder=builder, meshcat=meshcat)
 
     # Build the system diagram
     diagram = builder.Build()
