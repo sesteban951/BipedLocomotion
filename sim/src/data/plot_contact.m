@@ -14,8 +14,8 @@ config = yaml.loadFile(yaml_file);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % choose what to plot
-plot_foot_position = 1;
-plot_foot_boolean = 0;
+plot_foot_position = 0;
+plot_foot_boolean = 1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -23,8 +23,8 @@ plot_foot_boolean = 0;
 dt = config.MPC.dt;
 t0 = min(data.Time);
 tf = max(data.Time);
-% t0 = 8;
-% tf = 10;
+% t0 = 4;
+% tf = 6;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -144,10 +144,14 @@ if plot_foot_boolean == 1
     red = [1, 0, 0];
     orange = [1, 0.5, 0];
     green = [0, 1, 0];
+    subplot(4,1,1)
     area(time_unique, left_heel_contact_bool_signal, 'FaceColor',blue, 'EdgeColor', blue, 'FaceAlpha', 0.5, 'LineWidth', 1);
-    % area(time_unique, left_toe_contact_bool_signal, 'FaceColor', orange, 'EdgeColor', orange, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    subplot(4,1,2)
+    area(time_unique, left_toe_contact_bool_signal, 'FaceColor', orange, 'EdgeColor', orange, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    subplot(4,1,3)
     area(time_unique, right_heel_contact_bool_signal, 'FaceColor', red, 'EdgeColor', red, 'FaceAlpha', 0.5, 'LineWidth', 1);
-    % area(time_unique, right_toe_contact_bool_signal, 'FaceColor', green, 'EdgeColor', green, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    subplot(4,1,4)
+    area(time_unique, right_toe_contact_bool_signal, 'FaceColor', green, 'EdgeColor', green, 'FaceAlpha', 0.5, 'LineWidth', 1);
 
     % Customize the plot
     xlabel('Time [s]');

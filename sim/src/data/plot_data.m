@@ -21,8 +21,9 @@ config = yaml.loadFile(yaml_file);
 plot_state = 0;
 plot_torque = 0;
 plot_joy = 0;
-plot_phase = 1;
+plot_phase = 0;
 save_phase_movie = 0;
+plot_cot = 0;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -35,23 +36,28 @@ v_data = state_data(:,nq+1:nq+nv);
 tau_data = torque_data;
 
 % plot only a desired segments of the data
-t0 = 0;
+t0 = t_data(1);
 tf = t_data(end);
+% t0 = 2;
+% tf = 4;
+
+% data extraction with respect to time range
 idx = find(t_data >= t0 & t_data <= tf);
 t_data = t_data(idx);
 q_data = q_data(idx,:);
 v_data = v_data(idx,:);
+tau_data = tau_data(idx,:);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% state data
+q_base_data = q_data(:,1:7);
+q_joint_data = q_data(:,8:end);
+v_base_data = v_data(:,1:6);
+v_joint_data = v_data(:,7:end);
+
 % plot the states
 if plot_state == 1
-
-    % state data
-    q_base_data = q_data(:,1:7);
-    q_joint_data = q_data(:,8:end);
-    v_base_data = v_data(:,1:6);
-    v_joint_data = v_data(:,7:end);
 
     % plot y labels
     q_base_labels = ["q_{w}", "q_{x}", "q_{y}", "q_{z}", ...
@@ -121,10 +127,11 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% extract the data
+leg_idx = [1, 2, 3, 4, 5, 10, 11, 12, 13, 14];
+arm_idx = [6, 7, 8, 9, 15, 16, 17, 18];
+
 if plot_torque == 1
-    % extract the data
-    leg_idx = [1, 2, 3, 4, 5, 10, 11, 12, 13, 14];
-    arm_idx = [6, 7, 8, 9, 15, 16, 17, 18];
 
     % torque labels
     tau_joint_labels = ["\tau_{LHY}", "\tau_{LHR}", "\tau_{LHP}", "\tau_{LKP}", "\tau_{LAP}", ...
@@ -299,3 +306,60 @@ if plot_phase == 1
         close(video);
     end
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% plot the cost of transport
+% COT = (tau(t) * omega(t)) / (m * g * v(t))
+
+% compute the mechanical joint power
+[r, ~] = size(tau_data);
+P = zeros(r, 1);
+for t = 1:r
+    % take the dot product of each row of tau with the corresponding row of v
+    tau_t = tau_data(t,:);
+    v_joint_data_t = v_joint_data(t,:);
+    P(t) = tau_t * v_joint_data_t';
+end
+
+% plot the mechanical power
+figure('Name', 'State Data');
+tabgp = uitabgroup;
+tab = uitab(tabgp, 'Title', 'Mechanical Power');
+axes('Parent', tab);
+plot(t_data, P, 'k', 'LineWidth', 1.5);
+xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+ylabel('Power [W]', 'FontSize', 16, 'Interpreter', 'latex');
+
+% Compute the accumulated energy over time using trapz in a loop
+E = zeros(r, 1);
+for t = 2:r
+    E(t) = trapz(t_data(1:t), P(1:t));
+end
+
+% plot the accumulated energy
+tab = uitab(tabgp, 'Title', 'Accumulated Energy');
+axes('Parent', tab);
+plot(t_data, E, 'g', 'LineWidth', 1.5);
+xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+ylabel('Energy [J]', 'FontSize', 16, 'Interpreter', 'latex');
+
+% compute the COT
+m = 22.5; % [kg]
+g = 9.81; % [m/s^2]
+COT = zeros(r, 1);
+for t = 1:r
+    if abs(v_joint_data(t,1)) < 1e-6
+        COT(t) = 0;
+    else
+        COT(t) = P(t) / (m * g * v_base_data(t,1));
+    end
+end
+
+% plot the COT
+tab = uitab(tabgp, 'Title', 'Cost of Transport');
+axes('Parent', tab);
+plot(t_data, COT, 'm', 'LineWidth', 1.5);
+xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+ylabel('Cost of Transport [1]', 'FontSize', 16, 'Interpreter', 'latex');
+
