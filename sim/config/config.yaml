@@ -97,6 +97,22 @@ sim:
     time_step: 0.005     # [sec], simulation time step
 
 ##################################################################################################
+# REFERENCES
+##################################################################################################
+
+# references to test tracking
+references:
+    enabled: False
+
+    # constant velocity tracking
+    vx_ref: 0.0  # [m/s], forward velocity
+    vy_ref: 0.0  # [m/s], lateral velocity
+    wz_ref: 0.0  # [deg/s], yaw rate  (HLIP cannot track this)
+    
+    # constant CoM height tracking
+    z_com_ref: 0.62  # [m], CoM height
+
+##################################################################################################
 # DISTURBANCES
 ##################################################################################################
 
@@ -255,7 +271,7 @@ obstacle_field:
 
 # A floating obstacle that we need to duck under
 overhang:
-    enabled: True
+    enabled: False
 
     # Obstacle parameters
     dimensions: [0.5, 2.0, 0.3]  # length, width, height

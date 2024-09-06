@@ -370,11 +370,17 @@ class AchillesMPC(ModelPredictiveController):
         self.t_current = context.get_time()
 
         # unpack the joystick commands
-        joy_command = self.joystick_port.Eval(context)
-        vx_des = joy_command[1] * self.vx_max  
-        vy_des = joy_command[0] * self.vy_max
-        wz_des = joy_command[2] * self.w_max
-        z_com_des = joy_command[4] * (self.z_com_lower - self.z_com_upper) + self.z_com_upper
+        if config['references']['enabled']==True:
+            vx_des = config['references']['vx_ref']
+            vy_des = config['references']['vy_ref']
+            wz_des = config['references']['wz_ref'] * (np.pi / 180)
+            z_com_des = config['references']['z_com_ref']
+        else:
+            joy_command = self.joystick_port.Eval(context)
+            vx_des = joy_command[1] * self.vx_max  
+            vy_des = joy_command[0] * self.vy_max
+            wz_des = joy_command[2] * self.w_max
+            z_com_des = joy_command[4] * (self.z_com_lower - self.z_com_upper) + self.z_com_upper
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
         v_base = np.array([[v0[3]], [v0[4]], [v0[5]]]) # in world frame
 
@@ -629,11 +635,17 @@ class HLIP(LeafSystem):
         # Get the current time
         self.t_current = context.get_time()
 
+        # get the desired velocity
+        if config['references']['enabled']==True:
+            vx_des = config['references']['vx_ref']
+            vy_des = config['references']['vy_ref']
+            z_com_des = config['references']['z_com_ref']
         # unpack the joystick commands
-        joy_command = self.joystick_port.Eval(context)
-        vx_des = joy_command[1] * self.vx_max  
-        vy_des = joy_command[0] * self.vy_max
-        z_com_des = joy_command[4] * (self.z_com_lower - self.z_com_upper) + self.z_com_upper
+        else:
+            joy_command = self.joystick_port.Eval(context)
+            vx_des = joy_command[1] * self.vx_max  
+            vy_des = joy_command[0] * self.vy_max
+            z_com_des = joy_command[4] * (self.z_com_lower - self.z_com_upper) + self.z_com_upper
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
 
         # get a new reference trajectory
