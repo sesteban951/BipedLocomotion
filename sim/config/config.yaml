@@ -92,9 +92,9 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 10.0       # [sec], simulation duration
-    real_time_rate: 1.0  # real-time rate of the simulation
-    time_step: 0.001     # [sec], simulation time step
+    duration: 20.0       # [sec], simulation duration
+    real_time_rate: 0  # real-time rate of the simulation
+    time_step: 0.005     # [sec], simulation time step
 
     # NOTE: 75 controlls the dt of the MPC
 
