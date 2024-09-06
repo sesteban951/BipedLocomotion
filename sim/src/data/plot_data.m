@@ -17,13 +17,18 @@ config = yaml.loadFile(yaml_file);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% choose what to plot
+% state and input plots
 plot_state = 0;
 plot_torque = 0;
+
+% joystick commands plot
 plot_joy = 0;
+
+% demo plots
 plot_phase = 0;
 save_phase_movie = 0;
 plot_cot = 0;
+plot_ref_tracking = 0;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -311,55 +316,89 @@ end
 
 % plot the cost of transport
 % COT = (tau(t) * omega(t)) / (m * g * v(t))
+if plot_cot == 1
 
-% compute the mechanical joint power
-[r, ~] = size(tau_data);
-P = zeros(r, 1);
-for t = 1:r
-    % take the dot product of each row of tau with the corresponding row of v
-    tau_t = tau_data(t,:);
-    v_joint_data_t = v_joint_data(t,:);
-    P(t) = tau_t * v_joint_data_t';
-end
-
-% plot the mechanical power
-figure('Name', 'State Data');
-tabgp = uitabgroup;
-tab = uitab(tabgp, 'Title', 'Mechanical Power');
-axes('Parent', tab);
-plot(t_data, P, 'k', 'LineWidth', 1.5);
-xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
-ylabel('Power [W]', 'FontSize', 16, 'Interpreter', 'latex');
-
-% Compute the accumulated energy over time using trapz in a loop
-E = zeros(r, 1);
-for t = 2:r
-    E(t) = trapz(t_data(1:t), P(1:t));
-end
-
-% plot the accumulated energy
-tab = uitab(tabgp, 'Title', 'Accumulated Energy');
-axes('Parent', tab);
-plot(t_data, E, 'g', 'LineWidth', 1.5);
-xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
-ylabel('Energy [J]', 'FontSize', 16, 'Interpreter', 'latex');
-
-% compute the COT
-m = 22.5; % [kg]
-g = 9.81; % [m/s^2]
-COT = zeros(r, 1);
-for t = 1:r
-    if abs(v_joint_data(t,1)) < 1e-6
-        COT(t) = 0;
-    else
-        COT(t) = P(t) / (m * g * v_base_data(t,1));
+    % compute the mechanical joint power
+    [r, ~] = size(tau_data);
+    P = zeros(r, 1);
+    for t = 1:r
+        % take the dot product of each row of tau with the corresponding row of v
+        tau_t = tau_data(t,:);
+        v_joint_data_t = v_joint_data(t,:);
+        P(t) = tau_t * v_joint_data_t';
     end
+
+    % plot the mechanical power
+    figure('Name', 'State Data');
+    tabgp = uitabgroup;
+    tab = uitab(tabgp, 'Title', 'Mechanical Power');
+    axes('Parent', tab);
+    plot(t_data, P, 'k', 'LineWidth', 1.5);
+    xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+    ylabel('Power [W]', 'FontSize', 16, 'Interpreter', 'latex');
+
+    % Compute the accumulated energy over time using trapz in a loop
+    E = zeros(r, 1);
+    for t = 2:r
+        E(t) = trapz(t_data(1:t), P(1:t));
+    end
+
+    % plot the accumulated energy
+    tab = uitab(tabgp, 'Title', 'Accumulated Energy');
+    axes('Parent', tab);
+    plot(t_data, E, 'g', 'LineWidth', 1.5);
+    xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+    ylabel('Energy [J]', 'FontSize', 16, 'Interpreter', 'latex');
+
+    % compute the COT
+    m = 22.5; % [kg]
+    g = 9.81; % [m/s^2]
+    COT = zeros(r, 1);
+    for t = 1:r
+        if abs(v_joint_data(t,1)) < 1e-6
+            COT(t) = 0;
+        else
+            COT(t) = P(t) / (m * g * v_base_data(t,1));
+        end
+    end
+
+    % plot the COT
+    tab = uitab(tabgp, 'Title', 'Cost of Transport');
+    axes('Parent', tab);
+    plot(t_data, COT, 'm', 'LineWidth', 1.5);
+    xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+    ylabel('Cost of Transport [1]', 'FontSize', 16, 'Interpreter', 'latex');
+
 end
 
-% plot the COT
-tab = uitab(tabgp, 'Title', 'Cost of Transport');
-axes('Parent', tab);
-plot(t_data, COT, 'm', 'LineWidth', 1.5);
-xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
-ylabel('Cost of Transport [1]', 'FontSize', 16, 'Interpreter', 'latex');
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% unpack the reference commands
+vx_ref = config.references.vx_ref;
+vy_ref = config.references.vy_ref;
+wz_ref = config.references.wz_ref;
+z_com_ref = config.references.z_com_ref;
+
+% plot the reference tracking
+figure('Name', 'Reference Tracking');
+tabgp = uitabgroup;
+
+% plot the velocity
+tab = uitab(tabgp, 'Title', 'X Velocity');
+axes('Parent', tab);
+hold on; grid on;
+plot(t_data, vx_ref * ones(length(t_data),1), '--k', 'LineWidth', 1.5);
+plot(t_data, v_base_data(:,1), 'b', 'LineWidth', 1.5);
+
+tab = uitab(tabgp, 'Title', 'Y Velocity');
+axes('Parent', tab);
+hold on; grid on;
+plot(t_data, vy_ref * ones(length(t_data),1), '--k', 'LineWidth', 1.5);
+plot(t_data, v_base_data(:,2), 'b', 'LineWidth', 1.5);
+
+% plot both x and y velocities
+tab = uitab(tabgp, 'Title', 'X and Y Velocities');
+axes('Parent', tab);
+hold on; grid on;
+plot(v_base_data(:,1), v_base_data(:,2), 'b', 'LineWidth', 1.5);
+plot(vx_ref, vy_ref, 'r+', 'MarkerSize', 10, 'MarkerFaceColor', 'r', 'LineWidth', 2);
