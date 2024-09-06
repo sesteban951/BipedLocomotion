@@ -57,7 +57,8 @@ with open(config_path, 'r') as file:
     config = yaml.safe_load(file)
 
 # Fix the random seed for reproducibility        
-np.random.seed(0)
+if config['seed']['fixed']:
+    np.random.seed(config['seed']['value'])
 
 #--------------------------------------------------------------------------------------------------------------------------#
 
@@ -801,9 +802,9 @@ if __name__=="__main__":
     
     # distubance generator
     disturbance_tau = np.zeros(plant.num_velocities())
-    disturbance_tau[3] = config['disturbance']['fx']  # base x
-    disturbance_tau[4] = config['disturbance']['fy']  # base y
-    disturbance_tau[5] = config['disturbance']['fz']  # base z
+    disturbance_tau[3:6] = np.random.multivariate_normal(
+        config['disturbance']['mu'], 
+        np.diag(config['disturbance']['sigma'])**2)
     time_applied = config['disturbance']['time_applied']
     duration = config['disturbance']['duration']
     dist_gen = builder.AddSystem(DisturbanceGenerator(plant, 
