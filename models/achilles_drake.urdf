@@ -675,7 +675,7 @@
     </inertial>
   </link>
   <joint name="static_com_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="-0.0019 0 -0.286"/> 
+    <origin rpy="0 0 0" xyz="-0.001 0 -0.28"/> 
     <parent link="torso"/>
     <child link="static_com"/>
   </joint>

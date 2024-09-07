@@ -75,7 +75,7 @@ HLIP:
     T_SSP: 0.35   # [sec], single support phase duration
 
     # CoM height range
-    z_com_upper: 0.65 # [m], upper bound for the CoM height
+    z_com_upper: 0.63 # [m], upper bound for the CoM height
     z_com_lower: 0.35 # [m], lower bound for the CoM height
 
     # foor parameters
@@ -100,7 +100,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 3.0       # [sec], simulation duration
+    duration: 30.0       # [sec], simulation duration
     real_time_rate: 1.0  # real-time rate of the simulation
     time_step: 0.005     # [sec], simulation time step
 
@@ -132,7 +132,7 @@ disturbance:
     sigma: [100.0, 100.0, 100.0]  # [N], standard deviation of the disturbance
 
     # time parameters
-    time_applied: 1.0  # [sec], time when the disturbance is applied
+    time_applied: 100.0  # [sec], time when the disturbance is applied
     duration: 0.1      # [sec], duration of the disturbance
 
 ##################################################################################################
@@ -168,12 +168,12 @@ blending:
 ##################################################################################################
 
 # parallel legs, slighlty bent
-q0: [1.0000, 0.0000, 0.0000, 0.0000,            # base orientation, (w, x, y, z)
-     0.0000, 0.0000, 0.9500,                    # base position, (x,y,z)
-     0.0000, 0.0209, -0.5515, 1.0239,-0.4725,   # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-     0.0900, 0.000, 0.0000, -0.0000,            # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
-     0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-     0.0900, 0.000, 0.0000, -0.0000]            # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
+q0:  [1.0000, -0.0000, -0.0031, -0.0000,          # base orientation, (w, x, y, z)
+     -0.0000, 0.0000, 0.9501,                    # base position, (x, y, z)
+      0.0000, -0.0002, -0.4752, 1.0012, -0.5245,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle)
+      0.0001, 0.0000, 0.0000, 0.0000,             # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
+     -0.0000, 0.0002, -0.4752, 1.0012, -0.5245,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle)
+      0.0001, 0.0000, 0.0000, 0.0000]             # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
 
 v0: [0.0000, 0.0000, 0.0000,            
      0.0000, 0.0000, 0.0000,                   
