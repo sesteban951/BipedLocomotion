@@ -886,6 +886,12 @@ if __name__=="__main__":
     vis_config.publish_contacts = False
     ApplyVisualizationConfig(config=vis_config, builder=builder, meshcat=meshcat)
 
+    # Set the meshcat position and target
+    meshcat.SetCameraPose(
+        config['camera']['position'],
+        config['camera']['target']
+    )
+
     # Build the system diagram
     diagram = builder.Build()
     diagram_context = diagram.CreateDefaultContext()
@@ -918,6 +924,13 @@ if __name__=="__main__":
            f"wall time: {wall_time:.4f}")
     meshcat.StopRecording()
     meshcat.PublishRecording()
+
+    # Save the meshcat recording to an HTML file so anyone can play it back
+    # in their browser, even without meshcat running
+    if config['save_html']['enabled']:
+        html = meshcat.StaticHtml()
+        with open("data/" + config['save_html']['filename'], "w") as f:
+            f.write(html)
 
     if config['logging']==True:
         # unpack recorded data from the logger
