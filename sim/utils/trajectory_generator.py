@@ -663,8 +663,8 @@ def rotation_matrix_from_points(p1, p2):
 if __name__ == "__main__":
 
     # model file
-    model_file = "../../models/achilles_drake_no_arms.urdf"
-    # model_file = "../../models/achilles_drake.urdf"
+    #model_file = "../../models/achilles_drake_no_arms.urdf"
+    model_file = "../../models/achilles_drake.urdf"
 
     # create a plant model for testing
     plant = MultibodyPlant(0)
@@ -689,20 +689,20 @@ if __name__ == "__main__":
     quat = orient.ToQuaternion()
 
     # initial condition 
+    #q0 = np.array([
+    #    quat.w(), quat.x(), quat.y(), quat.z(),            # base orientation, (w, x, y, z)
+    #    0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
+    #    0.0000,  0.0200, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+    #    0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+    #])
     q0 = np.array([
-        quat.w(), quat.x(), quat.y(), quat.z(),            # base orientation, (w, x, y, z)
-        0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
-        0.0000,  0.0200, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-        0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-    ])
-    # q0 = np.array([
-    #     quat.w(), quat.x(), quat.y(), quat.z(),            # base orientation, (w, x, y, z)
-    #     0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
-    #     0.0000,  0.0200, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-    #     0.0000, 0.0000, 0.0000, 0.0000,            # left arm
-    #     0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-    #     0.0000, 0.0000, 0.0000, 0.0000             # right arm
-    # ])
+         quat.w(), quat.x(), quat.y(), quat.z(),            # base orientation, (w, x, y, z)
+         0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
+         0.0000,  0.0200, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+         0.0000, 0.0000, 0.0000, 0.0000,            # left arm
+         0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
+         0.0000, 0.0000, 0.0000, 0.0000             # right arm
+     ])
     v0 = np.zeros(plant.num_velocities())
     plant.SetPositions(plant_context, q0)
     plant.SetVelocities(plant_context, v0)
@@ -735,27 +735,26 @@ if __name__ == "__main__":
                                                                    stance_foot_yaw=yaw,
                                                                    initial_stance_foot_name="right_foot")
 
-    # for i in range(len(q_HLIP)):
-    #     q = q_HLIP[i]
-    #     quat = q[:4]
-    #     pos = q[4:7]
-    #     left_leg = q[7:12]
-    #     right_leg = q[12:17]
+    for i in range(len(q_HLIP)):
+        q = q_HLIP[i]
+        quat = q[:4]
+        pos = q[4:7]
+        left_leg = q[7:12]
+        right_leg = q[12:17]
 
-    #     #  add zero for arm indeces
-    #     q = np.concatenate((quat, pos, left_leg, np.zeros(4), right_leg, np.zeros(4)))
-    #     q_HLIP[i] = q
+        #  add zero for arm indeces
+        q = np.concatenate((quat, pos, left_leg, np.zeros(4), right_leg, np.zeros(4)))
+        q_HLIP[i] = q
 
-    #     # same for the velocity
-    #     v = v_HLIP[i]
-    #     omega = v[:3]
-    #     vel = v[3:6]
-    #     left_leg_vel = v[6:11]
-    #     right_leg_vel = v[11:16]
-
-    #     # add zero for arm velocities
-    #     v = np.concatenate((omega, vel, left_leg_vel, np.zeros(4), right_leg_vel, np.zeros(4)))
-    #     v_HLIP[i] = v
+        # same for the velocity
+        v = v_HLIP[i]
+        omega = v[:3]
+        vel = v[3:6]
+        left_leg_vel = v[6:11]
+        right_leg_vel = v[11:16]
+        # add zero for arm velocities
+        v = np.concatenate((omega, vel, left_leg_vel, np.zeros(4), right_leg_vel, np.zeros(4)))
+        v_HLIP[i] = v
 
     # start meshcat
     meshcat = StartMeshcat()
