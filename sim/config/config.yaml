@@ -295,3 +295,10 @@ camera:
 
     # Where the meshcat camera is looking
     target: [1.0, 0.0, 0.5]
+
+save_html:
+    # Save the meshcat recording to an html file. This can be used to produce a
+    # video later, or even shared directly with someone to play in their 
+    # browser (even if they don't have Drake or meshcat installed).
+    enabled: True
+    filename: 'recording.html'

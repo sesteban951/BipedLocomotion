@@ -11,6 +11,7 @@ import time
 import numpy as np
 import csv
 import yaml
+import pickle
 
 # import the pydrake modules
 from pydrake.all import (
@@ -924,6 +925,13 @@ if __name__=="__main__":
            f"wall time: {wall_time:.4f}")
     meshcat.StopRecording()
     meshcat.PublishRecording()
+
+    # Save the meshcat recording to an HTML file so anyone can play it back
+    # in their browser, even without meshcat running
+    if config['save_html']['enabled']:
+        html = meshcat.StaticHtml()
+        with open("data/" + config['save_html']['filename'], "w") as f:
+            f.write(html)
 
     if config['logging']==True:
         # unpack recorded data from the logger
