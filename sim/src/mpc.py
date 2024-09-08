@@ -11,7 +11,6 @@ import time
 import numpy as np
 import csv
 import yaml
-import pickle
 
 # import the pydrake modules
 from pydrake.all import (
