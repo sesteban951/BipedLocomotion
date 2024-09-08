@@ -886,6 +886,12 @@ if __name__=="__main__":
     vis_config.publish_contacts = False
     ApplyVisualizationConfig(config=vis_config, builder=builder, meshcat=meshcat)
 
+    # Set the meshcat position and target
+    meshcat.SetCameraPose(
+        config['camera']['position'],
+        config['camera']['target']
+    )
+
     # Build the system diagram
     diagram = builder.Build()
     diagram_context = diagram.CreateDefaultContext()
