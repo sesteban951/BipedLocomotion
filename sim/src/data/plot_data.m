@@ -19,10 +19,10 @@ config = yaml.loadFile(yaml_file);
 
 % plot only a desired segments of the data
 t_data = time_data;
-% t0 = t_data(1);
-% tf = t_data(end);
-t0 = 5;
-tf = 10;
+t0 = t_data(1);
+tf = t_data(end);
+% t0 = 5;
+% tf = 10;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -31,11 +31,12 @@ plot_state = 0;
 plot_torque = 0;
 
 % joystick commands plot
-plot_joy = 1;
+plot_joy = 0;
 
 % demo plots
 plot_phase = 0;
-save_phase_movie = 0;
+plot_phase_movie = 1;
+save_phase_movie = 1;
 plot_cot = 0;
 plot_ref_tracking = 0;
 
@@ -213,10 +214,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % plot individual phase plots
-if plot_phase == 1
+if plot_phase_movie == 1
     
     figure('Name', 'Phase Plot', 'Position', [100, 100, 560, 420]);
-    joint_idx = 12;  % Left Hip Yaw (8), Left Hip Roll (9), Left Hip Pitch (10), Left Knee Pitch (11), Left ankle Pitch (12)
+    joint_idx = 11;  % Left Hip Yaw (8), Left Hip Roll (9), Left Hip Pitch (10), Left Knee Pitch (11), Left ankle Pitch (12)
                     % Left Shoulder Pitch (13), Left Shoulder Roll (14), Left Shoulder Yaw (15), Left Elbow Pitch (16)
                     % Right Hip Yaw (17), Right Hip Roll (18), Right Hip Pitch (19), Right Knee Pitch (20), Right ankle Pitch (21)
                     % Right Shoulder Pitch (22), Right Shoulder Roll (23), Right Shoulder Yaw (24), Right Elbow Pitch (25)
@@ -321,7 +322,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % plot the cost of transport
-% COT = (tau(t) * omega(t)) / (m * g * v(t))
+% COT = | (tau(t) * omega(t)) | / (m * g * v(t))
 if plot_cot == 1
 
     % compute the mechanical joint power
@@ -331,7 +332,7 @@ if plot_cot == 1
         % take the dot product of each row of tau with the corresponding row of v
         tau_t = tau_data(t,:);
         v_joint_data_t = v_joint_data(t,:);
-        P(t) = tau_t * v_joint_data_t';
+        P(t) = abs(tau_t * v_joint_data_t');
     end
 
     % plot the mechanical power
@@ -357,7 +358,7 @@ if plot_cot == 1
     ylabel('Energy [J]', 'FontSize', 16, 'Interpreter', 'latex');
 
     % compute the COT
-    m = 22.5; % [kg]
+    m = 24; % [kg]
     g = 9.81; % [m/s^2]
     COT = zeros(r, 1);
     for t = 1:r
@@ -380,31 +381,42 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % unpack the reference commands
-vx_ref = config.references.vx_ref;
-vy_ref = config.references.vy_ref;
-wz_ref = config.references.wz_ref;
-z_com_ref = config.references.z_com_ref;
+if plot_ref_tracking == 1
 
-% plot the reference tracking
-figure('Name', 'Reference Tracking');
-tabgp = uitabgroup;
+    % unpack the references
+    vx_ref = config.references.vx_ref;
+    vy_ref = config.references.vy_ref;
+    wz_ref = config.references.wz_ref;
+    z_com_ref = config.references.z_com_ref;
 
-% plot the velocity
-tab = uitab(tabgp, 'Title', 'X Velocity');
-axes('Parent', tab);
-hold on; grid on;
-plot(t_data, vx_ref * ones(length(t_data),1), '--k', 'LineWidth', 1.5);
-plot(t_data, v_base_data(:,1), 'b', 'LineWidth', 1.5);
+    % plot the reference tracking
+    figure('Name', 'Reference Tracking');
+    tabgp = uitabgroup;
 
-tab = uitab(tabgp, 'Title', 'Y Velocity');
-axes('Parent', tab);
-hold on; grid on;
-plot(t_data, vy_ref * ones(length(t_data),1), '--k', 'LineWidth', 1.5);
-plot(t_data, v_base_data(:,2), 'b', 'LineWidth', 1.5);
+    % plot the velocity
+    tab = uitab(tabgp, 'Title', 'X Velocity');
+    axes('Parent', tab);
+    hold on; grid on;
+    plot(t_data, vx_ref * ones(length(t_data),1), '--k', 'LineWidth', 1.5);
+    plot(t_data, v_base_data(:,1), 'b', 'LineWidth', 1.5);
+    xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+    ylabel('x-velocity [m/s]', 'FontSize', 16, 'Interpreter', 'latex');
 
-% plot both x and y velocities
-tab = uitab(tabgp, 'Title', 'X and Y Velocities');
-axes('Parent', tab);
-hold on; grid on;
-plot(v_base_data(:,1), v_base_data(:,2), 'b', 'LineWidth', 1.5);
-plot(vx_ref, vy_ref, 'r+', 'MarkerSize', 10, 'MarkerFaceColor', 'r', 'LineWidth', 2);
+    tab = uitab(tabgp, 'Title', 'Y Velocity');
+    axes('Parent', tab);
+    hold on; grid on;
+    plot(t_data, vy_ref * ones(length(t_data),1), '--k', 'LineWidth', 1.5);
+    plot(t_data, v_base_data(:,2), 'b', 'LineWidth', 1.5);
+    xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+    ylabel('y-velocity [m/s]', 'FontSize', 16, 'Interpreter', 'latex');
+
+    % plot both x and y velocities
+    tab = uitab(tabgp, 'Title', 'X and Y Velocities');
+    axes('Parent', tab);
+    hold on; grid on;
+    plot(v_base_data(:,1), v_base_data(:,2), 'b', 'LineWidth', 1.5);
+    plot(vx_ref, vy_ref, 'r+', 'MarkerSize', 10, 'MarkerFaceColor', 'r', 'LineWidth', 2);
+    xlabel('x-velocity [m/s]', 'FontSize', 14, 'Interpreter', 'latex');
+    ylabel('y-velocity [m/s]', 'FontSize', 14, 'Interpreter', 'latex');
+
+end
