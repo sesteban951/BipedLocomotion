@@ -21,8 +21,8 @@ config = yaml.loadFile(yaml_file);
 t_data = time_data;
 t0 = t_data(1);
 tf = t_data(end);
-% t0 = 5;
-% tf = 10;
+% t0 = 10;
+% tf = 15;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -34,9 +34,9 @@ plot_torque = 0;
 plot_joy = 0;
 
 % demo plots
-plot_phase = 0;
-plot_phase_movie = 1;
-save_phase_movie = 1;
+plot_phase = 1;
+plot_phase_movie = 0;
+save_phase_movie = 0;
 plot_cot = 0;
 plot_ref_tracking = 0;
 
@@ -68,26 +68,26 @@ q_joint_data = q_data(:,8:end);
 v_base_data = v_data(:,1:6);
 v_joint_data = v_data(:,7:end);
 
+% plot y labels
+q_base_labels = ["q_{w}", "q_{x}", "q_{y}", "q_{z}", ...
+                "p_x", "p_y", "p_z"];
+q_joint_labels = ["q_{LHY}", "q_{LHR}", "q_{LHP}", "q_{LKP}", "q_{LAP}", ...
+                "q_{LSP}", "q_{LSR}", "q_{LSY}", "q_{LEP}", ...
+                "q_{RHY}", "q_{RHR}", "q_{RHP}", "q_{RKP}", "q_{RAP}",...
+                "q_{RSP}", "q_{RSR}", "q_{RSY}", "q_{REP}"]; 
+v_base_labels = ["\omega_x", "\omega_y", "\omega_y",...
+                "v_x", "v_y", "v_z"];
+v_joint_labels = ["\dot{q}_{LHY}", "\dot{q}_{LHR}", "\dot{q}_{LHP}", "\dot{q}_{LKP}", "\dot{q}_{LAP}", ...
+                "\dot{q}_{LSP}", "\dot{q}_{LSR}", "\dot{q}_{LSY}", "\dot{q}_{LEP}", ...
+                "\dot{q}_{RHY}", "\dot{q}_{RHR}", "\dot{q}_{RHP}", "\dot{q}_{RKP}", "\dot{q}_{RAP}",...
+                "\dot{q}_{RSP}", "\dot{q}_{RSR}", "\dot{q}_{RSY}", "\dot{q}_{REP}"];
+q_base_labels = strcat("$", q_base_labels, "$");
+q_joint_labels = strcat("$", q_joint_labels, "$");
+v_base_labels = strcat("$", v_base_labels, "$");
+v_joint_labels = strcat("$", v_joint_labels, "$");
+
 % plot the states
 if plot_state == 1
-
-    % plot y labels
-    q_base_labels = ["q_{w}", "q_{x}", "q_{y}", "q_{z}", ...
-                    "p_x", "p_y", "p_z"];
-    q_joint_labels = ["q_{LHY}", "q_{LHR}", "q_{LHP}", "q_{LKP}", "q_{LAP}", ...
-                    "q_{LSP}", "q_{LSR}", "q_{LSY}", "q_{LEP}", ...
-                    "q_{RHY}", "q_{RHR}", "q_{RHP}", "q_{RKP}", "q_{RAP}",...
-                    "q_{RSP}", "q_{RSR}", "q_{RSY}", "q_{REP}"]; 
-    v_base_labels = ["\omega_x", "\omega_y", "\omega_y",...
-                    "v_x", "v_y", "v_z"];
-    v_joint_labels = ["\dot{q}_{LHY}", "\dot{q}_{LHR}", "\dot{q}_{LHP}", "\dot{q}_{LKP}", "\dot{q}_{LAP}", ...
-                    "\dot{q}_{LSP}", "\dot{q}_{LSR}", "\dot{q}_{LSY}", "\dot{q}_{LEP}", ...
-                    "\dot{q}_{RHY}", "\dot{q}_{RHR}", "\dot{q}_{RHP}", "\dot{q}_{RKP}", "\dot{q}_{RAP}",...
-                    "\dot{q}_{RSP}", "\dot{q}_{RSR}", "\dot{q}_{RSY}", "\dot{q}_{REP}"];
-    q_base_labels = strcat("$", q_base_labels, "$");
-    q_joint_labels = strcat("$", q_joint_labels, "$");
-    v_base_labels = strcat("$", v_base_labels, "$");
-    v_joint_labels = strcat("$", v_joint_labels, "$");
 
     figure('Name', 'State Data');
     tabgp = uitabgroup;
@@ -135,6 +135,7 @@ if plot_state == 1
         ylabel(v_joint_labels(i), 'FontSize', 16, 'Interpreter', 'latex');
         grid on;
     end
+
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -213,6 +214,52 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% plot all phase plots
+if plot_phase == 1
+
+    figure('Name', 'Phase Plot');
+    tabgp = uitabgroup;
+
+    q_leg_data = q_joint_data(:,[1,2,3,4,5,10,11,12,13,14]);
+    v_leg_data = v_joint_data(:,[1,2,3,4,5,10,11,12,13,14]);
+    q_arm_data = q_joint_data(:,[6,7,8,9,15,16,17,18]);
+    v_arm_data = v_joint_data(:,[6,7,8,9,15,16,17,18]);
+
+    q_leg_labels = q_joint_labels([1,2,3,4,5,10,11,12,13,14]);
+    q_leg_labels = strcat("$", q_leg_labels, "$");
+    v_leg_labels = v_joint_labels([1,2,3,4,5,10,11,12,13,14]);
+    v_leg_labels = strcat("$", v_leg_labels, "$");
+    q_arm_labels = q_joint_labels([6,7,8,9,15,16,17,18]);   
+    q_arm_labels = strcat("$", q_arm_labels, "$");
+    v_arm_labels = v_joint_labels([6,7,8,9,15,16,17,18]);
+    v_arm_labels = strcat("$", v_arm_labels, "$");
+
+    % plot the leg phase plots
+    tab = uitab(tabgp, 'Title', 'Leg Torques');
+    axes('Parent', tab);
+    for i = 1:size(q_leg_data,2)
+        subplot(2,5,i)
+        plot(q_leg_data(:,i), v_leg_data(:,i), 'b', 'LineWidth', 1.5);
+        xlabel(q_leg_labels(i), 'FontSize', 16, 'Interpreter', 'latex');
+        ylabel(v_leg_labels(i), 'FontSize', 16, 'Interpreter', 'latex');
+        grid on;
+    end
+
+    % plot the arm phase plots
+    tab = uitab(tabgp, 'Title', 'Arm Torques');
+    axes('Parent', tab);
+    for i = 1:size(q_arm_data,2)
+        subplot(2,4,i)
+        plot(q_arm_data(:,i), v_arm_data(:,i), 'b', 'LineWidth', 1.5);
+        xlabel(q_arm_labels(i), 'FontSize', 16, 'Interpreter', 'latex');
+        ylabel(v_arm_labels(i), 'FontSize', 16, 'Interpreter', 'latex');
+        grid on;
+    end
+
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % plot individual phase plots
 if plot_phase_movie == 1
     
@@ -250,12 +297,13 @@ if plot_phase_movie == 1
     end
 
     % animate the data
-    tic
+    tic = t_data(1);
     t_end = t_data(end);
     idx = 2;
 
     % num_points_to_keep = length(t_data);
-    num_points_to_keep = 50;
+    hold_sec = 0.5;
+    num_points_to_keep = round(hz_des * hold_sec);
     line_objects = []; % Initialize an empty list to store line objects
 
     while idx <= length(t_data)
@@ -322,7 +370,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % plot the cost of transport
-% COT = | (tau(t) * omega(t)) | / (m * g * v(t))
+% COT = (tau(t) * omega(t)) / (m * g * v(t))
 if plot_cot == 1
 
     % compute the mechanical joint power
@@ -332,7 +380,7 @@ if plot_cot == 1
         % take the dot product of each row of tau with the corresponding row of v
         tau_t = tau_data(t,:);
         v_joint_data_t = v_joint_data(t,:);
-        P(t) = abs(tau_t * v_joint_data_t');
+        P(t) = tau_t * v_joint_data_t';
     end
 
     % plot the mechanical power
@@ -358,7 +406,7 @@ if plot_cot == 1
     ylabel('Energy [J]', 'FontSize', 16, 'Interpreter', 'latex');
 
     % compute the COT
-    m = 24; % [kg]
+    m = 22.5; % [kg]
     g = 9.81; % [m/s^2]
     COT = zeros(r, 1);
     for t = 1:r
@@ -380,10 +428,9 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% unpack the reference commands
 if plot_ref_tracking == 1
 
-    % unpack the references
+    % unpack the reference commands
     vx_ref = config.references.vx_ref;
     vy_ref = config.references.vy_ref;
     wz_ref = config.references.wz_ref;
@@ -399,16 +446,12 @@ if plot_ref_tracking == 1
     hold on; grid on;
     plot(t_data, vx_ref * ones(length(t_data),1), '--k', 'LineWidth', 1.5);
     plot(t_data, v_base_data(:,1), 'b', 'LineWidth', 1.5);
-    xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
-    ylabel('x-velocity [m/s]', 'FontSize', 16, 'Interpreter', 'latex');
 
     tab = uitab(tabgp, 'Title', 'Y Velocity');
     axes('Parent', tab);
     hold on; grid on;
     plot(t_data, vy_ref * ones(length(t_data),1), '--k', 'LineWidth', 1.5);
     plot(t_data, v_base_data(:,2), 'b', 'LineWidth', 1.5);
-    xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
-    ylabel('y-velocity [m/s]', 'FontSize', 16, 'Interpreter', 'latex');
 
     % plot both x and y velocities
     tab = uitab(tabgp, 'Title', 'X and Y Velocities');
@@ -416,7 +459,5 @@ if plot_ref_tracking == 1
     hold on; grid on;
     plot(v_base_data(:,1), v_base_data(:,2), 'b', 'LineWidth', 1.5);
     plot(vx_ref, vy_ref, 'r+', 'MarkerSize', 10, 'MarkerFaceColor', 'r', 'LineWidth', 2);
-    xlabel('x-velocity [m/s]', 'FontSize', 14, 'Interpreter', 'latex');
-    ylabel('y-velocity [m/s]', 'FontSize', 14, 'Interpreter', 'latex');
 
 end
