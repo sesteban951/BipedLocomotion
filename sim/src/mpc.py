@@ -181,19 +181,26 @@ class AchillesMPC(ModelPredictiveController):
         bezier_order = config['HLIP']['bezier_order']     # 5 or 7
         hip_bias = config['HLIP']['hip_bias']             # bias between the foot-to-foot distance in y-direction
 
-        # maximum velocity for the robot
-        self.vx_max = config['HLIP']['vx_max']  # [m/s]
-        self.vy_max = config['HLIP']['vy_max']  # [m/s]
-        w_max = config['HLIP']['wz_max']        # [deg/s]
-        self.w_max = w_max * (np.pi / 180)      # [rad/s]
-        P_half = np.diag([1/self.vx_max, 1/self.vy_max, 1/self.w_max]) 
+        # maximum command velocity for the robot
+        self.vx_max = config['HLIP']['vx_max']                 # [m/s]
+        self.vy_max = config['HLIP']['vy_max']                 # [m/s]
+        self.wz_max = config['HLIP']['wz_max'] * (np.pi / 180) # [rad/s]
+
+        # maximum base velocity for activation
+        vx_base_thresh = config['HLIP']['vx_base_threshold']                 # [m/s]
+        vy_base_thresh = config['HLIP']['vy_base_threshold']                 # [m/s]
+        wz_base_thresh = config['HLIP']['wz_base_threshold'] * (np.pi / 180) # [rad/s]
+
+        # matrix for the weighted norm
+        P_half = np.diag([1/self.vx_max, 1/self.vy_max, 1/self.wz_max, 
+                          1/vx_base_thresh, 1/vy_base_thresh, 1/wz_base_thresh]) 
         self.P = P_half.T @ P_half
 
         # avtication function for blending
         a = config['blending']['a']  
         p = config['blending']['p']  
         tanh = lambda x: (np.exp(2*x) -1 ) / (np.exp(2*x) + 1)
-        self.alpha = lambda v_des: 0.5 * tanh(a * (v_des - p)) + 0.5  
+        self.alpha = lambda v_norm: 0.5 * tanh(a * (v_norm - p)) + 0.5  
 
         # foot info variables
         self.left_foot_frame = self.plant.GetFrameByName("left_foot")
@@ -381,10 +388,9 @@ class AchillesMPC(ModelPredictiveController):
             joy_command = self.joystick_port.Eval(context)
             vx_des = joy_command[1] * self.vx_max  
             vy_des = joy_command[0] * self.vy_max
-            wz_des = joy_command[2] * self.w_max
+            wz_des = joy_command[2] * self.wz_max
             z_com_des = joy_command[4] * (self.z_com_lower - self.z_com_upper) + self.z_com_upper
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
-        v_base = np.array([[v0[3]], [v0[4]], [v0[5]]]) # in world frame
 
         # Get the desired MPC standing trajectory
         q_stand = [np.copy(self.q_stand) for i in range(self.optimizer.num_steps() + 1)]
@@ -441,11 +447,9 @@ class AchillesMPC(ModelPredictiveController):
             self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
 
         # compute alpha 
-        v_command = np.array([[vx_des], [vy_des], [wz_des]])
-        v_command_norm = (v_command.T @ self.P @ v_command)[0][0] # NOTE: this is 1 if any of the axis sees its respective max velocity, otherwise can exceed 1.0 easily
-        v_base_norm = np.linalg.norm(v_base)
-        v = np.max([v_base_norm, v_command_norm])
-        a = self.alpha(v)                                         # NOTE: activation function should be bounded [0,1]
+        vel = np.array([[vx_des], [vy_des], [wz_des], [v0[3]], [v0[4]], [v0[2]]])
+        v_norm = (vel.T @ self.P @ vel)[0][0]     # NOTE: this is 1 if any of the axis sees its respective max velocity, otherwise can exceed 1.0 easily
+        a = self.alpha(v_norm)                    # NOTE: activation function is bounded to [0,1]
 
         # convex combination of the standing position and the nominal trajectory
         q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
