@@ -16,11 +16,11 @@
 ##
 
 
-num_trials=10
+num_trials=500
 num_falls=0
 
 # Set up a file to save the results
-save_file="data/data_random_disturbance.csv"
+save_file="data/data_random_disturbance_mpc.csv"
 echo "fx, fy, fz, fell" > $save_file
 
 # Run the experiment
