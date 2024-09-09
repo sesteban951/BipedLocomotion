@@ -807,16 +807,18 @@ if __name__=="__main__":
     
     # distubance generator
     disturbance_tau = np.zeros(plant.num_velocities())
-    d = np.random.multivariate_normal(
-        config['disturbance']['mu'], 
-        np.diag(config['disturbance']['sigma'])**2)
-    disturbance_tau[3:6] = d
+
+    if config['disturbance']['enabled']:
+        r = config['disturbance']['force_radius'] * np.sqrt(np.random.rand())
+        theta = 2 * np.pi * np.random.rand()
+        d = np.array([r * np.cos(theta), r * np.sin(theta), 0.0])
+        print("Disturbance vector: ", d)
+        disturbance_tau[3:6] = d
     time_applied = config['disturbance']['time_applied']
     duration = config['disturbance']['duration']
     dist_gen = builder.AddSystem(DisturbanceGenerator(plant, 
                                                       meshcat, 
                                                       disturbance_tau, time_applied, duration))
-    print("Disturbance vector: ", d)
 
     # Wire the systems together
     if config['controller']=='MPC':

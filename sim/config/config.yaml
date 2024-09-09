@@ -105,7 +105,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 20.0       # [sec], simulation duration
+    duration: 3.0       # [sec], simulation duration
     real_time_rate: 1.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -131,13 +131,14 @@ references:
 
 # single disturbance on the base frame
 disturbance:
-    # force to be applied on the base frame is drawn from a normal distribution
-    # f ~ N(mu, diag(sigma^2))
-    mu: [0.0, 0.0, 0.0]  # [N], mean of the disturbance
-    sigma: [100.0, 100.0, 100.0]  # [N], standard deviation of the disturbance
+    enabled: True
+
+    # force to be applied on the base frame is drawn uniformly from a circle
+    # in the xy direction with this radius
+    force_radius: 150.0  # [N]
 
     # time parameters
-    time_applied: 100.0  # [sec], time when the disturbance is applied
+    time_applied: 1.0  # [sec], time when the disturbance is applied
     duration: 0.1      # [sec], duration of the disturbance
 
 ##################################################################################################
