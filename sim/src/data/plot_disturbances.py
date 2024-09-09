@@ -26,12 +26,14 @@ def make_scatter_plot(fname):
     plt.ylim(-200, 200)
     plt.gca().set_aspect('equal', adjustable='box')
 
+plt.figure(figsize=(8, 4))
 plt.subplot(1,2,1)
-plt.title("HLIP")
+plt.title("HLIP only")
 make_scatter_plot("data_random_disturbance_hlip.csv")
+plt.legend(loc='upper left')
 
 plt.subplot(1,2,2)
-plt.title("Proposed")
+plt.title("HLIP + CI-MPC (proposed)")
 make_scatter_plot("data_random_disturbance_mpc.csv")
-plt.legend()
+plt.tight_layout()
 plt.show()
