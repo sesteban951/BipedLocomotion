@@ -88,10 +88,15 @@ HLIP:
     ux_max: 0.6  # [m], max forward step length
     uy_max: 0.4  # [m], max lateral step length
 
-    # command parameters
+    # maximum magnitude command parameters
     vx_max: 0.5          # [m/s], max forward velocity
     vy_max: 0.3          # [m/s], max lateral velocity
     wz_max: 35           # [deg/s], max yaw rate
+
+    # threshold fro base velocity
+    vx_base_threshold: 0.5  # [m/s], threshold for forward velocity
+    vy_base_threshold: 0.5  # [m/s], threshold for lateral velocity
+    wz_base_threshold: 20   # [deg/s], threshold for yaw rate
 
 ##################################################################################################
 # SIMULATION PARAMETERS
@@ -102,7 +107,7 @@ sim:
 
     duration: 20.0       # [sec], simulation duration
     real_time_rate: 1.0  # real-time rate of the simulation
-    time_step: 0.005     # [sec], simulation time step
+    time_step: 0.002     # [sec], simulation time step
 
 ##################################################################################################
 # REFERENCES
