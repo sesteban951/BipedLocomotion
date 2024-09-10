@@ -245,7 +245,7 @@ class AchillesMPC(ModelPredictiveController):
                               6, 7, 8, 9, 10,     # left leg
                               15, 16, 17, 18, 19] # right leg
 
-        if config['HLIP_vis']==True:
+        if (config['HLIP_vis']==True and config['controller']=='MH'):
             # create someobjects for the meshcat plot
             red_color = Rgba(1, 0, 0, 1)
             green_color = Rgba(0, 1, 0, 1)
@@ -414,50 +414,56 @@ class AchillesMPC(ModelPredictiveController):
             v_stand[i][4] = v_des_W[1][0]
 
         # get a new reference trajectory
-        q_HLIP, v_HLIP, meshcat_horizon = self.traj_gen_HLIP.generate_trajectory(
-                                                                q0 = q0,
-                                                                v0 = v0,
-                                                                v_des = v_des,
-                                                                z_com_des = z_com_des,
-                                                                t_phase = self.t_phase,
-                                                                initial_swing_foot_pos = self.p_swing_init_W,
-                                                                stance_foot_pos = self.p_stance_W,
-                                                                stance_foot_yaw = self.control_stance_yaw,
-                                                                initial_stance_foot_name = self.stance_foot_frame.name())
-        # replace HLIP floating base reference trajectory
-        for i in range(self.num_steps + 1):
-            
-            # increment orientation
-            quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
-            q_HLIP[i][0] = quat_delta.w()
-            q_HLIP[i][1] = quat_delta.x()
-            q_HLIP[i][2] = quat_delta.y()
-            q_HLIP[i][3] = quat_delta.z()
-            
-            # increment position
-            p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
-            q_HLIP[i][4] = q0[4] + p_increment[0][0]
-            q_HLIP[i][5] = q0[5] + p_increment[1][0]
-            q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
-            v_HLIP[i][3] = v_des_W[0][0]
-            v_HLIP[i][4] = v_des_W[1][0]
+        if config['controller']=='MH':
+            q_HLIP, v_HLIP, meshcat_horizon = self.traj_gen_HLIP.generate_trajectory(
+                                                                    q0 = q0,
+                                                                    v0 = v0,
+                                                                    v_des = v_des,
+                                                                    z_com_des = z_com_des,
+                                                                    t_phase = self.t_phase,
+                                                                    initial_swing_foot_pos = self.p_swing_init_W,
+                                                                    stance_foot_pos = self.p_stance_W,
+                                                                    stance_foot_yaw = self.control_stance_yaw,
+                                                                    initial_stance_foot_name = self.stance_foot_frame.name())
+            # replace HLIP floating base reference trajectory
+            for i in range(self.num_steps + 1):
+                
+                # increment orientation
+                quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
+                q_HLIP[i][0] = quat_delta.w()
+                q_HLIP[i][1] = quat_delta.x()
+                q_HLIP[i][2] = quat_delta.y()
+                q_HLIP[i][3] = quat_delta.z()
+                
+                # increment position
+                p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
+                q_HLIP[i][4] = q0[4] + p_increment[0][0]
+                q_HLIP[i][5] = q0[5] + p_increment[1][0]
+                q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
+                v_HLIP[i][3] = v_des_W[0][0]
+                v_HLIP[i][4] = v_des_W[1][0]
 
-        # draw the meshcat horizon
-        if config['HLIP_vis']==True:
-            self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
+            # draw the meshcat horizon
+            if config['HLIP_vis']==True:
+                self.plot_meshcat_horizon(meshcat_horizon, self.t_current)
 
-        # compute alpha 
-        vel = np.array([[vx_des], [vy_des], [wz_des], [v0[3]], [v0[4]], [v0[2]]])
-        v_norm = (vel.T @ self.P @ vel)[0][0]     # NOTE: this is 1 if any of the axis sees its respective max velocity, otherwise can exceed 1.0 easily
-        v_norm = np.clip(v_norm, 0, 2)
-        a = self.alpha(v_norm)                    # NOTE: activation function is bounded to [0,1]
+            # compute alpha 
+            vel = np.array([[vx_des], [vy_des], [wz_des], [v0[3]], [v0[4]], [v0[2]]])
+            v_norm = (vel.T @ self.P @ vel)[0][0]     # NOTE: this is 1 if any of the axis sees its respective max velocity, otherwise can exceed 1.0 easily
+            v_norm = np.clip(v_norm, 0, 2)
+            a = self.alpha(v_norm)                    # NOTE: activation function is bounded to [0,1]
 
-        # convex combination of the standing position and the nominal trajectory
-        q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
-        v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
-        for i in range(self.optimizer.num_steps() + 1):
-            q_nom[i][self.idx_no_arms_q] = (1 - a) * q_stand[i][self.idx_no_arms_q] + a * q_HLIP[i]
-            v_nom[i][self.idx_no_arms_v] = (1 - a) * v_stand[i][self.idx_no_arms_v] + a * v_HLIP[i]
+            # convex combination of the standing position and the nominal trajectory
+            q_nom = [np.copy(np.zeros(len(q0))) for i in range(self.optimizer.num_steps() + 1)]
+            v_nom = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
+            for i in range(self.optimizer.num_steps() + 1):
+                q_nom[i][self.idx_no_arms_q] = (1 - a) * q_stand[i][self.idx_no_arms_q] + a * q_HLIP[i]
+                v_nom[i][self.idx_no_arms_v] = (1 - a) * v_stand[i][self.idx_no_arms_v] + a * v_HLIP[i]
+        
+        # if no HLIP blending is enabled, use the standing position
+        else:
+            q_nom = q_stand
+            v_nom = v_stand
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 
@@ -791,7 +797,7 @@ if __name__=="__main__":
     joystick = builder.AddSystem(GamepadCommand(deadzone=0.05))
 
     # Create the MPC controller and interpolator systems
-    if config['controller']=='MPC':
+    if (config['controller']=='MPC' or config['controller']=='MH'):
     
         mpc_rate = config['MPC']['mpc_rate']  # Hz
         controller = builder.AddSystem(AchillesMPC(optimizer, q_guess, mpc_rate, model_file, meshcat))
@@ -828,7 +834,7 @@ if __name__=="__main__":
                                                       disturbance_tau, time_applied, duration))
 
     # Wire the systems together
-    if config['controller']=='MPC':
+    if (config['controller']=='MPC' or config['controller']=='MH'):
         
         # MPC
         builder.Connect(
