@@ -105,8 +105,8 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 5.0       # [sec], simulation duration
-    real_time_rate: 1.0  # real-time rate of the simulation
+    duration: 4.0       # [sec], simulation duration
+    real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.00125     # [sec], simulation time step
 
 ##################################################################################################
@@ -132,7 +132,7 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: False
+    enabled: True
 
     # fixed disturbance
     fixed: False
@@ -142,11 +142,11 @@ disturbance:
 
     # force to be applied on the base frame is drawn uniformly from a circle
     # in the xy direction with this radius
-    force_radius: 150.0  # [N]
+    force_radius: 200.0  # [N]
 
     # time parameters
     time_applied: 1.0  # [sec], time when the disturbance is applied
-    duration: 1.0      # [sec], duration of the disturbance
+    duration: 0.1      # [sec], duration of the disturbance
 
 ##################################################################################################
 # Terrain

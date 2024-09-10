@@ -16,7 +16,7 @@
 ##
 
 
-num_trials=500
+num_trials=10
 num_falls=0
 
 # Set up a file to save the results
