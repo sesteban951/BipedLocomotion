@@ -105,9 +105,9 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 3.0       # [sec], simulation duration
+    duration: 15.0       # [sec], simulation duration
     real_time_rate: 1.0  # real-time rate of the simulation
-    time_step: 0.002     # [sec], simulation time step
+    time_step: 0.00125     # [sec], simulation time step
 
 ##################################################################################################
 # REFERENCES
@@ -131,7 +131,14 @@ references:
 
 # single disturbance on the base frame
 disturbance:
+    
     enabled: True
+
+    # fixed disturbance
+    fixed: True
+    fx: 0.0
+    fy: 0.0
+    fz: 50.0
 
     # force to be applied on the base frame is drawn uniformly from a circle
     # in the xy direction with this radius
@@ -166,7 +173,7 @@ terrain:
 # p in [0,1], where the transition is located at in [0,1]
 
 blending:
-    a: 5
+    a: 5.0
     p: 0.5
 
 ##################################################################################################
@@ -194,14 +201,18 @@ v0: [0.0000, 0.0000, 0.0000,
 
 gains:
 
-  Kp: [800, 800, 800, 900, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+  Kp: [700, 700, 700, 800, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        100, 100, 100, 100,       # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-       800, 800, 800, 900, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       700, 700, 700, 800, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        100, 100, 100, 100]       # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-  Kd: [10, 10, 10, 10, 1,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+  Kd: [25, 25, 25, 25, 5,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        5, 5, 5, 5,               # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-       10, 10, 10, 10, 1,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       25, 25, 25, 25, 5,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        5, 5, 5, 5]               # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+
+    # Adrian gains
+    # 500, 1000, 500, 500, 500 (legs)
+    # 10, 10, 20, 5, 2         (arms)
 
 ##################################################################################################
 # LOGGING
@@ -217,6 +228,9 @@ logging: False
 # visluaze the HLIP trajectory
 HLIP_vis: False
 
+# contact force visualization
+contact_vis: False
+
 # colors to use throughout the simulation
 color:
 
@@ -226,7 +240,8 @@ color:
     # caltech orange: [0.9200, 0.3896, 0.0433, 1.0] 
 
     ground: [0.0, 0.0, 0.0, 0.0]
-    terrain: [0.5, 0.5, 0.5, 1.0]
+    # ground: [0.5, 0.5, 0.5, 1.0]
+    terrain: [0.5, 0.5, 0.5, 0.5]
 
 ##################################################################################################
 # WALL
@@ -237,10 +252,11 @@ wall:
     enabled: False
 
     # Size and position
-    length: 2.0  # [m]
-    height: 0.6  # [m]
-    x: 0.0  # [m]
-    y: 0.6  # [m] 
+    length: 0.1  # [m]
+    width: 2.0  # [m]
+    height: 0.9  # [m]
+    x: 0.5  # [m]
+    y: 0.0  # [m] 
 
 ##################################################################################################
 # MODEL ERROR
