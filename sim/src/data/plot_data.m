@@ -19,25 +19,27 @@ config = yaml.loadFile(yaml_file);
 
 % plot only a desired segments of the data
 t_data = time_data;
-t0 = t_data(1);
-tf = t_data(end);
-% t0 = 4;
-% tf = 11;
+% t0 = t_data(1);
+% tf = t_data(end);
+t0 = 12;
+tf = 14;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% state and input plots
+% STATE and INPUT
 plot_state = 0;
-plot_torque = 1;
+plot_torque = 0;
 
-% joystick commands plot
+% COMMANDS
 plot_joy = 0;
 
-% demo plots
+% PHASE
 plot_phase = 0;
 plot_phase_movie = 0;
 save_phase_movie = 0;
-plot_cot = 0;
+
+% EFFICIENCY
+plot_efficiency = 1;
 plot_ref_tracking = 0;
 
 % plot settings
@@ -374,7 +376,7 @@ end
 
 % plot the cost of transport
 % COT = (tau(t) * omega(t)) / (m * g * v(t))
-if plot_cot == 1
+if plot_efficiency == 1
 
     % compute the mechanical joint power
     [r, ~] = size(tau_data);
@@ -386,14 +388,19 @@ if plot_cot == 1
         P(t) = tau_t * v_joint_data_t';
     end
 
+    % integrate teh total power to get energy consumed
+    total = trapz(t_data, P);
+
     % plot the mechanical power
     figure('Name', 'State Data');
     tabgp = uitabgroup;
     tab = uitab(tabgp, 'Title', 'Mechanical Power');
     axes('Parent', tab);
     plot(t_data, P, 'k', 'LineWidth', 1.5);
+    yline(0);
     xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
     ylabel('Power [W]', 'FontSize', 16, 'Interpreter', 'latex');
+    title(['Total Integrated: ', num2str(total)], 'FontSize', 16, 'Interpreter', 'latex');
 
     % Compute the accumulated energy over time using trapz in a loop
     E = zeros(r, 1);
@@ -407,9 +414,10 @@ if plot_cot == 1
     plot(t_data, E, 'g', 'LineWidth', 1.5);
     xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
     ylabel('Energy [J]', 'FontSize', 16, 'Interpreter', 'latex');
+    yline(0);
 
     % compute the COT
-    m = 22.5; % [kg]
+    m = 24; % [kg]
     g = 9.81; % [m/s^2]
     COT = zeros(r, 1);
     for t = 1:r
@@ -426,6 +434,27 @@ if plot_cot == 1
     plot(t_data, COT, 'm', 'LineWidth', 1.5);
     xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
     ylabel('Cost of Transport [1]', 'FontSize', 16, 'Interpreter', 'latex');
+    yline(0);
+
+    % compute the torque squared, ||u||^2 = u1^2 + u2^2 + u3^2  + ...
+    [r, ~] = size(tau_data);
+    U = zeros(r, 1);
+    for t = 1:r
+        tau_t = tau_data(t,:);
+        U(t) = tau_t * tau_t';
+    end
+    
+    % integrate over the bounds to get the total energy
+    total = trapz(t_data, U);
+
+    % plot torque squared
+    tab = uitab(tabgp, 'Title', 'Torque Squared');
+    axes('Parent', tab);
+    plot(t_data, U, 'r', 'LineWidth', 1.5);
+    yline(0);
+    xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+    ylabel('$\|\tau\|^2_2$, (Nm)$^2$', 'FontSize', 16, 'Interpreter', 'latex');
+    title(['Total Integrated: ', num2str(total)], 'FontSize', 16, 'Interpreter', 'latex');
 
 end
 
