@@ -449,6 +449,7 @@ class AchillesMPC(ModelPredictiveController):
         # compute alpha 
         vel = np.array([[vx_des], [vy_des], [wz_des], [v0[3]], [v0[4]], [v0[2]]])
         v_norm = (vel.T @ self.P @ vel)[0][0]     # NOTE: this is 1 if any of the axis sees its respective max velocity, otherwise can exceed 1.0 easily
+        v_norm = np.clip(v_norm, 0, 2)
         a = self.alpha(v_norm)                    # NOTE: activation function is bounded to [0,1]
 
         # convex combination of the standing position and the nominal trajectory
@@ -739,7 +740,7 @@ if __name__=="__main__":
     if config['wall']['enabled']==True:
         R_wall = RigidTransform(
             p=[config['wall']['x'], config['wall']['y'], config['wall']['height']/2])
-        wall_geom = Box(config['wall']['length'], 0.2, config['wall']['height'])
+        wall_geom = Box(config['wall']['length'], config['wall']['width'], config['wall']['height'])
         plant.RegisterVisualGeometry(
             plant.world_body(), 
             R_wall, 
@@ -809,11 +810,17 @@ if __name__=="__main__":
     disturbance_tau = np.zeros(plant.num_velocities())
 
     if config['disturbance']['enabled']:
-        r = config['disturbance']['force_radius'] * np.sqrt(np.random.rand())
-        theta = 2 * np.pi * np.random.rand()
-        d = np.array([r * np.cos(theta), r * np.sin(theta), 0.0])
-        print("Disturbance vector: ", d)
-        disturbance_tau[3:6] = d
+        if config['disturbance']['fixed'] == False:
+            r = config['disturbance']['force_radius'] * np.sqrt(np.random.rand())
+            theta = 2 * np.pi * np.random.rand()
+            d = np.array([r * np.cos(theta), r * np.sin(theta), 0.0])
+            print("Disturbance vector: ", d)
+            disturbance_tau[3:6] = d
+        else:
+            disturbance_tau[3] = config['disturbance']['fx']
+            disturbance_tau[4] = config['disturbance']['fy']
+            disturbance_tau[5] = config['disturbance']['fz']
+
     time_applied = config['disturbance']['time_applied']
     duration = config['disturbance']['duration']
     dist_gen = builder.AddSystem(DisturbanceGenerator(plant, 
@@ -889,7 +896,7 @@ if __name__=="__main__":
     
     # Connect the plant to meshcat for visualization
     vis_config = VisualizationConfig()
-    vis_config.publish_contacts = False
+    vis_config.publish_contacts = config['contact_vis']
     ApplyVisualizationConfig(config=vis_config, builder=builder, meshcat=meshcat)
 
     # Set the meshcat position and target

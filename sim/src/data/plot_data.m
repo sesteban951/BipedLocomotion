@@ -21,8 +21,8 @@ config = yaml.loadFile(yaml_file);
 t_data = time_data;
 t0 = t_data(1);
 tf = t_data(end);
-% t0 = 10;
-% tf = 15;
+% t0 = 4;
+% tf = 11;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -34,9 +34,9 @@ plot_torque = 0;
 plot_joy = 0;
 
 % demo plots
-plot_phase = 1;
-plot_phase_movie = 0;
-save_phase_movie = 0;
+plot_phase = 0;
+plot_phase_movie = 1;
+save_phase_movie = 1;
 plot_cot = 0;
 plot_ref_tracking = 0;
 
@@ -217,6 +217,9 @@ end
 % plot all phase plots
 if plot_phase == 1
 
+    % orbit tail length
+    hold_sec = 0.3;
+
     figure('Name', 'Phase Plot');
     tabgp = uitabgroup;
 
@@ -302,7 +305,7 @@ if plot_phase_movie == 1
     idx = 2;
 
     % num_points_to_keep = length(t_data);
-    hold_sec = 0.5;
+    hold_sec = 0.1;
     num_points_to_keep = round(hz_des * hold_sec);
     line_objects = []; % Initialize an empty list to store line objects
 
