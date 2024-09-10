@@ -10,7 +10,7 @@ seed:
 # CONTROLLER
 ##################################################################################################
 
-controller: 'MPC'  # choose between 'MPC' or 'HLIP'
+controller: 'MH'  # choose between 'MPC', 'HLIP', 'MH' (both)
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -75,7 +75,7 @@ HLIP:
     T_SSP: 0.35   # [sec], single support phase duration
 
     # CoM height range
-    z_com_upper: 0.64 # [m], upper bound for the CoM height
+    z_com_upper: 0.62 # [m], upper bound for the CoM height
     z_com_lower: 0.35 # [m], lower bound for the CoM height
 
     # foor parameters
@@ -105,7 +105,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 5.0       # [sec], simulation duration
+    duration: 15.0       # [sec], simulation duration
     real_time_rate: 1.0  # real-time rate of the simulation
     time_step: 0.00125     # [sec], simulation time step
 
@@ -138,7 +138,7 @@ disturbance:
     fixed: False
     fx: 15.0
     fy: 0.0
-    fz: -200.0
+    fz: -375.0
 
     # force to be applied on the base frame is drawn uniformly from a circle
     # in the xy direction with this radius
@@ -219,7 +219,7 @@ gains:
 ##################################################################################################
 
 # choose to log new data from simulation
-logging: True
+logging: False
 
 ##################################################################################################
 # VISUALIZATION
