@@ -28,15 +28,15 @@ tf = t_data(end);
 
 % state and input plots
 plot_state = 0;
-plot_torque = 0;
+plot_torque = 1;
 
 % joystick commands plot
 plot_joy = 0;
 
 % demo plots
 plot_phase = 0;
-plot_phase_movie = 1;
-save_phase_movie = 1;
+plot_phase_movie = 0;
+save_phase_movie = 0;
 plot_cot = 0;
 plot_ref_tracking = 0;
 
