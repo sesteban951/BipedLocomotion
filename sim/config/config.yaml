@@ -105,8 +105,8 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 15.0       # [sec], simulation duration
-    real_time_rate: 1.0  # real-time rate of the simulation
+    duration: 7.0       # [sec], simulation duration
+    real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.00125     # [sec], simulation time step
 
 ##################################################################################################
@@ -115,10 +115,10 @@ sim:
 
 # references to test tracking
 references:
-    enabled: False
+    enabled: True
 
     # constant velocity tracking
-    vx_ref: 0.0  # [m/s], forward velocity
+    vx_ref: 0.3  # [m/s], forward velocity
     vy_ref: 0.0  # [m/s], lateral velocity
     wz_ref: 0.0  # [deg/s], yaw rate  (HLIP cannot track this)
     
@@ -202,13 +202,13 @@ v0: [0.0000, 0.0000, 0.0000,
 gains:
 
   Kp: [700, 700, 700, 800, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
-       100, 100, 100, 100,       # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+       10, 10, 10, 10,       # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
        700, 700, 700, 800, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
-       100, 100, 100, 100]       # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+       10, 10, 10, 10]       # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
   Kd: [25, 25, 25, 25, 5,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
-       5, 5, 5, 5,               # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+       0.01, 0.01, 0.01, 0.01,               # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
        25, 25, 25, 25, 5,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
-       5, 5, 5, 5]               # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+       0.01, 0.01, 0.01, 0.01]               # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
 
     # Adrian gains
     # 500, 1000, 500, 500, 500 (legs)
@@ -219,7 +219,7 @@ gains:
 ##################################################################################################
 
 # choose to log new data from simulation
-logging: False
+logging: True
 
 ##################################################################################################
 # VISUALIZATION

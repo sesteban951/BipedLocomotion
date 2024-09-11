@@ -894,7 +894,7 @@ if __name__=="__main__":
                 dist_gen.get_output_port(),
                 logger_distrubances.get_input_port())
         # logger contact forces
-        csv_file_name = "./data/data_contacts.csv"
+        csv_file_name = './data/data_contacts_' + config['controller'] + '.csv'
         logger_contact = builder.AddSystem(ContactLogger(plant, sim_time_step, csv_file_name))    
         builder.Connect(
             plant.get_contact_results_output_port(),
@@ -965,31 +965,36 @@ if __name__=="__main__":
         disturbances = disturbance_log.data().T
 
         # save the time data to a CSV file
-        with open('./data/data_times.csv', mode='w') as file:
+        label = './data/data_times_' + config['controller'] + '.csv'
+        with open(label, mode='w') as file:
             writer = csv.writer(file)
             for i in range(len(times)):
                 writer.writerow([times[i]])
 
         # save the state data to a CSV file
-        with open('./data/data_states.csv', mode='w') as file:
+        label = './data/data_states_' + config['controller'] + '.csv'
+        with open(label, mode='w') as file:
             writer = csv.writer(file)
             for i in range(len(times)):
                 writer.writerow(states[i])
 
         # save the torque data to a CSV file
-        with open('./data/data_torques.csv', mode='w') as file:
+        label = './data/data_torques_' + config['controller'] + '.csv'
+        with open(label, mode='w') as file:
             writer = csv.writer(file)
             for i in range(len(times)):
                 writer.writerow(list(torques[i]))
 
         # save the joystick data to a CSV file
-        with open('./data/data_joystick.csv', mode='w') as file:
+        label = './data/data_joystick_' + config['controller'] + '.csv'
+        with open(label, mode='w') as file:
             writer = csv.writer(file)
             for i in range(len(times)):
                 writer.writerow(list(joystick_commands[i]))
 
         # save the disturbance data to a CSV file
-        with open('./data/data_disturbances.csv', mode='w') as file:
+        label = './data/data_disturbances_' + config['controller'] + '.csv'
+        with open(label, mode='w') as file:
             writer = csv.writer(file)
             for i in range(len(times)):
                 writer.writerow(list(disturbances[i]))

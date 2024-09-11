@@ -4,10 +4,11 @@
 clear all; close all; clc;
 
 % Load the csv data
-time_data = csvread('data_times.csv');
-state_data = csvread('data_states.csv');
-torque_data = csvread('data_torques.csv');
-joystick_data = csvread('data_joystick.csv');
+controller = 'MH';
+time_data = csvread(strcat('data_times_', controller, '.csv'));
+state_data = csvread(strcat('data_states_', controller, '.csv'));
+torque_data = csvread(strcat('data_torques_', controller, '.csv'));
+joystick_data = csvread(strcat('data_joystick_', controller, '.csv'));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -21,8 +22,8 @@ config = yaml.loadFile(yaml_file);
 t_data = time_data;
 % t0 = t_data(1);
 % tf = t_data(end);
-t0 = 12;
-tf = 14;
+t0 = 4;
+tf = 6;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -34,12 +35,12 @@ plot_torque = 0;
 plot_joy = 0;
 
 % PHASE
-plot_phase = 0;
+plot_phase = 1;
 plot_phase_movie = 0;
 save_phase_movie = 0;
 
 % EFFICIENCY
-plot_efficiency = 1;
+plot_efficiency = 0;
 plot_ref_tracking = 0;
 
 % plot settings
@@ -385,7 +386,7 @@ if plot_efficiency == 1
         % take the dot product of each row of tau with the corresponding row of v
         tau_t = tau_data(t,:);
         v_joint_data_t = v_joint_data(t,:);
-        P(t) = tau_t * v_joint_data_t';
+        P(t) = abs(tau_t * v_joint_data_t');
     end
 
     % integrate teh total power to get energy consumed
