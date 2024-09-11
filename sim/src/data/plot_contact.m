@@ -4,8 +4,13 @@
 clear all; close all; clc;
 
 % Read the CSV file into a table
-filename = 'data_contacts.csv';
+controller = 'MH';
+filename = strcat('data_contacts_', controller, '.csv');
 data = readtable(filename);
+
+% import other data
+t_data = csvread(strcat('data_times_', controller, '.csv'));
+disturbance_data = csvread(strcat('data_disturbances_', controller, '.csv'));
 
 % import the yaml file
 yaml_file = '../../config/config.yaml';
@@ -78,6 +83,23 @@ right_foot_toe_pos = cell2mat(pos(right_foot_toe_idx));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Extract the relevant segments of the data based on the time range
+idx = find(t_data >= t0 & t_data <= tf);
+t_data = t_data(idx);
+disturbance_data = disturbance_data(idx, :);
+
+% extract the disturbance data
+F = disturbance_data(:, 4:6);  % forces in world frame
+M = disturbance_data(:, 1:3);  % moments in world frame
+
+% disturbance labels
+disturbance_F_labels = ["f_{x}", "f_{y}", "f_{z}"];
+disturbance_M_labels = ["M_{x}", "M_{y}", "M_{z}"];
+disturbance_F_labels = strcat("$", disturbance_F_labels, "$");
+disturbance_M_labels = strcat("$", disturbance_M_labels, "$");
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % plot the x-y position of the feet
 if plot_foot_position == 1
 
@@ -126,7 +148,7 @@ if plot_foot_boolean == 1
     for i = 1:length(time_unique)
         t = find(right_foot_heel_time == time_unique(i));
         if ~isempty(t)
-            right_heel_contact_bool_signal(i) = -1;
+            right_heel_contact_bool_signal(i) = 1;
         end
     end
 
@@ -134,7 +156,7 @@ if plot_foot_boolean == 1
     for i = 1:length(time_unique)
         t = find(right_foot_toe_time == time_unique(i));
         if ~isempty(t)
-            right_toe_contact_bool_signal(i) = -1;
+            right_toe_contact_bool_signal(i) = 1;
         end
     end
 
@@ -150,15 +172,37 @@ if plot_foot_boolean == 1
     % Plot the subplots and remove y-axis ticks
     subplot(4,1,1)
     area(time_unique, left_heel_contact_bool_signal, 'FaceColor', blue, 'EdgeColor', blue, 'FaceAlpha', 0.5, 'LineWidth', 1);
-    set(gca, 'YTick', []);
+    title('Left Heel Contact');
+    set(gca, 'YTick', [0,1]);
     subplot(4,1,2)
     area(time_unique, left_toe_contact_bool_signal, 'FaceColor', orange, 'EdgeColor', orange, 'FaceAlpha', 0.5, 'LineWidth', 1);
-    set(gca, 'YTick', []);
+    title('Left Toe Contact');
+    set(gca, 'YTick', [0,1]);
     subplot(4,1,3)
     area(time_unique, right_heel_contact_bool_signal, 'FaceColor', red, 'EdgeColor', red, 'FaceAlpha', 0.5, 'LineWidth', 1);
-    set(gca, 'YTick', []);
+    title('Right Heel Contact');
+    set(gca, 'YTick', [0,1]);
     subplot(4,1,4)
     area(time_unique, right_toe_contact_bool_signal, 'FaceColor', green, 'EdgeColor', green, 'FaceAlpha', 0.5, 'LineWidth', 1);
-    set(gca, 'YTick', []);
-
+    title('Right Toe Contact');
+    set(gca, 'YTick', [0,1]);
 end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+subplot(3,2,1)
+plot(t_data, F(:, 1), 'r', 'LineWidth', 2);
+
+subplot(3,2,3)
+area(time_unique, left_heel_contact_bool_signal, 'FaceColor', blue, 'EdgeColor', blue, 'FaceAlpha', 0.5, 'LineWidth', 1);
+
+subplot(3,2,5)
+area(time_unique, right_heel_contact_bool_signal, 'FaceColor', red, 'EdgeColor', red, 'FaceAlpha', 0.5, 'LineWidth', 1);
+
+% plot the heel and toe positions
+subplot(3, 2, [2, 4, 6])
+hold on;
+plot(left_foot_heel_pos(:, 1), left_foot_heel_pos(:, 2), 'bo', 'LineWidth', 2, 'MarkerSize', 10);
+plot(left_foot_toe_pos(:, 1), left_foot_toe_pos(:, 2), 'b*', 'LineWidth', 2, 'MarkerSize', 10);
+plot(right_foot_heel_pos(:, 1), right_foot_heel_pos(:, 2), 'ro', 'LineWidth', 2, 'MarkerSize', 10);
+plot(right_foot_toe_pos(:, 1), right_foot_toe_pos(:, 2), 'r*', 'LineWidth', 2, 'MarkerSize', 10);

@@ -8,6 +8,7 @@ controller = 'MH';
 time_data = csvread(strcat('data_times_', controller, '.csv'));
 state_data = csvread(strcat('data_states_', controller, '.csv'));
 torque_data = csvread(strcat('data_torques_', controller, '.csv'));
+disturbance_data = csvread(strcat('data_disturbances_', controller, '.csv'));
 joystick_data = csvread(strcat('data_joystick_', controller, '.csv'));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -20,10 +21,10 @@ config = yaml.loadFile(yaml_file);
 
 % plot only a desired segments of the data
 t_data = time_data;
-% t0 = t_data(1);
-% tf = t_data(end);
-t0 = 4;
-tf = 6;
+t0 = t_data(1);
+tf = t_data(end);
+% t0 = 4;
+% tf = 6;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -35,9 +36,12 @@ plot_torque = 0;
 plot_joy = 0;
 
 % PHASE
-plot_phase = 1;
+plot_phase = 0;
 plot_phase_movie = 0;
 save_phase_movie = 0;
+
+% DISTURBANCE
+plot_disturbance = 0;
 
 % EFFICIENCY
 plot_efficiency = 0;
@@ -61,6 +65,7 @@ t_data = t_data(idx);
 q_data = q_data(idx,:);
 v_data = v_data(idx,:);
 tau_data = tau_data(idx,:);
+disturbance_data = disturbance_data(idx,:);
 joystick_data = joystick_data(idx,:);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -180,6 +185,46 @@ if plot_torque == 1
         plot(t_data, tau_data(:,arm_idx(i)),'r','LineWidth', 1.5);
         xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
         ylabel(tau_joint_labels(arm_idx(i)), 'FontSize', 16, 'Interpreter', 'latex');
+        grid on;
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% extract teh disturbance data
+F = disturbance_data(:, 4:6);  % forces in world frame
+M = disturbance_data(:, 1:3);  % moments in world frame
+
+if plot_disturbance == 1
+    % disturbance labels
+    disturbance_F_labels = ["f_{x}", "f_{y}", "f_{z}"];
+    disturbance_M_labels = ["M_{x}", "M_{y}", "M_{z}"];
+    disturbance_F_labels = strcat("$", disturbance_F_labels, "$");
+    disturbance_M_labels = strcat("$", disturbance_M_labels, "$");
+
+    % plot the disturbance data
+    figure('Name', 'Disturbance Data');
+    tabgp = uitabgroup;
+
+    % plot the forces
+    tab = uitab(tabgp, 'Title', 'Forces');
+    axes('Parent', tab);
+    for i = 1:size(F,2)
+        subplot(3,1,i);
+        plot(t_data, F(:,i),'r','LineWidth', 1.5);
+        xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+        ylabel(disturbance_F_labels(i), 'FontSize', 16, 'Interpreter', 'latex');
+        grid on;
+    end
+
+    % plot the moments
+    tab = uitab(tabgp, 'Title', 'Moments');
+    axes('Parent', tab);
+    for i = 1:size(M,2)
+        subplot(3,1,i);
+        plot(t_data, M(:,i),'r','LineWidth', 1.5);
+        xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+        ylabel(disturbance_M_labels(i), 'FontSize', 16, 'Interpreter', 'latex');
         grid on;
     end
 end

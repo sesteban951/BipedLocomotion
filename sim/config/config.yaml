@@ -10,7 +10,7 @@ seed:
 # CONTROLLER
 ##################################################################################################
 
-controller: 'MPC'  # choose between 'MPC', 'HLIP', 'MH' (both)
+controller: 'MH'  # choose between 'MPC', 'HLIP', 'MH' (both)
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -94,8 +94,8 @@ HLIP:
     wz_max: 35           # [deg/s], max yaw rate
 
     # threshold fro base velocity
-    vx_base_threshold: 0.5  # [m/s], threshold for forward velocity
-    vy_base_threshold: 0.5  # [m/s], threshold for lateral velocity
+    vx_base_threshold: 0.2  # [m/s], threshold for forward velocity
+    vy_base_threshold: 0.2  # [m/s], threshold for lateral velocity
     wz_base_threshold: 20   # [deg/s], threshold for yaw rate
 
 ##################################################################################################
@@ -107,7 +107,7 @@ sim:
 
     duration: 7.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
-    time_step: 0.00125     # [sec], simulation time step
+    time_step: 0.005     # [sec], simulation time step
 
 ##################################################################################################
 # REFERENCES
@@ -115,7 +115,7 @@ sim:
 
 # references to test tracking
 references:
-    enabled: True
+    enabled: False
 
     # constant velocity tracking
     vx_ref: 0.3  # [m/s], forward velocity
@@ -132,13 +132,13 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: False
+    enabled: True
 
     # fixed disturbance
-    fixed: False
-    fx: 15.0
+    fixed: True
+    fx: 25.0
     fy: 0.0
-    fz: -375.0
+    fz: 0.0
 
     # force to be applied on the base frame is drawn uniformly from a circle
     # in the xy direction with this radius
@@ -146,7 +146,7 @@ disturbance:
 
     # time parameters
     time_applied: 1.0  # [sec], time when the disturbance is applied
-    duration: 1.0      # [sec], duration of the disturbance
+    duration: 0.5      # [sec], duration of the disturbance
 
 ##################################################################################################
 # Terrain

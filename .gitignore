@@ -3,3 +3,4 @@
 *.csv
 *.avi
 *.html
+**/plots/
