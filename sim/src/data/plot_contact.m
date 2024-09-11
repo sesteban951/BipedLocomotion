@@ -20,16 +20,17 @@ config = yaml.loadFile(yaml_file);
 
 % plot only a desired segments of the data
 dt = config.MPC.dt;
-t0 = min(data.Time);
-tf = max(data.Time);
-% t0 = 4;
-% tf = 6;
+% t0 = min(data.Time);
+% tf = max(data.Time);
+t0 = 0.9;
+tf = 2.5;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % choose what to plot
 plot_foot_position = 0;
-plot_foot_boolean = 1;
+plot_foot_boolean = 0;
+plot_disturbance_schedule = 1;
 
 % Set default properties for all axes
 set(0, 'DefaultAxesTickLabelInterpreter', 'latex');
@@ -119,56 +120,59 @@ if plot_foot_position == 1
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   
+% create a boolean signal
+left_heel_contact_bool_signal = zeros(length(time_unique), 1);
+right_heel_contact_bool_signal = zeros(length(time_unique), 1);
+left_toe_contact_bool_signal = zeros(length(time_unique), 1);
+right_toe_contact_bool_signal = zeros(length(time_unique), 1);
+
+% left foot heel
+for i = 1:length(time_unique)
+    t = find(left_foot_heel_time == time_unique(i));
+    if ~isempty(t)
+        left_heel_contact_bool_signal(i) = 1;
+    end
+end
+
+% left foot toe
+for i = 1:length(time_unique)
+    t = find(left_foot_toe_time == time_unique(i));
+    if ~isempty(t)
+        left_toe_contact_bool_signal(i) = 1;
+    end
+end
+
+% right foot heel
+for i = 1:length(time_unique)
+    t = find(right_foot_heel_time == time_unique(i));
+    if ~isempty(t)
+        right_heel_contact_bool_signal(i) = 1;
+    end
+end
+
+% right foot toe
+for i = 1:length(time_unique)
+    t = find(right_foot_toe_time == time_unique(i));
+    if ~isempty(t)
+        right_toe_contact_bool_signal(i) = 1;
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Plot the left contact boolean signal with color under the curve
+blue = [0, 0, 1];
+red = [1, 0, 0];
+orange = [1, 0.5, 0];
+green = [0, 1, 0];
 
 if plot_foot_boolean == 1
-   
-    % create a boolean signal
-    left_heel_contact_bool_signal = zeros(length(time_unique), 1);
-    right_heel_contact_bool_signal = zeros(length(time_unique), 1);
-    left_toe_contact_bool_signal = zeros(length(time_unique), 1);
-    right_toe_contact_bool_signal = zeros(length(time_unique), 1);
-
-    % left foot heel
-    for i = 1:length(time_unique)
-        t = find(left_foot_heel_time == time_unique(i));
-        if ~isempty(t)
-            left_heel_contact_bool_signal(i) = 1;
-        end
-    end
-
-    % left foot toe
-    for i = 1:length(time_unique)
-        t = find(left_foot_toe_time == time_unique(i));
-        if ~isempty(t)
-            left_toe_contact_bool_signal(i) = 1;
-        end
-    end
-
-    % right foot heel
-    for i = 1:length(time_unique)
-        t = find(right_foot_heel_time == time_unique(i));
-        if ~isempty(t)
-            right_heel_contact_bool_signal(i) = 1;
-        end
-    end
-
-    % right foot toe
-    for i = 1:length(time_unique)
-        t = find(right_foot_toe_time == time_unique(i));
-        if ~isempty(t)
-            right_toe_contact_bool_signal(i) = 1;
-        end
-    end
 
     % plot the contact boolean
     figure('Name', 'Contact Boolean');
     hold on; grid on;
 
-    % Plot the left contact boolean signal with color under the curve
-    blue = [0, 0, 1];
-    red = [1, 0, 0];
-    orange = [1, 0.5, 0];
-    green = [0, 1, 0];
     % Plot the subplots and remove y-axis ticks
     subplot(4,1,1)
     area(time_unique, left_heel_contact_bool_signal, 'FaceColor', blue, 'EdgeColor', blue, 'FaceAlpha', 0.5, 'LineWidth', 1);
@@ -190,19 +194,40 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-subplot(3,2,1)
-plot(t_data, F(:, 1), 'r', 'LineWidth', 2);
+if plot_disturbance_schedule == 1
 
-subplot(3,2,3)
-area(time_unique, left_heel_contact_bool_signal, 'FaceColor', blue, 'EdgeColor', blue, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    figure('Name', 'Disturbance Schedule');
 
-subplot(3,2,5)
-area(time_unique, right_heel_contact_bool_signal, 'FaceColor', red, 'EdgeColor', red, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    tick_size = 12;
+    label_size = 14;
 
-% plot the heel and toe positions
-subplot(3, 2, [2, 4, 6])
-hold on;
-plot(left_foot_heel_pos(:, 1), left_foot_heel_pos(:, 2), 'bo', 'LineWidth', 2, 'MarkerSize', 10);
-plot(left_foot_toe_pos(:, 1), left_foot_toe_pos(:, 2), 'b*', 'LineWidth', 2, 'MarkerSize', 10);
-plot(right_foot_heel_pos(:, 1), right_foot_heel_pos(:, 2), 'ro', 'LineWidth', 2, 'MarkerSize', 10);
-plot(right_foot_toe_pos(:, 1), right_foot_toe_pos(:, 2), 'r*', 'LineWidth', 2, 'MarkerSize', 10);
+    subplot(3,2,1)
+    plot(t_data, F(:, 1), 'r', 'LineWidth', 2);
+    xlim([t0, tf]);
+    ylabel('$f_x$ [N]', 'Interpreter', 'latex', 'FontSize', label_size); 
+    set(gca, 'YTick', [0,max(F(:, 1))], 'FontSize', tick_size); % Set YTick and FontSize
+
+    subplot(3,2,3)
+    area(time_unique, left_heel_contact_bool_signal, 'FaceColor', blue, 'EdgeColor', blue, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    xlim([t0, tf]);
+    ylabel('Left', 'Interpreter', 'latex', 'FontSize', label_size);
+    set(gca, 'YTick', [0,1], 'FontSize', tick_size); % Set YTick and FontSize
+
+
+    subplot(3,2,5)
+    area(time_unique, right_heel_contact_bool_signal, 'FaceColor', red, 'EdgeColor', red, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    xlim([t0, tf]);
+    xlabel('Time [s]', 'Interpreter', 'latex', 'FontSize', label_size);
+    ylabel('Right', 'Interpreter', 'latex', 'FontSize', label_size);
+    set(gca, 'YTick', [0,1], 'FontSize', tick_size); % Set YTick and FontSize
+
+
+    % plot the heel and toe positions
+    subplot(3, 2, [2, 4, 6])
+    hold on; axis equal; grid on;
+    plot(left_foot_heel_pos(:, 1), left_foot_heel_pos(:, 2), 'bo-', 'LineWidth', 2, 'MarkerSize', 10);
+    plot(right_foot_heel_pos(:, 1), right_foot_heel_pos(:, 2), 'ro-', 'LineWidth', 2, 'MarkerSize', 10);
+    xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', label_size); 
+    ylabel('$y$ [m]', 'Interpreter', 'latex', 'FontSize', label_size);
+    set(gca, 'FontSize', tick_size); % Set YTick and FontSize
+end
