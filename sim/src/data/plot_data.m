@@ -29,19 +29,19 @@ tf = t_data(end);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % STATE and INPUT
-plot_state = 0;
+plot_state = 1;
 plot_torque = 0;
 
 % COMMANDS
 plot_joy = 0;
 
 % PHASE
-plot_phase = 0;
+plot_phase = 1;
 plot_phase_movie = 0;
 save_phase_movie = 0;
 
 % DISTURBANCE
-plot_disturbance = 1;
+plot_disturbance = 0;
 
 % EFFICIENCY
 plot_efficiency = 0;

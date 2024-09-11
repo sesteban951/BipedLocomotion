@@ -21,17 +21,17 @@ MPC:
     # position weights
     Qq: [10.0, 10.0, 10.0, 10.0,  # base orientation
          1.0, 1.0, 1.0,           # base position
-         0.2, 0.4, 0.4, 0.3, 0.3, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+         0.2, 0.4, 0.4, 0.1, 0.3, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
          0.1, 0.1, 0.01, 0.01,    # left arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-         0.2, 0.4, 0.4, 0.3, 0.3, # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+         0.2, 0.4, 0.4, 0.1, 0.3, # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
          0.1, 0.1, 0.01, 0.01]    # right arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
 
     # velocity weights
     Qv: [1.0, 1.0, 1.0,                    # base orientation
          0.1, 0.1, 0.1,                    # base position
-         0.03, 0.03, 0.03, 0.03, 0.05,     # left leg
+         0.03, 0.03, 0.03, 0.01, 0.03,     # left leg
          0.01, 0.01, 0.001, 0.003,         # left arm
-         0.03, 0.03, 0.03, 0.03, 0.05,     # right leg
+         0.03, 0.03, 0.03, 0.01, 0.03,     # right leg
          0.01, 0.01, 0.001, 0.003]         # right arm
 
     # input weights
@@ -75,11 +75,11 @@ HLIP:
     T_SSP: 0.35   # [sec], single support phase duration
 
     # CoM height range
-    z_com_upper: 0.62 # [m], upper bound for the CoM height
+    z_com_upper: 0.65 # [m], upper bound for the CoM height
     z_com_lower: 0.35 # [m], lower bound for the CoM height
 
     # foor parameters
-    z_apex: 0.06         # [m], apex height of the foot trajectory
+    z_apex: 0.05         # [m], apex height of the foot trajectory
     z_foot_offset: 0.0  # [m], overall traj offset of the foot from the ground
     bezier_order: 7      # 5 or 7, order of the bezier curve for foot traj
     hip_bias: 0.3       # [m], bias of the hip, distance foot to foot
@@ -89,13 +89,13 @@ HLIP:
     uy_max: 0.4  # [m], max lateral step length
 
     # maximum magnitude command parameters
-    vx_max: 0.5          # [m/s], max forward velocity
-    vy_max: 0.3          # [m/s], max lateral velocity
+    vx_max: 0.75          # [m/s], max forward velocity
+    vy_max: 0.01          # [m/s], max lateral velocity
     wz_max: 35           # [deg/s], max yaw rate
 
-    # threshold fro base velocity
-    vx_base_threshold: 0.2  # [m/s], threshold for forward velocity
-    vy_base_threshold: 0.2  # [m/s], threshold for lateral velocity
+    # threshold for base velocity
+    vx_base_threshold: 1.0  # [m/s], threshold for forward velocity
+    vy_base_threshold: 1.0  # [m/s], threshold for lateral velocity
     wz_base_threshold: 20   # [deg/s], threshold for yaw rate
 
 ##################################################################################################
@@ -105,9 +105,9 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 7.0       # [sec], simulation duration
+    duration: 15.0       # [sec], simulation duration
     real_time_rate: 1.0  # real-time rate of the simulation
-    time_step: 0.002     # [sec], simulation time step
+    time_step: 0.001     # [sec], simulation time step
 
 ##################################################################################################
 # REFERENCES
@@ -115,7 +115,7 @@ sim:
 
 # references to test tracking, assumes you start at (px,py) = (0,0)
 references:
-    enabled: True
+    enabled: False
 
     # constant velocity tracking
     vx_ref: 0.4  # [m/s], forward velocity in world frame
@@ -131,7 +131,7 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: True
+    enabled: False
 
     # fixed disturbance
     fixed: True
@@ -310,6 +310,9 @@ overhang:
 ##################################################################################################
 
 camera:
+
+    # 2D Render Mode
+    2D_mode: False
 
     # Position of the Meshcat camera in the world frame
     position: [0.0,-2.0, 1.0]

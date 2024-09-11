@@ -728,6 +728,10 @@ if __name__=="__main__":
     # start meshcat
     meshcat = StartMeshcat()
 
+    # set to 2D render mode
+    if config['camera']['2D_mode']==True:
+        meshcat.Set2dRenderMode()
+
     # set up the model file
     model_file = "../../models/achilles_drake.urdf"
 

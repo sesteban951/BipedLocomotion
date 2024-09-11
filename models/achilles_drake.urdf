@@ -1,9 +1,28 @@
 <?xml version="1.0" ?>
 <robot name="achilles">
 
-   <!-- Materials -->
+  <!-- Colorblind -->
+  <material name="red">
+    <!-- <color rgba="0.847 0.106 0.377 1" /> -->
+    <color rgba="0.4 0 0 1" />
+  </material>
+  <material name="green">
+    <color rgba="0.0 0.302 0.251 1" />
+  </material>
+  <material name="blue">
+    <!-- <color rgba="0.1176 0.533 0.898 1" /> -->
+    <color rgba="0 0 0.4 1" />
+  </material>
+  <material name="yellow">
+    <color rgba="1.0 0.757 0.028 1" />
+  </material>
+
+  <!-- Materials -->
   <material name="black">
     <color rgba="0.2 0.2 0.2 1" />
+  </material>
+  <material name="white">
+    <color rgba="0.8 0.8 0.8 1" />
   </material>
   <material name="caltech_orange">
     <color rgba="0.92 0.39 0.043 1" />
@@ -22,6 +41,7 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/torso.obj"/>
       </geometry>
+      <material name="white"/>
     </visual>
   </link>
   <joint name="base_to_torso_joint" type="fixed">
@@ -42,6 +62,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/left_hip_yaw.obj"/>
       </geometry>
+      <!-- <material name="white"/> -->
+      <material name="blue"/>
     </visual>
   </link>
   <joint name="left_hip_yaw_joint" type="revolute">
@@ -64,6 +86,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/left_hip_roll.obj"/>
       </geometry>
+      <!-- <material name="white"/> -->
+      <material name="blue"/>
     </visual>
   </link>
   <joint name="left_hip_roll_joint" type="revolute">
@@ -86,6 +110,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/left_hip_pitch.obj"/>
       </geometry>
+      <!-- <material name="white"/> -->
+      <material name="blue"/>
     </visual>
   </link>
   <joint name="left_hip_pitch_joint" type="revolute">
@@ -121,6 +147,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/left_knee_pitch.obj"/>
       </geometry>
+      <!-- <material name="white"/> -->
+      <material name="blue"/>
     </visual>
   </link>
   <joint name="left_knee_pitch_joint" type="revolute">
@@ -143,6 +171,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/ankle_pitch.obj"/>
       </geometry>
+      <!-- <material name="white"/> -->
+      <material name="blue"/>
     </visual>
   </link>
   <joint name="left_ankle_pitch_joint" type="revolute">
@@ -220,7 +250,7 @@
     <child link="left_foot_heel"/>
   </joint>
 
-    <!-- Left Arm-->
+  <!-- Left Arm-->
   <link name="left_shoulder_pitch">
     <inertial>
       <origin rpy="0 0 0" xyz="0 0.05 0"/>
@@ -232,6 +262,7 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/left_shoulder_pitch.obj"/>
       </geometry>
+      <material name="white"/>
     </visual>
   </link>
   <joint name="left_shoulder_pitch_joint" type="revolute">
@@ -254,6 +285,7 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/left_shoulder_roll.obj"/>
       </geometry>
+      <material name="white"/>
     </visual>
   </link>
   <joint name="left_shoulder_roll_joint" type="revolute">
@@ -289,6 +321,7 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_shoulder_yaw.obj"/>
       </geometry>
+      <material name="white"/>
     </visual>
   </link>
   <joint name="left_shoulder_yaw_joint" type="revolute">
@@ -310,6 +343,7 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/left_elbow_pitch.obj"/>
       </geometry>
+      <material name="white"/>
     </visual>
   </link>
   <joint name="left_elbow_pitch_joint" type="revolute">
@@ -362,6 +396,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_hip_yaw.obj"/>
       </geometry>
+      <!-- <material name="white"/> -->
+      <material name="red"/>
     </visual>
   </link>
   <joint name="right_hip_yaw_joint" type="revolute">
@@ -384,6 +420,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_hip_roll.obj"/>
       </geometry>
+      <!-- <material name="white"/> -->
+      <material name="red"/>
     </visual>
   </link>
   <joint name="right_hip_roll_joint" type="revolute">
@@ -406,6 +444,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_hip_pitch.obj"/>
       </geometry>
+      <!-- <material name="white"/> -->
+      <material name="red"/>
     </visual>
   </link>
   <joint name="right_hip_pitch_joint" type="revolute">
@@ -441,6 +481,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_knee_pitch.obj"/>
       </geometry>
+      <!-- <material name="white"/> -->
+      <material name="red"/>
     </visual>
   </link>
   <joint name="right_knee_pitch_joint" type="revolute">
@@ -463,6 +505,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/ankle_pitch.obj"/>
       </geometry>
+      <!-- <material name="white"/> -->
+      <material name="red"/>
     </visual>
   </link>
   <joint name="right_ankle_pitch_joint" type="revolute">
@@ -551,6 +595,7 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_shoulder_pitch.obj"/>
       </geometry>
+      <material name="white"/>
     </visual>
   </link>
   <joint name="right_shoulder_pitch_joint" type="revolute">
@@ -573,6 +618,7 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_shoulder_roll.obj"/>
       </geometry>
+      <material name="white"/>
     </visual>
   </link>
   <joint name="right_shoulder_roll_joint" type="revolute">
@@ -608,6 +654,7 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_shoulder_yaw.obj"/>
       </geometry>
+      <material name="white"/>
     </visual>
   </link>
   <joint name="right_shoulder_yaw_joint" type="revolute">
@@ -629,6 +676,7 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_elbow_pitch.obj"/>
       </geometry>
+      <material name="white"/>
     </visual>
   </link>
   <joint name="right_elbow_pitch_joint" type="revolute">
