@@ -10,7 +10,7 @@ seed:
 # CONTROLLER
 ##################################################################################################
 
-controller: 'MH'  # choose between 'MPC', 'HLIP', 'MH' (both)
+controller: 'MPC'  # choose between 'MPC', 'HLIP', 'MH' (both)
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -313,14 +313,13 @@ overhang:
 camera:
 
     # Position of the Meshcat camera in the world frame
-    position: [2.0,-2.0, 1.0]
+    position: [0.0,-2.0, 1.0]
 
     # Where the meshcat camera is looking
-    target: [1.0, 0.0, 0.5]
+    target: [0.0, 0.0, 1.0]
 
 save_html:
     # Save the meshcat recording to an html file. This can be used to produce a
     # video later, or even shared directly with someone to play in their 
     # browser (even if they don't have Drake or meshcat installed).
     enabled: True
-    filename: 'recording.html'

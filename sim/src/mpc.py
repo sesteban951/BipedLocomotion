@@ -948,7 +948,7 @@ if __name__=="__main__":
     # in their browser, even without meshcat running
     if config['save_html']['enabled']:
         html = meshcat.StaticHtml()
-        with open("data/" + config['save_html']['filename'], "w") as f:
+        with open('data/' + 'recording_' + config['controller'] + '.html', "w") as f:
             f.write(html)
 
     if config['logging']==True:
