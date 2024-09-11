@@ -378,12 +378,13 @@ class AchillesMPC(ModelPredictiveController):
         # Get the current time
         self.t_current = context.get_time()
 
-        # unpack the joystick commands
+        # fixed velocity reference
         if config['references']['enabled']==True:
             vx_des = config['references']['vx_ref']
             vy_des = config['references']['vy_ref']
-            wz_des = config['references']['wz_ref'] * (np.pi / 180)
+            wz_des = 0.0
             z_com_des = config['references']['z_com_ref']
+        # joystick commands
         else:
             joy_command = self.joystick_port.Eval(context)
             vx_des = joy_command[1] * self.vx_max  
@@ -393,25 +394,38 @@ class AchillesMPC(ModelPredictiveController):
         v_des = np.array([[vx_des], [vy_des]]) # in local stance foot frame
 
         # Get the desired MPC standing trajectory
-        q_stand = [np.copy(self.q_stand) for i in range(self.optimizer.num_steps() + 1)]
-        v_stand = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
-        v_des_W = self.R_stance_W_2D @ v_des
-        for i in range(self.num_steps + 1):
+        if config['references']['enabled']==False:
+            q_stand = [np.copy(self.q_stand) for i in range(self.optimizer.num_steps() + 1)]
+            v_stand = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
+            v_des_W = self.R_stance_W_2D @ v_des
+            for i in range(self.num_steps + 1):
 
-            # increment orientation
-            quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
-            q_stand[i][0] = quat_delta.w()
-            q_stand[i][1] = quat_delta.x()
-            q_stand[i][2] = quat_delta.y()
-            q_stand[i][3] = quat_delta.z()
-            
-            # increment position
-            p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
-            q_stand[i][4] = q0[4] + p_increment[0][0]
-            q_stand[i][5] = q0[5] + p_increment[1][0]
-            q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
-            v_stand[i][3] = v_des_W[0][0]
-            v_stand[i][4] = v_des_W[1][0]
+                # increment orientation
+                quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
+                q_stand[i][0] = quat_delta.w()
+                q_stand[i][1] = quat_delta.x()
+                q_stand[i][2] = quat_delta.y()
+                q_stand[i][3] = quat_delta.z()
+                
+                # increment position
+                p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
+                q_stand[i][4] = q0[4] + p_increment[0][0]
+                q_stand[i][5] = q0[5] + p_increment[1][0]
+                q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
+                v_stand[i][3] = v_des_W[0][0]
+                v_stand[i][4] = v_des_W[1][0]
+
+        # hardcoded reference trajectory
+        elif config['references']['enabled']==True:
+            q_stand = [np.copy(self.q_stand) for i in range(self.optimizer.num_steps() + 1)]
+            v_stand = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
+            for i in range(self.optimizer.num_steps() + 1):
+                # increment the position
+                q_stand[i][4] = (vx_des * self.t_current)  + vx_des * i * self.optimizer.time_step()
+                q_stand[i][5] = (vy_des * self.t_current)  + vy_des * i * self.optimizer.time_step()
+                q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
+                v_stand[i][3] = vx_des
+                v_stand[i][4] = vy_des
 
         # get a new reference trajectory
         if config['controller']=='MH':
@@ -428,20 +442,35 @@ class AchillesMPC(ModelPredictiveController):
             # replace HLIP floating base reference trajectory
             for i in range(self.num_steps + 1):
                 
-                # increment orientation
-                quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
-                q_HLIP[i][0] = quat_delta.w()
-                q_HLIP[i][1] = quat_delta.x()
-                q_HLIP[i][2] = quat_delta.y()
-                q_HLIP[i][3] = quat_delta.z()
+                if config['references']['enabled']==False:
+                    # increment orientation
+                    quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
+                    q_HLIP[i][0] = quat_delta.w()
+                    q_HLIP[i][1] = quat_delta.x()
+                    q_HLIP[i][2] = quat_delta.y()
+                    q_HLIP[i][3] = quat_delta.z()
+                    
+                    # increment position
+                    p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
+                    q_HLIP[i][4] = q0[4] + p_increment[0][0]
+                    q_HLIP[i][5] = q0[5] + p_increment[1][0]
+                    q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
+                    v_HLIP[i][3] = v_des_W[0][0]
+                    v_HLIP[i][4] = v_des_W[1][0]
                 
-                # increment position
-                p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
-                q_HLIP[i][4] = q0[4] + p_increment[0][0]
-                q_HLIP[i][5] = q0[5] + p_increment[1][0]
-                q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
-                v_HLIP[i][3] = v_des_W[0][0]
-                v_HLIP[i][4] = v_des_W[1][0]
+                elif config['references']['enabled']==True:
+                    # increment orientation
+                    q_HLIP[i][0] = 1.0
+                    q_HLIP[i][1] = 0.0
+                    q_HLIP[i][2] = 0.0
+                    q_HLIP[i][3] = 0.0
+
+                    # increment position
+                    q_HLIP[i][4] = (vx_des * self.t_current)  + vx_des * i * self.optimizer.time_step()
+                    q_HLIP[i][5] = (vy_des * self.t_current)  + vy_des * i * self.optimizer.time_step()
+                    q_HLIP[i][6] = z_com_des + self.p_torso_com[2][0]
+                    v_HLIP[i][3] = vx_des
+                    v_HLIP[i][4] = vy_des
 
             # draw the meshcat horizon
             if config['HLIP_vis']==True:
@@ -544,7 +573,7 @@ class HLIP(LeafSystem):
                                           bezier_order = bezier_order,
                                           T_SSP = self.T_SSP,
                                           dt = 0.005,
-                                          N = 2)
+                                          N = 3)
 
     # update the meshcat plot with the HLIP horizon
     def plot_meshcat_horizon(self, meshcat_horizon, t):
@@ -684,11 +713,10 @@ class HLIP(LeafSystem):
                           0.0, 0.0, 0.0, 0.0,
                           q_des[12], q_des[13], q_des[14], q_des[15], q_des[16],
                           0.0, 0.0, 0.0, 0.0])
-        # v_des = np.array([v_des[6], v_des[7], v_des[8], v_des[9], v_des[10],
-        #                   0.0, 0.0, 0.0, 0.0,
-        #                   v_des[11], v_des[12], v_des[13], v_des[14], v_des[15],
-        #                   0.0, 0.0, 0.0, 0.0])
-        v_des = np.zeros(18)
+        v_des = np.array([v_des[6], v_des[7], v_des[8], v_des[9], v_des[10],
+                          0.0, 0.0, 0.0, 0.0,
+                          v_des[11], v_des[12], v_des[13], v_des[14], v_des[15],
+                          0.0, 0.0, 0.0, 0.0])
         x_des = np.block([q_des, v_des])
 
         output.SetFromVector(x_des)

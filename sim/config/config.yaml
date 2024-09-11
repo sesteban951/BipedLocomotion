@@ -106,24 +106,23 @@ HLIP:
 sim:
 
     duration: 7.0       # [sec], simulation duration
-    real_time_rate: 0.0  # real-time rate of the simulation
-    time_step: 0.005     # [sec], simulation time step
+    real_time_rate: 1.0  # real-time rate of the simulation
+    time_step: 0.002     # [sec], simulation time step
 
 ##################################################################################################
 # REFERENCES
 ##################################################################################################
 
-# references to test tracking
+# references to test tracking, assumes you start at (px,py) = (0,0)
 references:
     enabled: False
 
     # constant velocity tracking
-    vx_ref: 0.3  # [m/s], forward velocity
-    vy_ref: 0.0  # [m/s], lateral velocity
-    wz_ref: 0.0  # [deg/s], yaw rate  (HLIP cannot track this)
+    vx_ref: 0.5  # [m/s], forward velocity in world frame
+    vy_ref: 0.0  # [m/s], lateral velocity in world frame
     
     # constant CoM height tracking
-    z_com_ref: 0.62  # [m], CoM height
+    z_com_ref: 0.63  # [m], CoM height
 
 ##################################################################################################
 # DISTURBANCES
@@ -136,8 +135,8 @@ disturbance:
 
     # fixed disturbance
     fixed: True
-    fx: 25.0
-    fy: 0.0
+    fx: 0.0
+    fy: 50.0
     fz: 0.0
 
     # force to be applied on the base frame is drawn uniformly from a circle
@@ -145,8 +144,8 @@ disturbance:
     force_radius: 150.0  # [N]
 
     # time parameters
-    time_applied: 1.0  # [sec], time when the disturbance is applied
-    duration: 0.5      # [sec], duration of the disturbance
+    time_applied: 3.5  # [sec], time when the disturbance is applied
+    duration: 0.1      # [sec], duration of the disturbance
 
 ##################################################################################################
 # Terrain
@@ -202,13 +201,13 @@ v0: [0.0000, 0.0000, 0.0000,
 gains:
 
   Kp: [700, 700, 700, 800, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
-       10, 10, 10, 10,       # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+       100, 100, 100, 100,       # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
        700, 700, 700, 800, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
-       10, 10, 10, 10]       # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-  Kd: [25, 25, 25, 25, 5,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
-       0.01, 0.01, 0.01, 0.01,               # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-       25, 25, 25, 25, 5,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
-       0.01, 0.01, 0.01, 0.01]               # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+       100, 100, 100, 100]       # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+  Kd: [20, 20, 20, 20, 10,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       10, 10, 10, 10,               # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+       20, 20, 20, 20, 10,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       10, 10, 10, 10]               # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
 
     # Adrian gains
     # 500, 1000, 500, 500, 500 (legs)
