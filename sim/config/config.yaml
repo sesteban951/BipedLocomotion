@@ -115,10 +115,10 @@ sim:
 
 # references to test tracking, assumes you start at (px,py) = (0,0)
 references:
-    enabled: False
+    enabled: True
 
     # constant velocity tracking
-    vx_ref: 0.5  # [m/s], forward velocity in world frame
+    vx_ref: 0.4  # [m/s], forward velocity in world frame
     vy_ref: 0.0  # [m/s], lateral velocity in world frame
     
     # constant CoM height tracking
@@ -145,7 +145,7 @@ disturbance:
 
     # time parameters
     time_applied: 3.5  # [sec], time when the disturbance is applied
-    duration: 0.1      # [sec], duration of the disturbance
+    duration: 0.2      # [sec], duration of the disturbance
 
 ##################################################################################################
 # Terrain

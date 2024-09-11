@@ -20,10 +20,8 @@ config = yaml.loadFile(yaml_file);
 
 % plot only a desired segments of the data
 dt = config.MPC.dt;
-% t0 = min(data.Time);
-% tf = max(data.Time);
-t0 = 0.9;
-tf = 2.5;
+t0 = min(data.Time);
+tf = max(data.Time);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -201,33 +199,23 @@ if plot_disturbance_schedule == 1
     tick_size = 12;
     label_size = 14;
 
-    subplot(3,2,1)
-    plot(t_data, F(:, 1), 'r', 'LineWidth', 2);
+    subplot(3,1,1)
+    plot(t_data, F(:, 2), 'r', 'LineWidth', 2);
     xlim([t0, tf]);
-    ylabel('$f_x$ [N]', 'Interpreter', 'latex', 'FontSize', label_size); 
-    set(gca, 'YTick', [0,max(F(:, 1))], 'FontSize', tick_size); % Set YTick and FontSize
+    ylabel('$f_y$ [N]', 'Interpreter', 'latex', 'FontSize', label_size); 
+    set(gca, 'YTick', [0,max(F(:, 2))], 'FontSize', tick_size); % Set YTick and FontSize
 
-    subplot(3,2,3)
+    subplot(3,1,2)
     area(time_unique, left_heel_contact_bool_signal, 'FaceColor', blue, 'EdgeColor', blue, 'FaceAlpha', 0.5, 'LineWidth', 1);
     xlim([t0, tf]);
     ylabel('Left', 'Interpreter', 'latex', 'FontSize', label_size);
     set(gca, 'YTick', [0,1], 'FontSize', tick_size); % Set YTick and FontSize
 
-
-    subplot(3,2,5)
+    subplot(3,1,3)
     area(time_unique, right_heel_contact_bool_signal, 'FaceColor', red, 'EdgeColor', red, 'FaceAlpha', 0.5, 'LineWidth', 1);
     xlim([t0, tf]);
     xlabel('Time [s]', 'Interpreter', 'latex', 'FontSize', label_size);
     ylabel('Right', 'Interpreter', 'latex', 'FontSize', label_size);
     set(gca, 'YTick', [0,1], 'FontSize', tick_size); % Set YTick and FontSize
 
-
-    % plot the heel and toe positions
-    subplot(3, 2, [2, 4, 6])
-    hold on; axis equal; grid on;
-    plot(left_foot_heel_pos(:, 1), left_foot_heel_pos(:, 2), 'bo-', 'LineWidth', 2, 'MarkerSize', 10);
-    plot(right_foot_heel_pos(:, 1), right_foot_heel_pos(:, 2), 'ro-', 'LineWidth', 2, 'MarkerSize', 10);
-    xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', label_size); 
-    ylabel('$y$ [m]', 'Interpreter', 'latex', 'FontSize', label_size);
-    set(gca, 'FontSize', tick_size); % Set YTick and FontSize
 end

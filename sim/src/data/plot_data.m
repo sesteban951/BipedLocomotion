@@ -41,7 +41,7 @@ plot_phase_movie = 0;
 save_phase_movie = 0;
 
 % DISTURBANCE
-plot_disturbance = 0;
+plot_disturbance = 1;
 
 % EFFICIENCY
 plot_efficiency = 0;
