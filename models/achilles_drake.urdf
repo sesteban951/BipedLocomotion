@@ -262,7 +262,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/left_shoulder_pitch.obj"/>
       </geometry>
-      <material name="white"/>
+      <!-- <material name="white"/> -->
+      <material name="blue"/>
     </visual>
   </link>
   <joint name="left_shoulder_pitch_joint" type="revolute">
@@ -285,7 +286,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/left_shoulder_roll.obj"/>
       </geometry>
-      <material name="white"/>
+      <!-- <material name="white"/> -->
+      <material name="blue"/>
     </visual>
   </link>
   <joint name="left_shoulder_roll_joint" type="revolute">
@@ -321,7 +323,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_shoulder_yaw.obj"/>
       </geometry>
-      <material name="white"/>
+      <!-- <material name="white"/> -->
+      <material name="blue"/>
     </visual>
   </link>
   <joint name="left_shoulder_yaw_joint" type="revolute">
@@ -343,7 +346,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/left_elbow_pitch.obj"/>
       </geometry>
-      <material name="white"/>
+      <!-- <material name="white"/> -->
+      <material name="blue"/>
     </visual>
   </link>
   <joint name="left_elbow_pitch_joint" type="revolute">
@@ -595,7 +599,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_shoulder_pitch.obj"/>
       </geometry>
-      <material name="white"/>
+      <!-- <material name="white"/> -->
+      <material name="red"/>
     </visual>
   </link>
   <joint name="right_shoulder_pitch_joint" type="revolute">
@@ -618,7 +623,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_shoulder_roll.obj"/>
       </geometry>
-      <material name="white"/>
+      <!-- <material name="white"/> -->
+      <material name="red"/>
     </visual>
   </link>
   <joint name="right_shoulder_roll_joint" type="revolute">
@@ -654,7 +660,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_shoulder_yaw.obj"/>
       </geometry>
-      <material name="white"/>
+      <!-- <material name="white"/> -->
+      <material name="red"/>
     </visual>
   </link>
   <joint name="right_shoulder_yaw_joint" type="revolute">
@@ -676,7 +683,8 @@
       <geometry>
         <mesh filename="../meshes/achilles_obj/right_elbow_pitch.obj"/>
       </geometry>
-      <material name="white"/>
+      <!-- <material name="white"/> -->
+      <material name="red"/>
     </visual>
   </link>
   <joint name="right_elbow_pitch_joint" type="revolute">

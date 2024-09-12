@@ -21,17 +21,17 @@ MPC:
     # position weights
     Qq: [10.0, 10.0, 10.0, 10.0,  # base orientation
          1.0, 1.0, 1.0,           # base position
-         0.2, 0.4, 0.4, 0.1, 0.3, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+         0.2, 0.4, 0.4, 0.3, 0.3, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
          0.1, 0.1, 0.01, 0.01,    # left arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-         0.2, 0.4, 0.4, 0.1, 0.3, # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+         0.2, 0.4, 0.4, 0.3, 0.3, # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
          0.1, 0.1, 0.01, 0.01]    # right arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
 
     # velocity weights
     Qv: [1.0, 1.0, 1.0,                    # base orientation
          0.1, 0.1, 0.1,                    # base position
-         0.03, 0.03, 0.03, 0.01, 0.03,     # left leg
+         0.03, 0.03, 0.03, 0.03, 0.05,     # left leg
          0.01, 0.01, 0.001, 0.003,         # left arm
-         0.03, 0.03, 0.03, 0.01, 0.03,     # right leg
+         0.03, 0.03, 0.03, 0.03, 0.05,     # right leg
          0.01, 0.01, 0.001, 0.003]         # right arm
 
     # input weights
@@ -79,7 +79,7 @@ HLIP:
     z_com_lower: 0.35 # [m], lower bound for the CoM height
 
     # foor parameters
-    z_apex: 0.05         # [m], apex height of the foot trajectory
+    z_apex: 0.06         # [m], apex height of the foot trajectory
     z_foot_offset: 0.0  # [m], overall traj offset of the foot from the ground
     bezier_order: 7      # 5 or 7, order of the bezier curve for foot traj
     hip_bias: 0.3       # [m], bias of the hip, distance foot to foot
@@ -89,8 +89,8 @@ HLIP:
     uy_max: 0.4  # [m], max lateral step length
 
     # maximum magnitude command parameters
-    vx_max: 0.75          # [m/s], max forward velocity
-    vy_max: 0.01          # [m/s], max lateral velocity
+    vx_max: 0.8          # [m/s], max forward velocity
+    vy_max: 0.3          # [m/s], max lateral velocity
     wz_max: 35           # [deg/s], max yaw rate
 
     # threshold for base velocity
@@ -107,7 +107,7 @@ sim:
 
     duration: 15.0       # [sec], simulation duration
     real_time_rate: 1.0  # real-time rate of the simulation
-    time_step: 0.001     # [sec], simulation time step
+    time_step: 0.002     # [sec], simulation time step
 
 ##################################################################################################
 # REFERENCES
@@ -115,11 +115,16 @@ sim:
 
 # references to test tracking, assumes you start at (px,py) = (0,0)
 references:
+
+    # fix the base orientation
+    fixed_base_orientation: True
+
+    # if below is true, the base will follow a fixed velocity and z_com
     enabled: False
 
     # constant velocity tracking
-    vx_ref: 0.4  # [m/s], forward velocity in world frame
-    vy_ref: 0.0  # [m/s], lateral velocity in world frame
+    vx_ref: 0.6  # [m/s], forward velocity in world frame
+    vy_ref: 0.3  # [m/s], lateral velocity in world frame
     
     # constant CoM height tracking
     z_com_ref: 0.63  # [m], CoM height
@@ -200,14 +205,14 @@ v0: [0.0000, 0.0000, 0.0000,
 
 gains:
 
-  Kp: [700, 700, 700, 800, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+  Kp: [800, 800, 800, 900, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        100, 100, 100, 100,       # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-       700, 700, 700, 800, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       800, 800, 800, 900, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        100, 100, 100, 100]       # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-  Kd: [20, 20, 20, 20, 10,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
-       10, 10, 10, 10,               # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-       20, 20, 20, 20, 10,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
-       10, 10, 10, 10]               # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+  Kd: [10, 10, 10, 10, 1,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       5, 5, 5, 5,               # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+       10, 10, 10, 10, 1,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       5, 5, 5, 5]               # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
 
     # Adrian gains
     # 500, 1000, 500, 500, 500 (legs)
@@ -218,7 +223,7 @@ gains:
 ##################################################################################################
 
 # choose to log new data from simulation
-logging: True
+logging: False
 
 ##################################################################################################
 # VISUALIZATION
@@ -238,9 +243,9 @@ color:
     # gray: [0.5, 0.5, 0.5, 1.0]
     # caltech orange: [0.9200, 0.3896, 0.0433, 1.0] 
 
-    ground: [0.0, 0.0, 0.0, 0.0]
-    # ground: [0.5, 0.5, 0.5, 1.0]
-    terrain: [0.5, 0.5, 0.5, 0.5]
+    # ground: [0.0, 0.0, 0.0, 0.0]
+    ground: [0.5, 0.5, 0.5, 1.0]
+    terrain: [0.5, 0.5, 0.5, 1]
 
 ##################################################################################################
 # WALL

@@ -444,11 +444,17 @@ class AchillesMPC(ModelPredictiveController):
                 
                 if config['references']['enabled']==False:
                     # increment orientation
-                    quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
-                    q_HLIP[i][0] = quat_delta.w()
-                    q_HLIP[i][1] = quat_delta.x()
-                    q_HLIP[i][2] = quat_delta.y()
-                    q_HLIP[i][3] = quat_delta.z()
+                    if config['references']['fixed_base_orientation']==True:
+                        q_HLIP[i][0] = 1
+                        q_HLIP[i][1] = 0
+                        q_HLIP[i][2] = 0
+                        q_HLIP[i][3] = 0
+                    else:
+                        quat_delta = self.increment_quaternion(self.quat_stance, wz_des, i * self.optimizer.time_step())
+                        q_HLIP[i][0] = quat_delta.w()
+                        q_HLIP[i][1] = quat_delta.x()
+                        q_HLIP[i][2] = quat_delta.y()
+                        q_HLIP[i][3] = quat_delta.z()
                     
                     # increment position
                     p_increment = self.R_stance_W_2D @ (v_des * i * self.optimizer.time_step())
