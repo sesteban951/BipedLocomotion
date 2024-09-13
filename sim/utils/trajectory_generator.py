@@ -368,6 +368,10 @@ class HLIPTrajectoryGenerator():
         p_stance_com = self.R_control_stance_W_mat.T @ (p_stance_W - p_com_pos_W)
         p_swing_com = self.R_control_stance_W_mat.T @ (p_swing_W - p_com_pos_W)
 
+        # kind of replace the foot position 
+        p_swing_com[0][0] += 0.00
+        p_stance_com[0][0] += 0.00
+
         # convert to list for the IK solver
         if stance_name == "left_foot":
             p_left_com  = p_stance_com.T[0].tolist()

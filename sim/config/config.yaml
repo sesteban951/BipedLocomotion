@@ -10,7 +10,7 @@ seed:
 # CONTROLLER
 ##################################################################################################
 
-controller: 'MH'  # choose between 'MPC', 'HLIP', 'MH' (both)
+controller: 'MPC'  # choose between 'MPC', 'HLIP', 'MH' (both)
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -75,8 +75,8 @@ HLIP:
     T_SSP: 0.35   # [sec], single support phase duration
 
     # CoM height range
-    z_com_upper: 0.65 # [m], upper bound for the CoM height
-    z_com_lower: 0.35 # [m], lower bound for the CoM height
+    z_com_upper: 0.62 # [m], upper bound for the CoM height
+    z_com_lower: 0.45 # [m], lower bound for the CoM height
 
     # foor parameters
     z_apex: 0.06         # [m], apex height of the foot trajectory
@@ -89,13 +89,13 @@ HLIP:
     uy_max: 0.4  # [m], max lateral step length
 
     # maximum magnitude command parameters
-    vx_max: 0.8          # [m/s], max forward velocity
+    vx_max: 0.6          # [m/s], max forward velocity
     vy_max: 0.3          # [m/s], max lateral velocity
     wz_max: 35           # [deg/s], max yaw rate
 
     # threshold for base velocity
-    vx_base_threshold: 1.0  # [m/s], threshold for forward velocity
-    vy_base_threshold: 1.0  # [m/s], threshold for lateral velocity
+    vx_base_threshold: 0.5  # [m/s], threshold for forward velocity
+    vy_base_threshold: 0.4  # [m/s], threshold for lateral velocity
     wz_base_threshold: 20   # [deg/s], threshold for yaw rate
 
 ##################################################################################################
@@ -105,9 +105,9 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 15.0       # [sec], simulation duration
-    real_time_rate: 1.0  # real-time rate of the simulation
-    time_step: 0.002     # [sec], simulation time step
+    duration: 7.0       # [sec], simulation duration
+    real_time_rate: 0.0  # real-time rate of the simulation
+    time_step: 0.005     # [sec], simulation time step
 
 ##################################################################################################
 # REFERENCES
@@ -117,7 +117,7 @@ sim:
 references:
 
     # fix the base orientation
-    fixed_base_orientation: True
+    fixed_base_orientation: False
 
     # if below is true, the base will follow a fixed velocity and z_com
     enabled: False
@@ -136,21 +136,21 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: False
+    enabled: True
 
     # fixed disturbance
-    fixed: True
+    fixed: False
     fx: 0.0
     fy: 50.0
     fz: 0.0
 
     # force to be applied on the base frame is drawn uniformly from a circle
     # in the xy direction with this radius
-    force_radius: 150.0  # [N]
+    force_radius: 200.0  # [N]
 
     # time parameters
-    time_applied: 3.5  # [sec], time when the disturbance is applied
-    duration: 0.2      # [sec], duration of the disturbance
+    time_applied: 2.5  # [sec], time when the disturbance is applied
+    duration: 0.1      # [sec], duration of the disturbance
 
 ##################################################################################################
 # Terrain
@@ -329,4 +329,4 @@ save_html:
     # Save the meshcat recording to an html file. This can be used to produce a
     # video later, or even shared directly with someone to play in their 
     # browser (even if they don't have Drake or meshcat installed).
-    enabled: True
+    enabled: False

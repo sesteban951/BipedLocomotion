@@ -22,13 +22,15 @@ config = yaml.loadFile(yaml_file);
 dt = config.MPC.dt;
 t0 = min(data.Time);
 tf = max(data.Time);
+% t0 = 11;
+% tf = 14;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % choose what to plot
 plot_foot_position = 0;
-plot_foot_boolean = 0;
-plot_disturbance_schedule = 1;
+plot_foot_boolean = 1;
+plot_disturbance_schedule = 0;
 
 % Set default properties for all axes
 set(0, 'DefaultAxesTickLabelInterpreter', 'latex');
