@@ -205,13 +205,13 @@ v0: [0.0000, 0.0000, 0.0000,
 
 gains:
 
-  Kp: [700, 700, 700, 800, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+  Kp: [800, 800, 800, 900, 150, # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        100, 100, 100, 100,       # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-       700, 700, 700, 800, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       800, 800, 800, 900, 150, # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        100, 100, 100, 100]       # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-  Kd: [25, 25, 25, 25, 5,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+  Kd: [10, 10, 10, 10, 1,        # left: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        5, 5, 5, 5,               # left: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-       25, 25, 25, 25, 5,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+       10, 10, 10, 10, 1,        # right: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
        5, 5, 5, 5]               # right: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
 
     # Adrian gains
