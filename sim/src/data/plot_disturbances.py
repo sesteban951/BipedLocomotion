@@ -14,10 +14,10 @@ def make_scatter_plot(fname):
     fell = data[:, 3] > 0
 
     # Make a scatter plot of the data
-    plt.scatter(fy[fell], fx[fell], c=(0.0, 0.302, 0.251), marker='x', label='Fall')  # Red color in RGB
-    plt.scatter(fy[~fell], fx[~fell], c=(0, 0, 0.4), label='Success')  # Blue color in RGB
-    plt.xlabel('Sideways Disturbance Force (N)')
+    plt.scatter(fy[~fell], fx[~fell], c='b', label='Success')
+    plt.scatter(fy[fell], fx[fell], c='r', marker='x', label='Fall')
     plt.ylabel('Forward Disturbance Force (N)')
+    plt.xlabel('Sideways Disturbance Force (N)')
 
     # Make a circle with 150N radius
     circle = plt.Circle((0, 0), 200, color='k', fill=False)

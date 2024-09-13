@@ -149,7 +149,7 @@ disturbance:
     force_radius: 200.0  # [N]
 
     # time parameters
-    time_applied: 2.5  # [sec], time when the disturbance is applied
+    time_applied: 2.0  # [sec], time when the disturbance is applied
     duration: 0.1      # [sec], duration of the disturbance
 
 ##################################################################################################
@@ -243,9 +243,9 @@ color:
     # gray: [0.5, 0.5, 0.5, 1.0]
     # caltech orange: [0.9200, 0.3896, 0.0433, 1.0] 
 
-    # ground: [0.0, 0.0, 0.0, 0.0]
-    ground: [0.5, 0.5, 0.5, 1.0]
-    terrain: [0.5, 0.5, 0.5, 1]
+    ground: [0.0, 0.0, 0.0, 0.0]
+    # ground: [0.5, 0.5, 0.5, 1.0]
+    terrain: [0.5, 0.5, 0.5, 0.5]
 
 ##################################################################################################
 # WALL
