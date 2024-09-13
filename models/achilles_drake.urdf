@@ -22,7 +22,7 @@
     <color rgba="0.2 0.2 0.2 1" />
   </material>
   <material name="white">
-    <color rgba="0.8 0.8 0.8 1" />
+    <color rgba="0.7 0.7 0.7 1" />
   </material>
   <material name="caltech_orange">
     <color rgba="0.92 0.39 0.043 1" />
@@ -39,7 +39,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="../meshes/achilles_obj/torso.obj"/>
+        <mesh filename="../meshes/achilles_obj/torso_rough.obj"/>
       </geometry>
       <material name="white"/>
     </visual>
