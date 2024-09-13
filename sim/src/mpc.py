@@ -866,6 +866,9 @@ if __name__=="__main__":
             disturbance_tau[5] = config['disturbance']['fz']
 
     time_applied = config['disturbance']['time_applied']
+    random_shift = np.random.uniform(-config['HLIP']['T_SSP'], config['HLIP']['T_SSP'])
+    time_applied += random_shift
+
     duration = config['disturbance']['duration']
     dist_gen = builder.AddSystem(DisturbanceGenerator(plant, 
                                                       meshcat, 

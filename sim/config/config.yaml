@@ -149,7 +149,7 @@ disturbance:
     force_radius: 200.0  # [N]
 
     # time parameters
-    time_applied: 2.5  # [sec], time when the disturbance is applied
+    time_applied: 2.0  # [sec], time when the disturbance is applied
     duration: 0.1      # [sec], duration of the disturbance
 
 ##################################################################################################
