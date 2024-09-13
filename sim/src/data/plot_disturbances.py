@@ -20,20 +20,25 @@ def make_scatter_plot(fname):
     plt.xlabel('Sideways Disturbance Force (N)')
 
     # Make a circle with 150N radius
-    circle = plt.Circle((0, 0), 150, color='k', fill=False)
+    circle = plt.Circle((0, 0), 200, color='k', fill=False)
     plt.gca().add_artist(circle)
     plt.xlim(-200, 200)
     plt.ylim(-200, 200)
     plt.gca().set_aspect('equal', adjustable='box')
 
 plt.figure(figsize=(8, 4))
-plt.subplot(1,2,1)
+plt.subplot(1,3,1)
 plt.title("HLIP only")
 make_scatter_plot("data_random_disturbance_hlip.csv")
 plt.legend(loc='upper left')
 
-plt.subplot(1,2,2)
-plt.title("HLIP + CI-MPC (proposed)")
+plt.subplot(1,3,2)
+plt.title("CI-MPC")
 make_scatter_plot("data_random_disturbance_mpc.csv")
+
+plt.subplot(1,3,3)
+plt.title("HLIP + CI-MPC (proposed)")
+make_scatter_plot("data_random_disturbance_mh.csv")
+
 plt.tight_layout()
 plt.show()

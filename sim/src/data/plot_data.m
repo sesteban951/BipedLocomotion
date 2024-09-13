@@ -4,10 +4,12 @@
 clear all; close all; clc;
 
 % Load the csv data
-time_data = csvread('data_times.csv');
-state_data = csvread('data_states.csv');
-torque_data = csvread('data_torques.csv');
-joystick_data = csvread('data_joystick.csv');
+controller = 'MH';
+time_data = csvread(strcat('data_times_', controller, '.csv'));
+state_data = csvread(strcat('data_states_', controller, '.csv'));
+torque_data = csvread(strcat('data_torques_', controller, '.csv'));
+disturbance_data = csvread(strcat('data_disturbances_', controller, '.csv'));
+joystick_data = csvread(strcat('data_joystick_', controller, '.csv'));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -22,22 +24,27 @@ t_data = time_data;
 t0 = t_data(1);
 tf = t_data(end);
 % t0 = 4;
-% tf = 11;
+% tf = 6;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% state and input plots
-plot_state = 0;
-plot_torque = 1;
+% STATE and INPUT
+plot_state = 1;
+plot_torque = 0;
 
-% joystick commands plot
+% COMMANDS
 plot_joy = 0;
 
-% demo plots
-plot_phase = 0;
+% PHASE
+plot_phase = 1;
 plot_phase_movie = 0;
 save_phase_movie = 0;
-plot_cot = 0;
+
+% DISTURBANCE
+plot_disturbance = 0;
+
+% EFFICIENCY
+plot_efficiency = 0;
 plot_ref_tracking = 0;
 
 % plot settings
@@ -58,6 +65,7 @@ t_data = t_data(idx);
 q_data = q_data(idx,:);
 v_data = v_data(idx,:);
 tau_data = tau_data(idx,:);
+disturbance_data = disturbance_data(idx,:);
 joystick_data = joystick_data(idx,:);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -177,6 +185,46 @@ if plot_torque == 1
         plot(t_data, tau_data(:,arm_idx(i)),'r','LineWidth', 1.5);
         xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
         ylabel(tau_joint_labels(arm_idx(i)), 'FontSize', 16, 'Interpreter', 'latex');
+        grid on;
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% extract teh disturbance data
+F = disturbance_data(:, 4:6);  % forces in world frame
+M = disturbance_data(:, 1:3);  % moments in world frame
+
+if plot_disturbance == 1
+    % disturbance labels
+    disturbance_F_labels = ["f_{x}", "f_{y}", "f_{z}"];
+    disturbance_M_labels = ["M_{x}", "M_{y}", "M_{z}"];
+    disturbance_F_labels = strcat("$", disturbance_F_labels, "$");
+    disturbance_M_labels = strcat("$", disturbance_M_labels, "$");
+
+    % plot the disturbance data
+    figure('Name', 'Disturbance Data');
+    tabgp = uitabgroup;
+
+    % plot the forces
+    tab = uitab(tabgp, 'Title', 'Forces');
+    axes('Parent', tab);
+    for i = 1:size(F,2)
+        subplot(3,1,i);
+        plot(t_data, F(:,i),'r','LineWidth', 1.5);
+        xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+        ylabel(disturbance_F_labels(i), 'FontSize', 16, 'Interpreter', 'latex');
+        grid on;
+    end
+
+    % plot the moments
+    tab = uitab(tabgp, 'Title', 'Moments');
+    axes('Parent', tab);
+    for i = 1:size(M,2)
+        subplot(3,1,i);
+        plot(t_data, M(:,i),'r','LineWidth', 1.5);
+        xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+        ylabel(disturbance_M_labels(i), 'FontSize', 16, 'Interpreter', 'latex');
         grid on;
     end
 end
@@ -374,7 +422,7 @@ end
 
 % plot the cost of transport
 % COT = (tau(t) * omega(t)) / (m * g * v(t))
-if plot_cot == 1
+if plot_efficiency == 1
 
     % compute the mechanical joint power
     [r, ~] = size(tau_data);
@@ -383,8 +431,11 @@ if plot_cot == 1
         % take the dot product of each row of tau with the corresponding row of v
         tau_t = tau_data(t,:);
         v_joint_data_t = v_joint_data(t,:);
-        P(t) = tau_t * v_joint_data_t';
+        P(t) = abs(tau_t * v_joint_data_t');
     end
+
+    % integrate teh total power to get energy consumed
+    total = trapz(t_data, P);
 
     % plot the mechanical power
     figure('Name', 'State Data');
@@ -392,8 +443,10 @@ if plot_cot == 1
     tab = uitab(tabgp, 'Title', 'Mechanical Power');
     axes('Parent', tab);
     plot(t_data, P, 'k', 'LineWidth', 1.5);
+    yline(0);
     xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
     ylabel('Power [W]', 'FontSize', 16, 'Interpreter', 'latex');
+    title(['Total Integrated: ', num2str(total)], 'FontSize', 16, 'Interpreter', 'latex');
 
     % Compute the accumulated energy over time using trapz in a loop
     E = zeros(r, 1);
@@ -407,9 +460,10 @@ if plot_cot == 1
     plot(t_data, E, 'g', 'LineWidth', 1.5);
     xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
     ylabel('Energy [J]', 'FontSize', 16, 'Interpreter', 'latex');
+    yline(0);
 
     % compute the COT
-    m = 22.5; % [kg]
+    m = 24; % [kg]
     g = 9.81; % [m/s^2]
     COT = zeros(r, 1);
     for t = 1:r
@@ -426,6 +480,27 @@ if plot_cot == 1
     plot(t_data, COT, 'm', 'LineWidth', 1.5);
     xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
     ylabel('Cost of Transport [1]', 'FontSize', 16, 'Interpreter', 'latex');
+    yline(0);
+
+    % compute the torque squared, ||u||^2 = u1^2 + u2^2 + u3^2  + ...
+    [r, ~] = size(tau_data);
+    U = zeros(r, 1);
+    for t = 1:r
+        tau_t = tau_data(t,:);
+        U(t) = tau_t * tau_t';
+    end
+    
+    % integrate over the bounds to get the total energy
+    total = trapz(t_data, U);
+
+    % plot torque squared
+    tab = uitab(tabgp, 'Title', 'Torque Squared');
+    axes('Parent', tab);
+    plot(t_data, U, 'r', 'LineWidth', 1.5);
+    yline(0);
+    xlabel('Time [s]', 'FontSize', 14, 'Interpreter', 'latex');
+    ylabel('$\|\tau\|^2_2$, (Nm)$^2$', 'FontSize', 16, 'Interpreter', 'latex');
+    title(['Total Integrated: ', num2str(total)], 'FontSize', 16, 'Interpreter', 'latex');
 
 end
 
