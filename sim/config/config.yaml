@@ -3,7 +3,7 @@
 ##################################################################################################
 
 seed:
-    fixed: True
+    fixed: False
     value: 0
 
 ##################################################################################################
@@ -19,7 +19,7 @@ controller: 'MH'  # choose between 'MPC', 'HLIP', 'MH' (both)
 MPC:
 
     # position weights
-    Qq: [2.0, 2.0, 2.0, 2.0,  # base orientation
+    Qq: [4.0, 4.0, 4.0, 4.0,  # base orientation
          1.0, 1.0, 1.0,           # base position
          0.4, 0.4, 0.4, 0.3, 0.8, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
          0.1, 0.1, 0.01, 0.01,    # left arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
@@ -27,7 +27,7 @@ MPC:
          0.1, 0.1, 0.01, 0.01]    # right arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
 
     # velocity weights
-    Qv: [0.2, 0.2, 0.2,                    # base orientation
+    Qv: [0.4, 0.4, 0.4,                    # base orientation
          0.1, 0.1, 0.1,                    # base position
          0.03, 0.03, 0.03, 0.03, 0.08,     # left leg
          0.01, 0.01, 0.001, 0.003,         # left arm
@@ -105,7 +105,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 17.0       # [sec], simulation duration
+    duration: 5.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -136,7 +136,7 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: False
+    enabled: True
 
     # fixed disturbance
     fixed: True
@@ -146,7 +146,7 @@ disturbance:
 
     # force to be applied on the base frame is drawn uniformly from a circle
     # in the xy direction with this radius
-    force_radius: 150.0  # [N]
+    force_radius: 175.0  # [N]
 
     # time parameters
     time_applied: 2.0  # [sec], time when the disturbance is applied
@@ -240,7 +240,7 @@ color:
 terrain:
     
     # choose whether or not to enable the rough terrain
-    enabled: True
+    enabled: False
 
     # parameters for generating the terrain
     num_entities: 50  # number of entities
@@ -268,7 +268,7 @@ wall:
 ##################################################################################################
 
 model_error:
-    enabled: True
+    enabled: False
 
     # Change link masses by m <-- m * r, 
     # where r ~ N(mu, sigma) is a random scale factor
