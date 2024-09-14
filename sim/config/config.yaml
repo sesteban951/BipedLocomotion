@@ -3,7 +3,7 @@
 ##################################################################################################
 
 seed:
-    fixed: True
+    fixed: False
     value: 0
 
 ##################################################################################################
@@ -21,17 +21,17 @@ MPC:
     # position weights
     Qq: [10.0, 10.0, 10.0, 10.0,  # base orientation
          1.0, 1.0, 1.0,           # base position
-         0.2, 0.4, 0.4, 0.3, 0.9, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+         0.4, 0.4, 0.4, 0.3, 0.8, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
          0.1, 0.1, 0.01, 0.01,    # left arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-         0.2, 0.4, 0.4, 0.3, 0.9, # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+         0.4, 0.4, 0.4, 0.3, 0.8, # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
          0.1, 0.1, 0.01, 0.01]    # right arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
 
     # velocity weights
     Qv: [1.0, 1.0, 1.0,                    # base orientation
          0.1, 0.1, 0.1,                    # base position
-         0.03, 0.03, 0.03, 0.03, 0.09,     # left leg
+         0.03, 0.03, 0.03, 0.03, 0.08,     # left leg
          0.01, 0.01, 0.001, 0.003,         # left arm
-         0.03, 0.03, 0.03, 0.03, 0.09,     # right leg
+         0.03, 0.03, 0.03, 0.03, 0.08,     # right leg
          0.01, 0.01, 0.001, 0.003]         # right arm
 
     # input weights
@@ -52,15 +52,15 @@ MPC:
     dt: 0.05       # time step
 
     # solver parameters
-    max_iterations: 2
+    max_iterations: 3
     scaling: True
     equality_constraints: False
     Delta0: 10.0
     Delta_max: 100_000
-    num_threads: 8
+    num_threads: 20
     contact_stiffness: 2_000
     dissipation_velocity: 0.1
-    smoothing_factor: 0.005
+    smoothing_factor: 0.008
     friction_coefficient: 0.5
     stiction_velocity: 0.5
     verbose: False
@@ -105,9 +105,9 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 20.0       # [sec], simulation duration
-    real_time_rate: 0.0  # real-time rate of the simulation
-    time_step: 0.005     # [sec], simulation time step
+    duration: 15.0       # [sec], simulation duration
+    real_time_rate: 1.0  # real-time rate of the simulation
+    time_step: 0.002     # [sec], simulation time step
 
 ##################################################################################################
 # REFERENCES
@@ -139,9 +139,9 @@ disturbance:
     enabled: False
 
     # fixed disturbance
-    fixed: False
+    fixed: True
     fx: 0.0
-    fy: 50.0
+    fy: 85.0
     fz: 0.0
 
     # force to be applied on the base frame is drawn uniformly from a circle
@@ -151,22 +151,6 @@ disturbance:
     # time parameters
     time_applied: 2.0  # [sec], time when the disturbance is applied
     duration: 0.1      # [sec], duration of the disturbance
-
-##################################################################################################
-# Terrain
-##################################################################################################
-
-# for testing the random terrain
-terrain:
-    
-    # choose whether or not to enable the rough terrain
-    enabled: True
-
-    # parameters for generating the terrain
-    num_entities: 50  # number of entities
-    x_range: [1.0, 2.0]   # [m], range of the x-axis
-    y_range: [-0.5, 0.5]  # [m], range of the y-axis
-    r_range: [0.1, 0.15]  # [m], range of the sphere radius
 
 ##################################################################################################
 # ACTIVATION FUNCTION
@@ -247,6 +231,23 @@ color:
     ground: [0.5, 0.5, 0.5, 1.0]
     terrain: [0.5, 0.5, 0.5, 1.0]
 
+
+##################################################################################################
+# Terrain
+##################################################################################################
+
+# for testing the random terrain
+terrain:
+    
+    # choose whether or not to enable the rough terrain
+    enabled: False
+
+    # parameters for generating the terrain
+    num_entities: 50  # number of entities
+    x_range: [1.0, 2.0]   # [m], range of the x-axis
+    y_range: [-0.5, 0.5]  # [m], range of the y-axis
+    r_range: [0.1, 0.15]  # [m], range of the sphere radius
+
 ##################################################################################################
 # WALL
 ##################################################################################################
@@ -256,11 +257,11 @@ wall:
     enabled: False
 
     # Size and position
-    length: 0.1  # [m]
-    width: 2.0  # [m]
-    height: 0.9  # [m]
-    x: 0.5  # [m]
-    y: 0.0  # [m] 
+    length: 1.0  # [m]
+    width: 0.1 # [m]
+    height: 0.7  # [m]
+    x: 0.0  # [m]
+    y: 0.5  # [m] 
 
 ##################################################################################################
 # MODEL ERROR
@@ -284,7 +285,7 @@ estimation_error:
     # Add Gaussian noise to the state estimate at each timestep
     # x <-- x + r, r ~ N(mu, sigma)
     mu: 0.0
-    sigma: 0.01
+    sigma: 0.02
 
 ##################################################################################################
 # VISUAL OBSTACLES
@@ -320,10 +321,10 @@ camera:
     2D_mode: False
 
     # Position of the Meshcat camera in the world frame
-    position: [0.0,-2.0, 1.0]
+    position: [2, -2.0, 1.0]
 
     # Where the meshcat camera is looking
-    target: [0.0, 0.0, 1.0]
+    target: [1.0, 0.0, 1.0]
 
 save_html:
     # Save the meshcat recording to an html file. This can be used to produce a
