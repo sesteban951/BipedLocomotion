@@ -3,14 +3,14 @@
 ##################################################################################################
 
 seed:
-    fixed: False
+    fixed: True
     value: 0
 
 ##################################################################################################
 # CONTROLLER
 ##################################################################################################
 
-controller: 'MPC'  # choose between 'MPC', 'HLIP', 'MH' (both)
+controller: 'MH'  # choose between 'MPC', 'HLIP', 'MH' (both)
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -21,25 +21,25 @@ MPC:
     # position weights
     Qq: [10.0, 10.0, 10.0, 10.0,  # base orientation
          1.0, 1.0, 1.0,           # base position
-         0.2, 0.4, 0.4, 0.3, 0.3, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+         0.2, 0.4, 0.4, 0.3, 0.9, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
          0.1, 0.1, 0.01, 0.01,    # left arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
-         0.2, 0.4, 0.4, 0.3, 0.3, # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+         0.2, 0.4, 0.4, 0.3, 0.9, # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
          0.1, 0.1, 0.01, 0.01]    # right arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
 
     # velocity weights
     Qv: [1.0, 1.0, 1.0,                    # base orientation
          0.1, 0.1, 0.1,                    # base position
-         0.03, 0.03, 0.03, 0.03, 0.05,     # left leg
+         0.03, 0.03, 0.03, 0.03, 0.09,     # left leg
          0.01, 0.01, 0.001, 0.003,         # left arm
-         0.03, 0.03, 0.03, 0.03, 0.05,     # right leg
+         0.03, 0.03, 0.03, 0.03, 0.09,     # right leg
          0.01, 0.01, 0.001, 0.003]         # right arm
 
     # input weights
     R: [100.0, 100.0, 100.0,       # base orientation
         100.0, 100.0, 100.0,       # base position
-        0.001, 0.001, 0.001, 0.001, 0.01, # left leg
+        0.001, 0.001, 0.001, 0.001, 0.0005, # left leg
         0.005, 0.005, 0.005, 0.005,       # left arm
-        0.001, 0.001, 0.001, 0.001, 0.01, # right leg
+        0.001, 0.001, 0.001, 0.001, 0.0005, # right leg
         0.005, 0.005, 0.005, 0.005]        # right arm
     
     # terminal scaling
@@ -47,12 +47,12 @@ MPC:
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 25  # number of nodes
+    num_steps: 20  # number of nodes
     mpc_rate: 50   # Hz
-    dt: 0.02       # time step
+    dt: 0.05       # time step
 
     # solver parameters
-    max_iterations: 1
+    max_iterations: 2
     scaling: True
     equality_constraints: False
     Delta0: 10.0
@@ -79,7 +79,7 @@ HLIP:
     z_com_lower: 0.45 # [m], lower bound for the CoM height
 
     # foor parameters
-    z_apex: 0.06         # [m], apex height of the foot trajectory
+    z_apex: 0.08         # [m], apex height of the foot trajectory
     z_foot_offset: 0.0  # [m], overall traj offset of the foot from the ground
     bezier_order: 7      # 5 or 7, order of the bezier curve for foot traj
     hip_bias: 0.3       # [m], bias of the hip, distance foot to foot
@@ -89,7 +89,7 @@ HLIP:
     uy_max: 0.4  # [m], max lateral step length
 
     # maximum magnitude command parameters
-    vx_max: 0.6          # [m/s], max forward velocity
+    vx_max: 0.5          # [m/s], max forward velocity
     vy_max: 0.3          # [m/s], max lateral velocity
     wz_max: 35           # [deg/s], max yaw rate
 
@@ -105,7 +105,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 7.0       # [sec], simulation duration
+    duration: 20.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.005     # [sec], simulation time step
 
@@ -123,8 +123,8 @@ references:
     enabled: False
 
     # constant velocity tracking
-    vx_ref: 0.6  # [m/s], forward velocity in world frame
-    vy_ref: 0.3  # [m/s], lateral velocity in world frame
+    vx_ref: 0.3  # [m/s], forward velocity in world frame
+    vy_ref: 0.0  # [m/s], lateral velocity in world frame
     
     # constant CoM height tracking
     z_com_ref: 0.63  # [m], CoM height
@@ -136,7 +136,7 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: True
+    enabled: False
 
     # fixed disturbance
     fixed: False
@@ -160,7 +160,7 @@ disturbance:
 terrain:
     
     # choose whether or not to enable the rough terrain
-    enabled: False
+    enabled: True
 
     # parameters for generating the terrain
     num_entities: 50  # number of entities
@@ -243,9 +243,9 @@ color:
     # gray: [0.5, 0.5, 0.5, 1.0]
     # caltech orange: [0.9200, 0.3896, 0.0433, 1.0] 
 
-    ground: [0.0, 0.0, 0.0, 0.0]
-    # ground: [0.5, 0.5, 0.5, 1.0]
-    terrain: [0.5, 0.5, 0.5, 0.5]
+    # ground: [0.0, 0.0, 0.0, 0.0]
+    ground: [0.5, 0.5, 0.5, 1.0]
+    terrain: [0.5, 0.5, 0.5, 1.0]
 
 ##################################################################################################
 # WALL
