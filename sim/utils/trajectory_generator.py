@@ -18,7 +18,8 @@ from pydrake.all import (
         Rgba, Sphere,
         Cylinder,
         BezierCurve,
-        JacobianWrtVariable
+        JacobianWrtVariable,
+        Box,
 )
 
 import sys, os
@@ -136,6 +137,42 @@ class HLIPTrajectoryGenerator():
         else:
             self.stance_foot_frame = self.left_foot_frame
             self.swing_foot_frame = self.right_foot_frame
+
+    def rotation_matrix_from_points(self, p1, p2):
+        """
+        Returns a 3D rotation matrix that aligns with the line segment connecting two points.
+        
+        Parameters:
+        p1: numpy array of shape (3, 1) - starting point
+        p2: numpy array of shape (3, 1) - ending point
+        
+        Returns:
+        R: 3x3 numpy array representing the rotation matrix
+        """
+        # Calculate the direction vector between p1 and p2
+        v = p2 - p1
+        # Normalize the vector to get the unit vector along the line segment
+        v_hat = v / np.linalg.norm(v)
+
+        # Choose a reference vector (not aligned with v_hat). We'll choose the x-axis unit vector [1, 0, 0].
+        # If v_hat is aligned with the x-axis, choose another arbitrary vector like [0, 1, 0].
+        if np.allclose(v_hat.flatten(), np.array([1, 0, 0])):  # if aligned with x-axis
+            e_ref = np.array([0, 1, 0])  # pick y-axis as reference
+        else:
+            e_ref = np.array([1, 0, 0])  # pick x-axis as reference
+
+        # Compute the first orthogonal vector by taking the cross product
+        u1 = np.cross(v_hat.flatten(), e_ref)
+        u1 = u1 / np.linalg.norm(u1)  # normalize the vector to get unit vector u1
+
+        # Compute the second orthogonal vector as the cross product of v_hat and u1
+        u2 = np.cross(v_hat.flatten(), u1)
+        u2 = u2 / np.linalg.norm(u2)  # normalize the vector to get unit vector u2
+
+        # Construct the rotation matrix using u1, u2, and v_hat
+        R = np.column_stack((u1, u2, v_hat.flatten()))
+
+        return R
 
     # -------------------------------------------------------------------------------------------------- #
 
@@ -628,46 +665,9 @@ class HLIPTrajectoryGenerator():
 
 ####################################################################################################
 
-def rotation_matrix_from_points(p1, p2):
-    """
-    Returns a 3D rotation matrix that aligns with the line segment connecting two points.
-    
-    Parameters:
-    p1: numpy array of shape (3, 1) - starting point
-    p2: numpy array of shape (3, 1) - ending point
-    
-    Returns:
-    R: 3x3 numpy array representing the rotation matrix
-    """
-    # Calculate the direction vector between p1 and p2
-    v = p2 - p1
-    # Normalize the vector to get the unit vector along the line segment
-    v_hat = v / np.linalg.norm(v)
-
-    # Choose a reference vector (not aligned with v_hat). We'll choose the x-axis unit vector [1, 0, 0].
-    # If v_hat is aligned with the x-axis, choose another arbitrary vector like [0, 1, 0].
-    if np.allclose(v_hat.flatten(), np.array([1, 0, 0])):  # if aligned with x-axis
-        e_ref = np.array([0, 1, 0])  # pick y-axis as reference
-    else:
-        e_ref = np.array([1, 0, 0])  # pick x-axis as reference
-
-    # Compute the first orthogonal vector by taking the cross product
-    u1 = np.cross(v_hat.flatten(), e_ref)
-    u1 = u1 / np.linalg.norm(u1)  # normalize the vector to get unit vector u1
-
-    # Compute the second orthogonal vector as the cross product of v_hat and u1
-    u2 = np.cross(v_hat.flatten(), u1)
-    u2 = u2 / np.linalg.norm(u2)  # normalize the vector to get unit vector u2
-
-    # Construct the rotation matrix using u1, u2, and v_hat
-    R = np.column_stack((u1, u2, v_hat.flatten()))
-
-    return R
-
 if __name__ == "__main__":
 
     # model file
-    #model_file = "../../models/achilles_drake_no_arms.urdf"
     model_file = "../../models/achilles_drake.urdf"
 
     # create a plant model for testing
@@ -681,27 +681,21 @@ if __name__ == "__main__":
 
     # set the parameters
     traj_gen.set_parameters(z_apex=0.07, 
-                            z_offset=0.01,
+                            z_offset=0.04,
                             hip_bias=0.2,
                             bezier_order=7, 
-                            T_SSP=0.3, 
-                            dt=0.05, 
-                            N=40)
+                            T_SSP=0.35, 
+                            dt=0.2, 
+                            N=10)
 
-    deg = -45.0
+    deg = -0.0
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
     quat = orient.ToQuaternion()
 
     # initial condition 
-    #q0 = np.array([
-    #    quat.w(), quat.x(), quat.y(), quat.z(),            # base orientation, (w, x, y, z)
-    #    0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
-    #    0.0000,  0.0200, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-    #    0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
-    #])
     q0 = np.array([
          quat.w(), quat.x(), quat.y(), quat.z(),            # base orientation, (w, x, y, z)
-         0.0000, 0.0000, 0.9300,                    # base position, (x,y,z)
+         0.0000, 0.1000, 0.9300,                    # base position, (x,y,z)
          0.0000,  0.0200, -0.5515, 1.0239,-0.4725,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
          0.0000, 0.0000, 0.0000, 0.0000,            # left arm
          0.0000, -0.0209, -0.5515, 1.0239,-0.4725,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle) 
@@ -726,7 +720,7 @@ if __name__ == "__main__":
     yaw = RollPitchYaw(R_stance).yaw_angle()
 
     # generate a trajectory
-    v_des = np.array([[0.2], [0.2]])
+    v_des = np.array([[0.5], [0.]])
     t_phase = 0.0
 
     q_HLIP, v_HLIP, meshcat_horizon = traj_gen.generate_trajectory(q0=q0,
@@ -747,7 +741,9 @@ if __name__ == "__main__":
         right_leg = q[12:17]
 
         #  add zero for arm indeces
-        q = np.concatenate((quat, pos, left_leg, np.zeros(4), right_leg, np.zeros(4)))
+        left_arm = np.array([0.5, 0.5, 0, -0.9])
+        right_arm = np.array([0.3, -0.1, 0, -0.8])
+        q = np.concatenate((quat, pos, left_leg, left_arm, right_leg, right_arm))
         q_HLIP[i] = q
 
         # same for the velocity
@@ -789,21 +785,21 @@ if __name__ == "__main__":
 
         # compute left leg rigid ttransform
         p_left_leg = 0.5 * (p_left + p_com)
-        R_left_leg = RotationMatrix(rotation_matrix_from_points(p_left_leg, p_com))
+        R_left_leg = RotationMatrix(traj_gen.rotation_matrix_from_points(p_left_leg, p_com))
         p_left_leg_len = np.linalg.norm(p_left - p_com)
 
         # compute right leg rigid transform
         p_right_leg = 0.5 * (p_right + p_com)
-        R_right_leg = RotationMatrix(rotation_matrix_from_points(p_right_leg, p_com))
+        R_right_leg = RotationMatrix(traj_gen.rotation_matrix_from_points(p_right_leg, p_com))
         p_right_leg_len = np.linalg.norm(p_right - p_com)
 
         # create a cylinder for the left leg
-        cyl_left = Cylinder(0.005, p_left_leg_len)
+        cyl_left = Cylinder(0.01, p_left_leg_len)
         meshcat.SetObject("left_leg_{}".format(i), cyl_left, blue_color_faint)
         meshcat.SetTransform("left_leg_{}".format(i), RigidTransform(R_left_leg, p_left_leg))
 
         # create a cylinder for the right leg
-        cyl_right = Cylinder(0.005, p_right_leg_len)
+        cyl_right = Cylinder(0.01, p_right_leg_len)
         meshcat.SetObject("right_leg_{}".format(i), cyl_right, red_color_faint)
         meshcat.SetTransform("right_leg_{}".format(i), RigidTransform(R_right_leg, p_right_leg))
 
@@ -811,6 +807,35 @@ if __name__ == "__main__":
     builder = DiagramBuilder()
     plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.0)
     models = Parser(plant).AddModels(model_file)
+
+    # Add the ground
+    plant.RegisterVisualGeometry(  # ground
+    plant.world_body(), 
+    RigidTransform(p=[0, 0, -25]), 
+    Box(50, 50, 50), "ground", 
+    [0.5,0.5,0.5,1])
+
+    # Add a wall to the scene
+    R_wall = RigidTransform(p=[0, 0.7, 0.3])
+    wall_geom = Box(2.0, 0.2, 0.8)
+    plant.RegisterVisualGeometry(
+            plant.world_body(), 
+            R_wall, 
+            wall_geom, 
+            "wall", 
+            [0.6,0.6,0.6,1])
+    
+    # Add rough terrain to the scene
+    for i in range(config['terrain']['num_entities']):
+            px = np.random.uniform(config['terrain']['x_range'][0], config['terrain']['x_range'][1]) - 0.8
+            py = np.random.uniform(config['terrain']['y_range'][0], config['terrain']['y_range'][1])
+            radius = np.random.uniform(config['terrain']['r_range'][0], config['terrain']['r_range'][1])
+            plant.RegisterVisualGeometry(
+                plant.world_body(), 
+                RigidTransform(p=[px, py, -0.1]), 
+                Sphere(radius), f"terrain_{i}", 
+                [0.6,0.6,0.6,1])
+
     plant.Finalize()
 
     AddDefaultVisualization(builder, meshcat)
