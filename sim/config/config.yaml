@@ -89,7 +89,7 @@ HLIP:
     uy_max: 0.4  # [m], max lateral step length
 
     # maximum magnitude command parameters
-    vx_max: 0.5          # [m/s], max forward velocity
+    vx_max: 0.7          # [m/s], max forward velocity
     vy_max: 0.3          # [m/s], max lateral velocity
     wz_max: 35           # [deg/s], max yaw rate
 
@@ -105,7 +105,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 5.0       # [sec], simulation duration
+    duration: 15.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -117,7 +117,7 @@ sim:
 references:
 
     # fix the base orientation
-    fixed_base_orientation: False
+    fixed_base_orientation: True
 
     # if below is true, the base will follow a fixed velocity and z_com
     enabled: False
@@ -136,7 +136,7 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: True
+    enabled: False
 
     # fixed disturbance
     fixed: True
@@ -170,7 +170,7 @@ blending:
 
 # parallel legs, slighlty bent
 q0:  [1.0000, -0.0000, 0.0031, -0.0000,          # base orientation, (w, x, y, z)
-     -0.0000, 0.0000, 0.9501,                    # base position, (x, y, z)
+     -1.0000, 0.0000, 0.9501,                    # base position, (x, y, z)
       0.0000, -0.0002, -0.4752, 1.0012, -0.5245,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle)
       0.0001, 0.0000, 0.0000, 0.0000,             # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
      -0.0000, 0.0002, -0.4752, 1.0012, -0.5245,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle)
@@ -207,7 +207,7 @@ gains:
 ##################################################################################################
 
 # choose to log new data from simulation
-logging: False
+logging: True
 
 ##################################################################################################
 # VISUALIZATION
@@ -254,7 +254,7 @@ terrain:
 
 # Extra wall for the robot to brace itself against
 wall: 
-    enabled: True
+    enabled: False
 
     # Size and position
     length: 1.0  # [m]
@@ -318,16 +318,16 @@ overhang:
 camera:
 
     # 2D Render Mode
-    2D_mode: False
+    2D_mode: True
 
     # Position of the Meshcat camera in the world frame
-    position: [2, -2.0, 1.0]
+    position: [0, -5, 1.0]
 
     # Where the meshcat camera is looking
-    target: [1.0, 0.0, 1.0]
+    target: [0.0, 0.0, 1.0]
 
 save_html:
     # Save the meshcat recording to an html file. This can be used to produce a
     # video later, or even shared directly with someone to play in their 
     # browser (even if they don't have Drake or meshcat installed).
-    enabled: False
+    enabled: True
