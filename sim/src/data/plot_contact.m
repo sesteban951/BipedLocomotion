@@ -20,17 +20,17 @@ config = yaml.loadFile(yaml_file);
 
 % plot only a desired segments of the data
 dt = config.MPC.dt;
-t0 = min(data.Time);
-tf = max(data.Time);
-% t0 = 11;
-% tf = 14;
+% t0 = min(data.Time);
+% tf = max(data.Time);
+t0 = 5;
+tf = 9.5;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % choose what to plot
 plot_foot_position = 0;
-plot_foot_boolean = 1;
-plot_disturbance_schedule = 0;
+plot_foot_boolean = 0;
+plot_disturbance_schedule = 1;
 
 % Set default properties for all axes
 set(0, 'DefaultAxesTickLabelInterpreter', 'latex');
@@ -162,10 +162,16 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Plot the left contact boolean signal with color under the curve
-blue = [0, 0, 1];
-red = [1, 0, 0];
-orange = [1, 0.5, 0];
-green = [0, 1, 0];
+% colors
+red = [216 27 96]; 
+red = red/norm(red);
+blue = [30 136 229];
+blue = blue/norm(blue);
+yellow = [255 193 7];
+yellow = yellow/norm(yellow);
+green = [0 77 64];
+green = green/norm(green);
+black = [0 0 0];
 
 if plot_foot_boolean == 1
 
@@ -201,22 +207,28 @@ if plot_disturbance_schedule == 1
     tick_size = 12;
     label_size = 14;
 
-    subplot(3,1,1)
-    plot(t_data, F(:, 2), 'r', 'LineWidth', 2);
+    subplot(4,1,1)
+    area(t_data, F(:, 1), 'FaceColor', green, 'EdgeColor', black, 'FaceAlpha', 0.5, 'LineWidth', 1);
     xlim([t0, tf]);
-    ylabel('$f_y$ [N]', 'Interpreter', 'latex', 'FontSize', label_size); 
-    set(gca, 'YTick', [0,max(F(:, 2))], 'FontSize', tick_size); % Set YTick and FontSize
+    ylabel('$f_x$ [$N$]', 'Interpreter', 'latex', 'FontSize', label_size); 
+    set(gca, 'YTick', [min(F(:, 1)),max(F(:, 1))], 'FontSize', tick_size); % Set YTick and FontSize
 
-    subplot(3,1,2)
-    area(time_unique, left_heel_contact_bool_signal, 'FaceColor', blue, 'EdgeColor', blue, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    subplot(4,1,2)
+    area(t_data, F(:, 2), 'FaceColor', green, 'EdgeColor', black, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    xlim([t0, tf]);
+    ylabel('$f_y$ [$N$]', 'Interpreter', 'latex', 'FontSize', label_size); 
+    set(gca, 'YTick', [min(F(:, 2)),max(F(:, 2))], 'FontSize', tick_size); % Set YTick and FontSize
+
+    subplot(4,1,3)
+    area(time_unique, left_heel_contact_bool_signal, 'FaceColor', blue, 'EdgeColor', black, 'FaceAlpha', 0.5, 'LineWidth', 1);
     xlim([t0, tf]);
     ylabel('Left', 'Interpreter', 'latex', 'FontSize', label_size);
     set(gca, 'YTick', [0,1], 'FontSize', tick_size); % Set YTick and FontSize
 
-    subplot(3,1,3)
-    area(time_unique, right_heel_contact_bool_signal, 'FaceColor', red, 'EdgeColor', red, 'FaceAlpha', 0.5, 'LineWidth', 1);
+    subplot(4,1,4)
+    area(time_unique, right_heel_contact_bool_signal, 'FaceColor', red, 'EdgeColor', black, 'FaceAlpha', 0.5, 'LineWidth', 1);
     xlim([t0, tf]);
-    xlabel('Time [s]', 'Interpreter', 'latex', 'FontSize', label_size);
+    xlabel('Time [$s$]', 'Interpreter', 'latex', 'FontSize', label_size);
     ylabel('Right', 'Interpreter', 'latex', 'FontSize', label_size);
     set(gca, 'YTick', [0,1], 'FontSize', tick_size); % Set YTick and FontSize
 

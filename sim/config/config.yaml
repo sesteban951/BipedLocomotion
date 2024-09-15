@@ -105,7 +105,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 20.0       # [sec], simulation duration
+    duration: 10.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -116,11 +116,11 @@ sim:
 # references to test tracking, assumes you start at (px,py) = (0,0)
 references:
 
-    # fix the base orientation
-    fixed_base_orientation: False
-
     # if below is true, the base will follow a fixed velocity and z_com
     enabled: True
+
+    # fix the base orientation
+    fixed_base_orientation: False
 
     # constant velocity tracking
     vx_ref: 0.5  # [m/s], forward velocity in world frame
@@ -128,8 +128,8 @@ references:
     
     # maximum velocity rates
     velocity_ramp: True
-    t_ramp_up: 4.0   # time to ramp up to max velocity
-    t_hold: 6.0      # time to hold velocity
+    t_ramp_up: 3.0   # time to ramp up to max velocity
+    t_hold: 16.0      # time to hold velocity
     t_ramp_down: 4.0 # time to ramp down to 0 velocity
     
     # constant CoM height tracking
@@ -142,12 +142,12 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: False
+    enabled: True
 
     # fixed disturbance
     fixed: True
-    fx: 0.0
-    fy: 85.0
+    fx: 50.0
+    fy: -50.0
     fz: 0.0
 
     # force to be applied on the base frame is drawn uniformly from a circle
@@ -155,8 +155,8 @@ disturbance:
     force_radius: 175.0  # [N]
 
     # time parameters
-    time_applied: 2.0  # [sec], time when the disturbance is applied
-    duration: 0.1      # [sec], duration of the disturbance
+    time_applied: 6.0  # [sec], time when the disturbance is applied
+    duration: 0.2      # [sec], duration of the disturbance
 
 ##################################################################################################
 # ACTIVATION FUNCTION
@@ -236,7 +236,6 @@ color:
     # ground: [0.0, 0.0, 0.0, 0.0]
     ground: [0.5, 0.5, 0.5, 1.0]
     terrain: [0.5, 0.5, 0.5, 1.0]
-
 
 ##################################################################################################
 # Terrain
