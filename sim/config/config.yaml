@@ -10,7 +10,7 @@ seed:
 # CONTROLLER
 ##################################################################################################
 
-controller: 'MH'  # choose between 'MPC', 'HLIP', 'MH' (both)
+controller: 'HLIP'  # choose between 'MPC', 'HLIP', 'MH' (both)
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -117,14 +117,20 @@ sim:
 references:
 
     # fix the base orientation
-    fixed_base_orientation: True
+    fixed_base_orientation: False
 
     # if below is true, the base will follow a fixed velocity and z_com
-    enabled: False
+    enabled: True
 
     # constant velocity tracking
-    vx_ref: 0.3  # [m/s], forward velocity in world frame
+    vx_ref: 0.5  # [m/s], forward velocity in world frame
     vy_ref: 0.0  # [m/s], lateral velocity in world frame
+    
+    # maximum velocity rates
+    velocity_ramp: True
+    t_ramp_up: 2.0   # time to ramp up to max velocity
+    t_hold: 5.0      # time to hold velocity
+    t_ramp_down: 2.0 # time to ramp down to 0 velocity
     
     # constant CoM height tracking
     z_com_ref: 0.63  # [m], CoM height
@@ -170,7 +176,7 @@ blending:
 
 # parallel legs, slighlty bent
 q0:  [1.0000, -0.0000, 0.0031, -0.0000,          # base orientation, (w, x, y, z)
-     -1.0000, 0.0000, 0.9501,                    # base position, (x, y, z)
+      0.0000, 0.0000, 0.9501,                    # base position, (x, y, z)
       0.0000, -0.0002, -0.4752, 1.0012, -0.5245,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle)
       0.0001, 0.0000, 0.0000, 0.0000,             # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
      -0.0000, 0.0002, -0.4752, 1.0012, -0.5245,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle)
@@ -318,7 +324,7 @@ overhang:
 camera:
 
     # 2D Render Mode
-    2D_mode: True
+    2D_mode: False
 
     # Position of the Meshcat camera in the world frame
     position: [0, -5, 1.0]

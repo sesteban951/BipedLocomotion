@@ -380,11 +380,34 @@ class AchillesMPC(ModelPredictiveController):
 
         # fixed velocity reference
         if config['references']['enabled']==True:
-            vx_des = config['references']['vx_ref']
+
+            if config['references']['velocity_ramp'] == True:
+                
+                t_up  = config['references']['t_ramp_up']
+                t_hold = config['references']['t_hold']
+                t_down = config['references']['t_ramp_down']
+                vx_max = config['references']['vx_ref']
+
+                # Ramp up phase
+                if self.t_current < t_up:
+                    vx_des = self.t_current / t_up * vx_max
+                # Hold phase
+                elif (self.t_current < t_hold + t_up) and (self.t_current >= t_up):
+                    vx_des = vx_max
+                # Ramp down phase
+                elif (self.t_current < t_down + t_hold + t_up) and (self.t_current >= t_hold + t_up):
+                    vx_des = (t_down + t_hold + t_up - self.t_current) / t_down * vx_max
+                # After ramp down
+                else:
+                    vx_des = 0.0
+            else:
+                vx_des = config['references']['vx_ref']
             vy_des = config['references']['vy_ref']
             wz_des = 0.0
             z_com_des = config['references']['z_com_ref']
-        # joystick commands
+            print("t_current: ", self.t_current)
+            print("vx_des: ", vx_des)
+
         else:
             joy_command = self.joystick_port.Eval(context)
             vx_des = joy_command[1] * self.vx_max  
@@ -421,8 +444,8 @@ class AchillesMPC(ModelPredictiveController):
             v_stand = [np.copy(np.zeros(len(v0))) for i in range(self.optimizer.num_steps() + 1)]
             for i in range(self.optimizer.num_steps() + 1):
                 # increment the position
-                q_stand[i][4] = (vx_des * self.t_current)  + vx_des * i * self.optimizer.time_step()
-                q_stand[i][5] = (vy_des * self.t_current)  + vy_des * i * self.optimizer.time_step()
+                q_stand[i][4] = q0[4] + vx_des * i * self.optimizer.time_step()
+                q_stand[i][5] = q0[5] + vy_des * i * self.optimizer.time_step()
                 q_stand[i][6] = z_com_des + self.p_torso_com[2][0]
                 v_stand[i][3] = vx_des
                 v_stand[i][4] = vy_des
@@ -472,8 +495,8 @@ class AchillesMPC(ModelPredictiveController):
                     q_HLIP[i][3] = 0.0
 
                     # increment position
-                    q_HLIP[i][4] = (vx_des * self.t_current)  + vx_des * i * self.optimizer.time_step()
-                    q_HLIP[i][5] = (vy_des * self.t_current)  + vy_des * i * self.optimizer.time_step()
+                    q_HLIP[i][4] = q0[4]  + vx_des * i * self.optimizer.time_step()
+                    q_HLIP[i][5] = q0[5]  + vy_des * i * self.optimizer.time_step()
                     q_HLIP[i][6] = z_com_des + self.p_torso_com[2][0]
                     v_HLIP[i][3] = vx_des
                     v_HLIP[i][4] = vy_des
@@ -685,9 +708,31 @@ class HLIP(LeafSystem):
 
         # get the desired velocity
         if config['references']['enabled']==True:
-            vx_des = config['references']['vx_ref']
+            
+            if config['references']['velocity_ramp'] == True:
+                t_up  = config['references']['t_ramp_up']
+                t_hold = config['references']['t_hold']
+                t_down = config['references']['t_ramp_down']
+                vx_max = config['references']['vx_ref']
+
+                # Ramp up phase
+                if self.t_current < t_up:
+                    vx_des = self.t_current / t_up * vx_max
+                # Hold phase
+                elif (self.t_current < t_hold + t_up) and (self.t_current >= t_up):
+                    vx_des = vx_max
+                # Ramp down phase
+                elif (self.t_current < t_down + t_hold + t_up) and (self.t_current >= t_hold + t_up):
+                    vx_des = (t_down + t_hold + t_up - self.t_current) / t_down * vx_max
+                # After ramp down
+                else:
+                    vx_des = 0.0
+            else:
+                vx_des = config['references']['vx_ref']
+
             vy_des = config['references']['vy_ref']
             z_com_des = config['references']['z_com_ref']
+            
         # unpack the joystick commands
         else:
             joy_command = self.joystick_port.Eval(context)
