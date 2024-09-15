@@ -405,8 +405,6 @@ class AchillesMPC(ModelPredictiveController):
             vy_des = config['references']['vy_ref']
             wz_des = 0.0
             z_com_des = config['references']['z_com_ref']
-            print("t_current: ", self.t_current)
-            print("vx_des: ", vx_des)
 
         else:
             joy_command = self.joystick_port.Eval(context)
@@ -732,7 +730,7 @@ class HLIP(LeafSystem):
 
             vy_des = config['references']['vy_ref']
             z_com_des = config['references']['z_com_ref']
-            
+
         # unpack the joystick commands
         else:
             joy_command = self.joystick_port.Eval(context)

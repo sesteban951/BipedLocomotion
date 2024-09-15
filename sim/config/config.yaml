@@ -10,7 +10,7 @@ seed:
 # CONTROLLER
 ##################################################################################################
 
-controller: 'HLIP'  # choose between 'MPC', 'HLIP', 'MH' (both)
+controller: 'MH'  # choose between 'MPC', 'HLIP', 'MH' (both)
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -105,7 +105,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 15.0       # [sec], simulation duration
+    duration: 20.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -128,9 +128,9 @@ references:
     
     # maximum velocity rates
     velocity_ramp: True
-    t_ramp_up: 2.0   # time to ramp up to max velocity
-    t_hold: 5.0      # time to hold velocity
-    t_ramp_down: 2.0 # time to ramp down to 0 velocity
+    t_ramp_up: 4.0   # time to ramp up to max velocity
+    t_hold: 6.0      # time to hold velocity
+    t_ramp_down: 4.0 # time to ramp down to 0 velocity
     
     # constant CoM height tracking
     z_com_ref: 0.63  # [m], CoM height
