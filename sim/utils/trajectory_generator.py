@@ -680,13 +680,13 @@ if __name__ == "__main__":
     traj_gen = HLIPTrajectoryGenerator(model_file)
 
     # set the parameters
-    traj_gen.set_parameters(z_apex=0.07, 
+    traj_gen.set_parameters(z_apex=0.10, 
                             z_offset=0.04,
                             hip_bias=0.2,
                             bezier_order=7, 
                             T_SSP=0.35, 
                             dt=0.2, 
-                            N=10)
+                            N=15)
 
     deg = -0.0
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
