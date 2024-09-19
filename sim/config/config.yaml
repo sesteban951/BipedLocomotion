@@ -10,7 +10,7 @@ seed:
 # CONTROLLER
 ##################################################################################################
 
-controller: 'MH'  # choose between 'MPC', 'HLIP', 'MH' (both)
+controller: 'HLIP'  # choose between 'MPC', 'HLIP', 'MH' (both)
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -105,8 +105,8 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 10.0       # [sec], simulation duration
-    real_time_rate: 0.0  # real-time rate of the simulation
+    duration: 15.0       # [sec], simulation duration
+    real_time_rate: 1.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
 ##################################################################################################
@@ -117,7 +117,7 @@ sim:
 references:
 
     # if below is true, the base will follow a fixed velocity and z_com
-    enabled: True
+    enabled: False
 
     # fix the base orientation
     fixed_base_orientation: False
@@ -127,7 +127,7 @@ references:
     vy_ref: 0.0  # [m/s], lateral velocity in world frame
     
     # maximum velocity rates
-    velocity_ramp: True
+    velocity_ramp: False
     t_ramp_up: 3.0   # time to ramp up to max velocity
     t_hold: 16.0      # time to hold velocity
     t_ramp_down: 4.0 # time to ramp down to 0 velocity
@@ -142,7 +142,7 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: True
+    enabled: False
 
     # fixed disturbance
     fixed: True
@@ -326,10 +326,10 @@ camera:
     2D_mode: False
 
     # Position of the Meshcat camera in the world frame
-    position: [0, -5, 1.0]
+    position: [1.5, -1, 1.75]
 
     # Where the meshcat camera is looking
-    target: [0.0, 0.0, 1.0]
+    target: [0.0, 0.0, 0.25]
 
 save_html:
     # Save the meshcat recording to an html file. This can be used to produce a

@@ -680,13 +680,16 @@ if __name__ == "__main__":
     traj_gen = HLIPTrajectoryGenerator(model_file)
 
     # set the parameters
+    T_ssp = 0.35
+    dt = 0.35/5.0
+    N = 25
     traj_gen.set_parameters(z_apex=0.10, 
                             z_offset=0.04,
                             hip_bias=0.2,
                             bezier_order=7, 
-                            T_SSP=0.35, 
-                            dt=0.2, 
-                            N=15)
+                            T_SSP=T_ssp, 
+                            dt=dt, 
+                            N=N)
 
     deg = -0.0
     orient = RollPitchYaw(0, 0, deg * np.pi / 180)
@@ -702,6 +705,8 @@ if __name__ == "__main__":
          0.0000, 0.0000, 0.0000, 0.0000             # right arm
      ])
     v0 = np.zeros(plant.num_velocities())
+    v0[3] = 0.3   # x-direction
+    v0[4] = -0.0   # y-direction
     plant.SetPositions(plant_context, q0)
     plant.SetVelocities(plant_context, v0)
 
@@ -720,7 +725,7 @@ if __name__ == "__main__":
     yaw = RollPitchYaw(R_stance).yaw_angle()
 
     # generate a trajectory
-    v_des = np.array([[0.5], [0.]])
+    v_des = np.array([[0.3], [0.3]])
     t_phase = 0.0
 
     q_HLIP, v_HLIP, meshcat_horizon = traj_gen.generate_trajectory(q0=q0,
@@ -741,8 +746,10 @@ if __name__ == "__main__":
         right_leg = q[12:17]
 
         #  add zero for arm indeces
-        left_arm = np.array([0.5, 0.5, 0, -0.9])
-        right_arm = np.array([0.3, -0.1, 0, -0.8])
+        # left_arm = np.array([0.5, 0.5, 0, -0.9])
+        # right_arm = np.array([0.3, -0.1, 0, -0.8])
+        left_arm = np.zeros(4)
+        right_arm = np.zeros(4)
         q = np.concatenate((quat, pos, left_leg, left_arm, right_leg, right_arm))
         q_HLIP[i] = q
 
@@ -815,26 +822,26 @@ if __name__ == "__main__":
     Box(50, 50, 50), "ground", 
     [0.5,0.5,0.5,1])
 
-    # Add a wall to the scene
-    R_wall = RigidTransform(p=[0, 0.7, 0.3])
-    wall_geom = Box(2.0, 0.2, 0.8)
-    plant.RegisterVisualGeometry(
-            plant.world_body(), 
-            R_wall, 
-            wall_geom, 
-            "wall", 
-            [0.6,0.6,0.6,1])
+    # # Add a wall to the scene
+    # R_wall = RigidTransform(p=[0, 0.7, 0.3])
+    # wall_geom = Box(2.0, 0.2, 0.8)
+    # plant.RegisterVisualGeometry(
+    #         plant.world_body(), 
+    #         R_wall, 
+    #         wall_geom, 
+    #         "wall", 
+    #         [0.6,0.6,0.6,1])
     
-    # Add rough terrain to the scene
-    for i in range(config['terrain']['num_entities']):
-            px = np.random.uniform(config['terrain']['x_range'][0], config['terrain']['x_range'][1]) - 0.8
-            py = np.random.uniform(config['terrain']['y_range'][0], config['terrain']['y_range'][1])
-            radius = np.random.uniform(config['terrain']['r_range'][0], config['terrain']['r_range'][1])
-            plant.RegisterVisualGeometry(
-                plant.world_body(), 
-                RigidTransform(p=[px, py, -0.1]), 
-                Sphere(radius), f"terrain_{i}", 
-                [0.6,0.6,0.6,1])
+    # # Add rough terrain to the scene
+    # for i in range(config['terrain']['num_entities']):
+    #         px = np.random.uniform(config['terrain']['x_range'][0], config['terrain']['x_range'][1]) - 0.8
+    #         py = np.random.uniform(config['terrain']['y_range'][0], config['terrain']['y_range'][1])
+    #         radius = np.random.uniform(config['terrain']['r_range'][0], config['terrain']['r_range'][1])
+    #         plant.RegisterVisualGeometry(
+    #             plant.world_body(), 
+    #             RigidTransform(p=[px, py, -0.1]), 
+    #             Sphere(radius), f"terrain_{i}", 
+    #             [0.6,0.6,0.6,1])
 
     plant.Finalize()
 
