@@ -10,7 +10,7 @@ seed:
 # CONTROLLER
 ##################################################################################################
 
-controller: 'HLIP'  # choose between 'MPC', 'HLIP', 'MH' (both)
+controller: 'MH'  # choose between 'MPC', 'HLIP', 'MH' (both)
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -57,7 +57,7 @@ MPC:
     equality_constraints: False
     Delta0: 10.0
     Delta_max: 100_000
-    num_threads: 20
+    num_threads: 16
     contact_stiffness: 2_000
     dissipation_velocity: 0.1
     smoothing_factor: 0.008
@@ -105,7 +105,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 15.0       # [sec], simulation duration
+    duration: 5.0       # [sec], simulation duration
     real_time_rate: 1.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -142,12 +142,12 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: False
+    enabled: True
 
     # fixed disturbance
     fixed: True
-    fx: 50.0
-    fy: -50.0
+    fx: 20.0
+    fy: 0.0
     fz: 0.0
 
     # force to be applied on the base frame is drawn uniformly from a circle
@@ -155,8 +155,8 @@ disturbance:
     force_radius: 175.0  # [N]
 
     # time parameters
-    time_applied: 6.0  # [sec], time when the disturbance is applied
-    duration: 0.2      # [sec], duration of the disturbance
+    time_applied: 2.0  # [sec], time when the disturbance is applied
+    duration: 0.75      # [sec], duration of the disturbance
 
 ##################################################################################################
 # ACTIVATION FUNCTION
@@ -213,7 +213,7 @@ gains:
 ##################################################################################################
 
 # choose to log new data from simulation
-logging: True
+logging: False
 
 ##################################################################################################
 # VISUALIZATION
@@ -326,7 +326,7 @@ camera:
     2D_mode: False
 
     # Position of the Meshcat camera in the world frame
-    position: [1.5, -1, 1.75]
+    position: [1., -0.75, 1.25]
 
     # Where the meshcat camera is looking
     target: [0.0, 0.0, 0.25]
