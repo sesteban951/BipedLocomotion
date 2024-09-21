@@ -21,24 +21,24 @@ config = yaml.loadFile(yaml_file);
 
 % plot only a desired segments of the data
 t_data = time_data;
-t0 = t_data(1);
-tf = t_data(end);
-% t0 = 4;
-% tf = 6;
+% t0 = t_data(1);
+% tf = t_data(end);
+t0 = 0;
+tf = 5;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % STATE and INPUT
-plot_state = 1;
+plot_state = 0;
 plot_torque = 0;
 
 % COMMANDS
 plot_joy = 0;
 
 % PHASE
-plot_phase = 1;
-plot_phase_movie = 0;
-save_phase_movie = 0;
+plot_phase = 0;
+plot_phase_movie = 1;
+save_phase_movie = 1;
 
 % DISTURBANCE
 plot_disturbance = 0;
@@ -265,28 +265,28 @@ end
 % plot all phase plots
 if plot_phase == 1
 
-    % orbit tail length
-    hold_sec = 0.3;
+    leg_idx = [1, 2, 3, 4, 5, 10, 11, 12, 13, 14];
+    arm_idx = [6, 7, 8, 9, 15, 16, 17, 18];
+
+    q_leg_data = q_joint_data(:,leg_idx);
+    v_leg_data = v_joint_data(:,leg_idx);
+    q_arm_data = q_joint_data(:,arm_idx);
+    v_arm_data = v_joint_data(:,arm_idx);
+
+    q_leg_labels = q_joint_labels(leg_idx);
+    q_leg_labels = strcat("$", q_leg_labels, "$");
+    v_leg_labels = v_joint_labels(leg_idx);
+    v_leg_labels = strcat("$", v_leg_labels, "$");
+    q_arm_labels = q_joint_labels(arm_idx);   
+    q_arm_labels = strcat("$", q_arm_labels, "$");
+    v_arm_labels = v_joint_labels(arm_idx);
+    v_arm_labels = strcat("$", v_arm_labels, "$");
 
     figure('Name', 'Phase Plot');
     tabgp = uitabgroup;
 
-    q_leg_data = q_joint_data(:,[1,2,3,4,5,10,11,12,13,14]);
-    v_leg_data = v_joint_data(:,[1,2,3,4,5,10,11,12,13,14]);
-    q_arm_data = q_joint_data(:,[6,7,8,9,15,16,17,18]);
-    v_arm_data = v_joint_data(:,[6,7,8,9,15,16,17,18]);
-
-    q_leg_labels = q_joint_labels([1,2,3,4,5,10,11,12,13,14]);
-    q_leg_labels = strcat("$", q_leg_labels, "$");
-    v_leg_labels = v_joint_labels([1,2,3,4,5,10,11,12,13,14]);
-    v_leg_labels = strcat("$", v_leg_labels, "$");
-    q_arm_labels = q_joint_labels([6,7,8,9,15,16,17,18]);   
-    q_arm_labels = strcat("$", q_arm_labels, "$");
-    v_arm_labels = v_joint_labels([6,7,8,9,15,16,17,18]);
-    v_arm_labels = strcat("$", v_arm_labels, "$");
-
     % plot the leg phase plots
-    tab = uitab(tabgp, 'Title', 'Leg Torques');
+    tab = uitab(tabgp, 'Title', 'Leg Phase');
     axes('Parent', tab);
     for i = 1:size(q_leg_data,2)
         subplot(2,5,i)
@@ -297,7 +297,7 @@ if plot_phase == 1
     end
 
     % plot the arm phase plots
-    tab = uitab(tabgp, 'Title', 'Arm Torques');
+    tab = uitab(tabgp, 'Title', 'Arm Phase');
     axes('Parent', tab);
     for i = 1:size(q_arm_data,2)
         subplot(2,4,i)
@@ -313,86 +313,92 @@ end
 
 % plot individual phase plots
 if plot_phase_movie == 1
-    
-    figure('Name', 'Phase Plot', 'Position', [100, 100, 560, 420]);
-    joint_idx = 11;  % Left Hip Yaw (8), Left Hip Roll (9), Left Hip Pitch (10), Left Knee Pitch (11), Left ankle Pitch (12)
-                    % Left Shoulder Pitch (13), Left Shoulder Roll (14), Left Shoulder Yaw (15), Left Elbow Pitch (16)
-                    % Right Hip Yaw (17), Right Hip Roll (18), Right Hip Pitch (19), Right Knee Pitch (20), Right ankle Pitch (21)
-                    % Right Shoulder Pitch (22), Right Shoulder Roll (23), Right Shoulder Yaw (24), Right Elbow Pitch (25)
-    q_joint = q_data(:, joint_idx);
-    v_joint = v_data(:, joint_idx-1);
 
-    % make a movie
+    figure('Name', 'Phase Plot', 'Position', [0, 0, 560, 420]);
+
+    joint_idx = [11];  % Joint indices
+    q_joint = q_data(:, joint_idx);
+    v_joint = v_data(:, joint_idx - 1);
+    
+    % Set axis limits
     xlims = [min(q_joint) - 0.05, max(q_joint) + 0.05];
     ylims = [min(v_joint) - 0.05, max(v_joint) + 0.05];
-    xlim(xlims); ylim(ylims);  
+    xlim(xlims);
+    ylim(ylims);
     yline(0);
-    grid on; hold on;
-    plot(nan, nan);
-
-    % down sample the data to plot in real time
+    grid on;
+    hold on;
+    
+    % Customize tick size and font size
+    ax = gca;  % Get current axes
+    ax.FontSize = 14;  % Set font size for axis labels and ticks
+    ax.TickLength = [0.02, 0.02];  % Increase the tick length
+    
+    % Down-sample the data for real-time plotting
     hz_data = 1 / mean(diff(t_data));
-    hz_des = hz_data;
-    % hz_des = 30;
+    hz_des = 350;
     down_sample_factor = round(hz_data / hz_des);
-
+    
     t_data = t_data(1:down_sample_factor:end);
     q_joint = q_joint(1:down_sample_factor:end);
     v_joint = v_joint(1:down_sample_factor:end);
-
-    % video writer object
+    
+    % Define how long points stay visible in the plot
+    hold_sec = 0.35;  % Duration in seconds that each point stays visible
+    
+    % Initialize video writer if saving the movie
     if save_phase_movie == 1
         video_filename = 'phase_plot.avi';
         video = VideoWriter(video_filename);
         open(video);
     end
-
-    % animate the data
-    tic = t_data(1);
-    t_end = t_data(end);
-    idx = 2;
-
-    % num_points_to_keep = length(t_data);
-    hold_sec = 0.1;
+    
+    % Determine the number of points to keep visible
     num_points_to_keep = round(hz_des * hold_sec);
-    line_objects = []; % Initialize an empty list to store line objects
-
+    line_objects = [];  % Initialize an empty list to store line handles
+    
+    % Animation loop setup
+    idx = 2;  % Ensure idx starts from 2
+    startTime = tic;
+    
     while idx <= length(t_data)
-
-        % super title
-        msg = sprintf('Time: %.2f s', t_data(idx));
-        sgtitle(msg);
-
-        % plot the data now
-        line = plot([q_joint(idx-1) q_joint(idx)], [v_joint(idx-1) v_joint(idx)], 'b-', 'LineWidth', 1.5);
-        dot = plot(q_joint(idx), v_joint(idx), 'ro', 'MarkerSize', 5, 'MarkerFaceColor', 'r');
-        xlabel("$q$", 'interpreter', 'latex');
-        ylabel("$\dot{q}$", 'interpreter', 'latex');
-
+        % Create a new line segment and store its handle
+        new_line = plot([q_joint(idx-1), q_joint(idx)], [v_joint(idx-1), v_joint(idx)], ...
+                        'LineWidth', 3.5, 'Color', [1, 1, 1]);  % Start with white color
+        
         % Add the new line object to the list
-        line_objects = [line_objects, line];
-
-        % If there are more than num_points_to_keep line objects, delete the oldest one
+        line_objects = [line_objects, new_line];
+        
+        % Limit the number of line objects to num_points_to_keep
         if length(line_objects) > num_points_to_keep
+            % Remove the oldest line object
             delete(line_objects(1));
-            line_objects(1) = []; % Remove the oldest line object from the list
+            line_objects(1) = [];  % Remove from the list
         end
-
-        % Define a colormap that transitions from blue to white
-        color_map = [linspace(1, 0, num_points_to_keep)', linspace(1, 0, num_points_to_keep)', ones(num_points_to_keep, 1)];
-
-        % Update the color of each line in the list
-        for i = 1:length(line_objects)
-            set(line_objects(i), 'Color', color_map(i, :));
+        
+        % Update the colormap for the reversed heat map effect (from blue to white)
+        num_existing_points = length(line_objects);
+        for i = 1:num_existing_points
+            % Reverse the color transition: white (newest) to blue (oldest)
+            fade_factor = 1 - (i - 1) / max(1, (num_existing_points - 1));  % Reverse scaling: 1 (newest) to 0 (oldest)
+            fade_factor = min(max(fade_factor, 0), 1);  % Clamp fade_factor to [0, 1]
+            set(line_objects(i), 'Color', [fade_factor, fade_factor, 1]);  % Transition from blue to white
         end
-
-        % draw the plot
-        drawnow;
-
-        % Capture the current frame and write it to the video
+        
+        % Update dot position
+        dot = plot(q_joint(idx), v_joint(idx), 'ro', 'MarkerSize', 7, 'MarkerFaceColor', 'r');
+    
+        % Update plot title and set title size
+        titleStr = sprintf('Time: %.2f s', t_data(idx));
+        sgtitle(titleStr, 'FontSize', 14);  % Set title size
+            
+        % Efficient draw call
+        drawnow limitrate;
+        
+        % Capture the current frame if saving a movie
         if save_phase_movie == 1
             frame = getframe(gcf);
-            % Resize frame to 560x420 if needed
+            % Resize frame to match figure dimensions if needed
             if size(frame.cdata, 1) ~= 420 || size(frame.cdata, 2) ~= 560
                 resized_frame = imresize(frame.cdata, [420, 560]);
                 writeVideo(video, resized_frame);
@@ -400,22 +406,19 @@ if plot_phase_movie == 1
                 writeVideo(video, frame);
             end
         end
-
-        while toc < t_data(idx)
-            % wait until the next time step
-        end
-
-        % remove the dot
-        delete(dot);
-
-        % increment the index
+        
+        % Clear dot position for the next frame
+        set(dot, 'XData', nan, 'YData', nan);
+        
+        % Increment index
         idx = idx + 1;
     end
-
-    % close the video file
+    
+    % Close video if recording
     if save_phase_movie == 1
         close(video);
     end
+    
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -538,4 +541,25 @@ if plot_ref_tracking == 1
     plot(v_base_data(:,1), v_base_data(:,2), 'b', 'LineWidth', 1.5);
     plot(vx_ref, vy_ref, 'r+', 'MarkerSize', 10, 'MarkerFaceColor', 'r', 'LineWidth', 2);
 
+end
+
+
+
+function replay_phase_plot(replay_data, t_data)
+    % Function to replay the phase plot
+    figure('Name', 'Replay Phase Plot', 'Position', [100, 100, 560, 420]);
+    hold on;
+    xlim([min(replay_data(:, 1)) - 0.05, max(replay_data(:, 1)) + 0.05]);
+    ylim([min(replay_data(:, 2)) - 0.05, max(replay_data(:, 2)) + 0.05]);
+    yline(0);
+    grid on;
+
+    % Loop through replay data
+    for i = 1:size(replay_data, 1) / 2
+        plot(replay_data(2*i-1:2*i, 1), replay_data(2*i-1:2*i, 2), 'LineWidth', 1.5, 'Color', [1, 1, 1]);
+        pause(0.1);  % Adjust the pause duration for desired replay speed
+    end
+
+    % Final title
+    sgtitle('Replay of Phase Plot');
 end
