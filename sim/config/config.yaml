@@ -57,7 +57,7 @@ MPC:
     equality_constraints: False
     Delta0: 10.0
     Delta_max: 100_000
-    num_threads: 16
+    num_threads: 20
     contact_stiffness: 2_000
     dissipation_velocity: 0.1
     smoothing_factor: 0.008
@@ -146,7 +146,7 @@ disturbance:
 
     # fixed disturbance
     fixed: True
-    fx: 20.0
+    fx: 0.0
     fy: 0.0
     fz: 0.0
 
@@ -156,7 +156,7 @@ disturbance:
 
     # time parameters
     time_applied: 2.0  # [sec], time when the disturbance is applied
-    duration: 0.75      # [sec], duration of the disturbance
+    duration: 0.5      # [sec], duration of the disturbance
 
 ##################################################################################################
 # ACTIVATION FUNCTION
@@ -176,14 +176,14 @@ blending:
 
 # parallel legs, slighlty bent
 q0:  [1.0000, -0.0000, 0.0031, -0.0000,          # base orientation, (w, x, y, z)
-      0.0000, 0.0000, 0.9501,                    # base position, (x, y, z)
+      0.0000, 0.0000, 1.9501,                    # base position, (x, y, z)
       0.0000, -0.0002, -0.4752, 1.0012, -0.5245,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle)
       0.0001, 0.0000, 0.0000, 0.0000,             # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
      -0.0000, 0.0002, -0.4752, 1.0012, -0.5245,  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle)
       0.0001, 0.0000, 0.0000, 0.0000]             # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow)
 
 v0: [0.0000, 0.0000, 0.0000,            
-     0.0000, 0.0000, 0.0000,                   
+     1.0000, 0.0000, 0.0000,                   
      0.0000, 0.0000, 0.0000, 0.0000, 0.0000,  
      0.0000, 0.0000, 0.0000, 0.0000,           
      0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
@@ -213,7 +213,7 @@ gains:
 ##################################################################################################
 
 # choose to log new data from simulation
-logging: False
+logging: True
 
 ##################################################################################################
 # VISUALIZATION
@@ -326,7 +326,7 @@ camera:
     2D_mode: False
 
     # Position of the Meshcat camera in the world frame
-    position: [1., -0.75, 1.25]
+    position: [0., -2, 0.75]
 
     # Where the meshcat camera is looking
     target: [0.0, 0.0, 0.25]

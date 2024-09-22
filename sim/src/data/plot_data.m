@@ -21,10 +21,10 @@ config = yaml.loadFile(yaml_file);
 
 % plot only a desired segments of the data
 t_data = time_data;
-% t0 = t_data(1);
-% tf = t_data(end);
-t0 = 0;
-tf = 5;
+t0 = t_data(1);
+tf = t_data(end);
+% t0 = 0;
+% tf = 16;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -316,9 +316,13 @@ if plot_phase_movie == 1
 
     figure('Name', 'Phase Plot', 'Position', [0, 0, 560, 420]);
 
-    joint_idx = [11];  % Joint indices
+    joint_idx = [11];  % Left Hip Yaw (8), Left Hip Roll (9), Left Hip Pitch (10), Left Knee Pitch (11), Left ankle Pitch (12)
+                       % Left Shoulder Pitch (13), Left Shoulder Roll (14), Left Shoulder Yaw (15), Left Elbow Pitch (16)
+                       % Right Hip Yaw (17), Right Hip Roll (18), Right Hip Pitch (19), Right Knee Pitch (20), Right ankle Pitch (21)
+                       % Right Shoulder Pitch (22), Right Shoulder Roll (23), Right Shoulder Yaw (24), Right Elbow Pitch (25)
     q_joint = q_data(:, joint_idx);
     v_joint = v_data(:, joint_idx - 1);
+    video_filename = 'phase_plot.avi';
     
     % Set axis limits
     xlims = [min(q_joint) - 0.05, max(q_joint) + 0.05];
@@ -328,6 +332,9 @@ if plot_phase_movie == 1
     yline(0);
     grid on;
     hold on;
+
+    xlabel('$q$ [rad]', 'FontSize', 14, 'Interpreter', 'latex');
+    ylabel('$\dot q$ [rad/$s$]', 'FontSize', 14, 'Interpreter', 'latex');
     
     % Customize tick size and font size
     ax = gca;  % Get current axes
@@ -348,7 +355,6 @@ if plot_phase_movie == 1
     
     % Initialize video writer if saving the movie
     if save_phase_movie == 1
-        video_filename = 'phase_plot.avi';
         video = VideoWriter(video_filename);
         open(video);
     end
