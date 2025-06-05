@@ -1,0 +1,147 @@
+##################################################################################################
+# RANDOM SEED
+##################################################################################################
+
+seed:
+    fixed: False
+    value: 0
+
+
+##################################################################################################
+# CONTROLLER
+##################################################################################################
+
+controller: 'MPC'  # choose between 'MPC', 'HLIP', 'MH' (both)
+
+
+##################################################################################################
+# MPC PARAMETERS
+##################################################################################################
+
+MPC:
+
+    # position weights
+    # Qq: [4.0, 4.0, 4.0, 4.0,      # base orientation
+    #      1.0, 1.0, 1.0,           # base position
+    #      0.4, 0.4, 0.4, 0.3, 0.8, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+    #      0.1, 0.1, 0.01, 0.01,    # left arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+    #      0.4, 0.4, 0.4, 0.3, 0.8, # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
+    #      0.1, 0.1, 0.01, 0.01]    # right arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+    Qq: [4.0, 4.0, 4.0, 4.0,           # base orientation
+         1.0, 1.0, 1.0,                # base position
+         0.4, 0.4, 0.4, 0.3, 0.8, 0.8, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
+         0.4, 0.4, 0.4, 0.3, 0.8, 0.8] # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
+
+    # velocity weights
+    # Qv: [0.4, 0.4, 0.4,                    # base orientation
+    #      0.1, 0.1, 0.1,                    # base position
+    #      0.03, 0.03, 0.03, 0.03, 0.08,     # left leg
+    #      0.01, 0.01, 0.001, 0.003,         # left arm
+    #      0.03, 0.03, 0.03, 0.03, 0.08,     # right leg
+    #      0.01, 0.01, 0.001, 0.003]         # right arm
+    Qv: [0.4, 0.4, 0.4,                       # base orientation
+         0.1, 0.1, 0.1,                       # base position
+         0.03, 0.03, 0.03, 0.03, 0.08, 0.08,  # left leg
+         0.03, 0.03, 0.03, 0.03, 0.08, 0.08]  # right leg
+
+    # input weights
+    # R: [100.0, 100.0, 100.0,       # base orientation
+    #     100.0, 100.0, 100.0,       # base position
+    #     0.001, 0.001, 0.001, 0.001, 0.0005, # left leg
+    #     0.005, 0.005, 0.005, 0.005,       # left arm
+    #     0.001, 0.001, 0.001, 0.001, 0.0005, # right leg
+    #     0.005, 0.005, 0.005, 0.005]        # right arm
+    R: [100.0, 100.0, 100.0,                         # base orientation
+        100.0, 100.0, 100.0,                         # base position
+        0.001, 0.001, 0.001, 0.001, 0.0005, 0.0005,  # left leg
+        0.001, 0.001, 0.001, 0.001, 0.0005, 0.0005,] # right leg
+    
+    # terminal scaling
+    Qf_q_scaling: 10.0
+    Qf_v_scaling: 10.0
+
+    # standard parameters
+    num_steps: 20  # number of nodes
+    mpc_rate: 50   # Hz
+    dt: 0.05       # time step
+
+    # solver parameters
+    max_iterations: 3
+    scaling: True
+    equality_constraints: False
+    Delta0: 10.0
+    Delta_max: 100_000
+    num_threads: 20
+    contact_stiffness: 2_000
+    dissipation_velocity: 0.1
+    smoothing_factor: 0.008
+    friction_coefficient: 0.5
+    stiction_velocity: 0.5
+    verbose: False
+
+
+##################################################################################################
+# SIMULATION PARAMETERS
+##################################################################################################
+
+# drake simulation parameters
+sim:
+
+    duration: 15.0       # [sec], simulation duration
+    real_time_rate: 1.0  # real-time rate of the simulation
+    time_step: 0.002     # [sec], simulation time step
+
+
+##################################################################################################
+# INITIAL CONFIGURATION
+##################################################################################################
+
+q0:  [1.00, 0.00, 0.00, 0.00,           # base orientation, (w, x, y, z)
+      0.00, 0.00, 0.79,                 # base position, (x, y, z)
+      0.20, 0.00, 0.00, 0.42, -0.23, 0.0,  # left leg, (hip yaw, hip roll, hip pitch, knee, ankle pitch, ankle roll)
+      0.20, 0.00, 0.00, 0.42, -0.23, 0.0]  # right leg, (hip yaw, hip roll, hip pitch, knee, ankle pitch, ankle roll)
+
+v0: [0.00, 0.00, 0.00,            
+     0.00, 0.00, 0.00,                   
+     0.00, 0.00, 0.00, 0.0, 0.0, 0.0,
+     0.00, 0.00, 0.00, 0.0, 0.0, 0.0]  # initial velocities of the robot (base orientation, base position, left leg, right leg)
+
+
+##################################################################################################
+# PD GAINS
+##################################################################################################
+
+gains:
+
+  Kp: [100, 100, 100, 150, 40, 40, 
+       100, 100, 100, 150, 40, 40]
+  Kd: [2, 2, 2, 4, 2, 2, 
+       2, 2, 2, 4, 2, 2]
+
+##################################################################################################
+# LOGGING
+##################################################################################################
+
+# choose to log new data from simulation
+logging: False
+
+
+##################################################################################################
+# VISUALIZATION
+##################################################################################################
+
+# contact force visualization
+contact_vis: False
+
+# colors to use throughout the simulation
+color:
+
+    # transparent: [0.0, 0.0, 0.0, 0.0]
+    # white: [1.0, 1.0, 1.0, 1.0]
+    # gray: [0.5, 0.5, 0.5, 1.0]
+    # caltech orange: [0.9200, 0.3896, 0.0433, 1.0] 
+
+    # ground: [0.0, 0.0, 0.0, 0.0]
+    ground: [0.5, 0.5, 0.5, 1.0]
+    terrain: [0.5, 0.5, 0.5, 1.0]
+

@@ -105,7 +105,7 @@ HLIP:
 # drake simulation parameters
 sim:
 
-    duration: 10.0       # [sec], simulation duration
+    duration: 60.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -117,7 +117,7 @@ sim:
 references:
 
     # if below is true, the base will follow a fixed velocity and z_com
-    enabled: True
+    enabled: False
 
     # fix the base orientation
     fixed_base_orientation: False
@@ -142,7 +142,7 @@ references:
 # single disturbance on the base frame
 disturbance:
     
-    enabled: True
+    enabled: False
 
     # fixed disturbance
     fixed: True
@@ -213,14 +213,14 @@ gains:
 ##################################################################################################
 
 # choose to log new data from simulation
-logging: True
+logging: False
 
 ##################################################################################################
 # VISUALIZATION
 ##################################################################################################
 
 # visluaze the HLIP trajectory
-HLIP_vis: False
+HLIP_vis: True
 
 # contact force visualization
 contact_vis: False
@@ -335,4 +335,4 @@ save_html:
     # Save the meshcat recording to an html file. This can be used to produce a
     # video later, or even shared directly with someone to play in their 
     # browser (even if they don't have Drake or meshcat installed).
-    enabled: True
+    enabled: False
