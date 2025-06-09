@@ -11,7 +11,7 @@ from pydrake.all import ModelVisualizer, MultibodyPlant, Parser, StartMeshcat
 from pydrake.all import *
 
 # load model
-urdf_path = "../../models/achilles_drake.urdf"
+urdf_path = "../../models/g1_12dof_obj.urdf"
 plant = MultibodyPlant(0)
 Parser(plant).AddModels(urdf_path)
 plant.Finalize()
@@ -19,7 +19,7 @@ plant.Finalize()
 ########################################################################################
 
 # model instance index
-model_instance_idx = plant.GetModelInstanceByName("achilles")
+model_instance_idx = plant.GetModelInstanceByName("g1_12dof")
 
 # BODIES
 print("-"*50)
