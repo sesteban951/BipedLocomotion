@@ -11,40 +11,40 @@ from pydrake.all import *
 class IDX:
 
     # generalized position indeces
-    POS_X = 0 # BASE POSITION
+    POS_X = 0  # BASE POSITION
     POS_Y = 1
     POS_Z = 2
-    Q_X = 3   # BASE ORIENTATION
+    Q_X = 3    # BASE ORIENTATION
     Q_Y = 4
     Q_Z = 5
     Q_W = 6
-    LHP = 7   # LEFT LEG
+    LHP = 7    # LEFT LEG
     LHR = 8   
     LHY = 9
     LKP = 10
     LAP = 11
     LAR = 12
-    RHP = 13  # RIGHT LEG
+    RHP = 13   # RIGHT LEG
     RHR = 14
     RHY = 15
     RKP = 16
     RAP = 17
     RAR = 18
-    WASIT_YAW = 19    # WAIST
-    WAIST_ROLL = 20
-    WAIST_PITCH = 21
-    LSP = 22  # LEFT ARM
+    WAY = 19   # WAIST
+    WAR = 20
+    WAP = 21
+    LSP = 22   # LEFT ARM
     LSR = 23
     LSY = 24
     LEP = 25
-    LWR = 26  # LEFT WRIST
+    LWR = 26   # LEFT WRIST
     LWP = 27
     LWY = 28
-    RSP = 29  # RIGHT ARM
+    RSP = 29   # RIGHT ARM
     RSR = 30
     RSY = 31
     REP = 32
-    RWR = 33  # RIGHT WRIST
+    RWR = 33   # RIGHT WRIST
     RWP = 34
     RWY = 35
 
@@ -53,39 +53,43 @@ class IDX:
                  POS_X, POS_Y, POS_Z,
                  LHP, LHR, LHY, LKP, LAP, LAR,
                  RHP, RHR, RHY, RKP, RAP, RAR]
+    
+    # base position indeces
+    idx_base_pos = [POS_X, POS_Y, POS_Z]
+
+    # base quaternion indeces
+    idx_base_quat = [Q_W, Q_X, Q_Y, Q_Z]
+
+    # leg position indeces
+    idx_leg = [LHP, LHR, LHY, LKP, LAP, LAR,
+               RHP, RHR, RHY, RKP, RAP, RAR]
 
 # main class for getting reference trajectories
 class ReferenceTrajectory:
 
     def __init__(self, config):
 
-        # load the model file from the config
-        model_file = "../../models/g1_12dof_obj.urdf"
-        plant = MultibodyPlant(0)
-        Parser(plant).AddModels(model_file)
-        plant.Finalize()
+        # load reference trajectory parameters
+        reference_path = config['reference']['path']
+        self.ref_dt = 1.0 / config['reference']['hz']
 
-        # get the number of positions and velocities
-        self.nq = plant.num_positions()
-        self.nv = plant.num_velocities()
+        # load the CSV file
+        self.data = self.load_reference_trajectory(reference_path)
+        self.ref_length = self.data.shape[0]          
 
         # class that holds the indeces
         self.idx = IDX()
+        
+        # extract the reference positions for the legs and base
+        self.time_vector = self.create_reference_time_vector() # reference time
+        self.q_legs = self.data[:, self.idx.idx_12dof]         # reference positions
 
-        # internal time and state parmeters
-        self.t_current = 0.0
-        self.q_current = np.zeros(plant.num_positions())    
-        self.v_current = np.zeros(plant.num_velocities())
-
-        # load the CSV file
-        reference_path = config['reference']['path']
-        self.dt = 1.0 / config['reference']['hz']
-        self.data = self.load_reference_trajectory(reference_path)
-        self.q_legs = self.data[:, self.idx.idx_12dof]  # reference positions
-        self.ref_length = self.q_legs.shape[0]  # length of the reference trajectory
-
-        # create a time vector
-        self.time_vector = self.create_time_vector()
+        # MPC parameters
+        self.mpc_dt = config['MPC']['dt']                # MPC time step
+        self.N = config['MPC']['num_steps'] +1           # MPC horizon length
+        self.horizon = self.create_horizon_time_vector() # MPC horizon time vector
+        self.q_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)))      # MPC horizon positions
+        self.v_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)-1))   # MPC horizon positions
 
     # load data from a CSV file
     def load_reference_trajectory(self,reference_path):
@@ -94,17 +98,148 @@ class ReferenceTrajectory:
         data = np.loadtxt(reference_path, delimiter=',', skiprows=1)
         return data
     
-    # create a time vector
-    def create_time_vector(self):
+    # create a time vector for the reference trajectory
+    def create_reference_time_vector(self):
         
         # get the size of the trajectory 
         rows = self.data.shape[0]
         
         # create a time vector of the same size
         integer_vec = np.arange(rows)
-        time_vec = integer_vec * self.dt
+        time_vec = integer_vec * self.ref_dt
 
         return time_vec
+    
+    # create a time vector for MPC horizon
+    def create_horizon_time_vector(self):
+        
+        # create time vector for the MPC horizon
+        integer_vec = np.arange(self.N)
+        time_vec = integer_vec * self.mpc_dt
+        
+        return time_vec
+
+    # find interpolation intervals
+    def get_interpolation_indeces(self, t_abs):
+
+        # create the absolute time horizon
+        horizon_abs = self.horizon + t_abs
+
+        # for each time in the horizon, find the beginning and end indeces
+        idx_interp = np.zeros((self.N, 2), dtype=int)   
+  
+        for i in range(self.N):
+            t = horizon_abs[i]
+
+            # Clip t to the time range
+            if t <= self.time_vector[0]:
+                idx_lower = 0
+                idx_upper = 1
+            elif t >= self.time_vector[-1]:
+                idx_lower = len(self.time_vector) - 2
+                idx_upper = len(self.time_vector) - 1
+            else:
+                idx_upper = np.searchsorted(self.time_vector, t, side='right')
+                idx_lower = idx_upper - 1
+
+            idx_interp[i, 0] = idx_lower
+            idx_interp[i, 1] = idx_upper
+
+        return idx_interp
+    
+    # interpolate the reference trajectory to get the full state trajectory
+    def get_interpolated_trajectory(self, t_abs):
+        # Get the interpolation index pairs for each horizon time point
+        idx_pairs = self.get_interpolation_indeces(t_abs)  # shape (N, 2)
+
+        # Get the absolute time for each step on the horizon
+        horizon_abs = self.horizon + t_abs
+
+        # Initialize the reference trajectory arrays
+        for i in range(self.N):
+
+            # Get the indices for the current horizon step
+            idx_0, idx_1 = idx_pairs[i]
+            t1 = self.time_vector[idx_0]
+            t2 = self.time_vector[idx_1]
+            q1 = self.q_legs[idx_0, :]
+            q2 = self.q_legs[idx_1, :]
+
+            # interpolate the state at the current horizon time
+            t_interp = horizon_abs[i]
+
+            # Perform interpolation
+            self.q_horizon_ref[i, :] = self.interpolate(t_interp, t1, t2, q1, q2)
+
+        # compute the velocities by finite differences
+        for i in range(self.N - 1):
+            q1 = self.q_horizon_ref[i, :]
+            q2 = self.q_horizon_ref[i + 1, :]
+            v_interp = self.finite_difference(q1, q2)
+            self.v_horizon_ref[i, :] = v_interp
+
+        # same velcoity for the last step
+        self.v_horizon_ref[-1, :] = self.v_horizon_ref[-2, :]
+        
+        return self.q_horizon_ref, self.v_horizon_ref
+
+    # linear interpolation
+    def interpolate(self, t_abs, t1, t2, q1, q2):
+
+        # ensure that time eval is in between t1 and t2
+        assert (t1 <= t_abs <= t2), "Time evaluation must be between t1 and t2."
+        
+        # interpolate the state between two time points
+        t_interp = t_abs - t1
+        t_total = t2 - t1
+
+        # cartesian interpolation 
+        q1_cartesian = q1[4:] 
+        q2_cartesian = q2[4:]
+        q_cart_interp = q1_cartesian + (t_interp / t_total) * (q2_cartesian - q1_cartesian)
+
+        # quaternion interpolation
+        q1_quat = q1[:4]
+        q2_quat = q2[:4]
+        q_quat_interp = q1_quat + (t_interp / t_total) * (q2_quat - q1_quat)
+        q_quat_interp /= np.linalg.norm(q_quat_interp)
+
+        # stack the interpolated quaternion and cartesian positions
+        q_interp = np.hstack((q_quat_interp, q_cart_interp))
+
+        return q_interp
+    
+    # finite difference
+    def finite_difference(self, q1, q2):
+
+        # finite difference the base and leg positions
+        q1_cartesian = q1[4:]
+        q2_cartesian = q2[4:]
+        v_cart = (q2_cartesian - q1_cartesian) / self.mpc_dt
+
+        # finite difference the quaternion
+        q1_quat = q1[:4] / np.linalg.norm(q1[:4])
+        q2_quat = q2[:4] / np.linalg.norm(q2[:4])
+
+        # Reorder to [x, y, z, w] for scipy
+        q1_xyzw = np.array([q1_quat[1], q1_quat[2], q1_quat[3], q1_quat[0]])
+        q2_xyzw = np.array([q2_quat[1], q2_quat[2], q2_quat[3], q2_quat[0]])
+
+        # Use scipy to compute relative rotation
+        r1 = sp.spatial.transform.Rotation.from_quat(q1_xyzw)
+        r2 = sp.spatial.transform.Rotation.from_quat(q2_xyzw)
+        r_rel = r2 * r1.inv()
+
+        # Angular velocity in world frame (rotation vector / dt)
+        omega_world = r_rel.as_rotvec() / self.mpc_dt
+
+        # Rotate world-frame angular velocity into body frame at time q1
+        omega_body = r1.inv().apply(omega_world)
+
+        # Stack [angular vel in body frame, linear vel]
+        v_finite_diff = np.hstack((omega_body, v_cart))
+
+        return v_finite_diff
 
 ####################################################################################################
 
@@ -119,9 +254,13 @@ if __name__ == "__main__":
     # instantiate the reference trajectory class
     ref_traj = ReferenceTrajectory(config)
 
-    # get the time vector and the reference positions
-    time_vector = ref_traj.time_vector
-    q_ref = ref_traj.q_legs
+    # get the interpolated trajectory
+    time_vector = ref_traj.horizon
+    q_ref, v_ref = ref_traj.get_interpolated_trajectory(0.0)
+
+    # entire reference trajectory
+    # time_vector = ref_traj.time_vector
+    # q_ref = ref_traj.q_legs
 
     # start meshcat
     meshcat = StartMeshcat()
@@ -131,23 +270,25 @@ if __name__ == "__main__":
     builder = DiagramBuilder()
     plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.0)
     models = Parser(plant).AddModels(model_file)
-
     plant.Finalize()
 
+    # add default visualization
     AddDefaultVisualization(builder, meshcat)
 
+    # build the diagram 
     diagram = builder.Build()
     diagram_context = diagram.CreateDefaultContext()
     plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
+    # start recording the meshcat playback
     time_elapsed = 0.0
     tot_time_des = time_vector[-1] - time_vector[0]
-    configs_per_sec = ref_traj.ref_length / tot_time_des
-    dt = 1.0 / configs_per_sec
-    for i in range(ref_traj.ref_length):
+    configs_per_sec = ref_traj.horizon / tot_time_des
+    dt = time_vector[1] - time_vector[0]
+    for i in range(ref_traj.horizon.shape[0]):
 
-        # Wait for the next state estimate  
-        time.sleep(ref_traj.dt)
+        # intialize the time for this iteration
+        t0 = time.time()
 
         # Set the Drake model to have this state
         q0 = q_ref[i, :]
@@ -157,9 +298,18 @@ if __name__ == "__main__":
         time_elapsed += dt
         diagram_context.SetTime(time_elapsed)
 
+        print("Playback time: {:.2f} s, Step: {:d}/{:d}".format(
+            time_elapsed, i + 1, ref_traj.horizon.shape[0]))    
+
         # Perform a forced publish event. This will propagate the plant's state to 
         # meshcat, without doing any physics simulation.
         diagram.ForcedPublish(diagram_context)
+
+        # wait until the desired time has passed
+        t1 = time.time()
+        time_to_wait = t1 - t0
+        if time_to_wait < dt:
+            time.sleep(dt - time_to_wait)
 
     # Publish the meshcat recording
     meshcat.StopRecording()

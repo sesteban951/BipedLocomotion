@@ -14,9 +14,10 @@ reference:
     
     # location of the reference trajectory file
     path: "../references/walk1_subject5.csv"
+    # path: "../references/sprint1_subject2.csv"
 
     # nominal dt between the reference trajectory points
-    hz: 30  # [sec]
+    hz: 24  # [sec]
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -25,7 +26,7 @@ reference:
 MPC:
 
     # position weights
-    Qq: [10.0, 10.0, 10.0, 10.0,           # base orientation
+    Qq: [10.0, 10.0, 10.0, 10.0,       # base orientation
          1.0, 1.0, 1.0,                # base position
          0.4, 0.4, 0.4, 0.3, 0.4, 0.4, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
          0.4, 0.4, 0.4, 0.3, 0.4, 0.4] # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
@@ -39,17 +40,17 @@ MPC:
     # input weights
     R: [100.0, 100.0, 100.0,                         # base orientation
         100.0, 100.0, 100.0,                         # base position
-        0.001, 0.001, 0.001, 0.001, 0.005, 0.005,  # left leg
-        0.001, 0.001, 0.001, 0.001, 0.005, 0.005,] # right leg
+        0.001, 0.001, 0.001, 0.001, 0.005, 0.005,    # left leg
+        0.001, 0.001, 0.001, 0.001, 0.005, 0.005,]   # right leg
     
     # terminal scaling
     Qf_q_scaling: 10.0
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 50  # number of nodes
-    mpc_rate: 50   # Hz
-    dt: 0.05       # time step
+    num_steps: 150  # number of nodes
+    mpc_rate: 60    # Hz
+    dt: 0.025        # time step
 
     # solver parameters
     max_iterations: 2
@@ -73,8 +74,8 @@ MPC:
 # drake simulation parameters
 sim:
 
-    duration: 10.0       # [sec], simulation duration
-    real_time_rate: 1.0  # real-time rate of the simulation
+    duration: 15.0       # [sec], simulation duration
+    real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
 
@@ -110,7 +111,7 @@ gains:
 ##################################################################################################
 
 # contact force visualization
-contact_vis: False
+contact_vis: True
 
 # colors to use throughout the simulation
 color:
