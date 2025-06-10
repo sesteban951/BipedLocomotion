@@ -149,10 +149,6 @@ class ReferenceTrajectory:
         horizon_sim = self.horizon + t_sim
 
         # Initialize the reference trajectory arrays
-        q_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)))     # MPC horizon positions
-        v_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)-1))   # MPC horizon velocities
-
-        # Initialize the reference trajectory arrays
         for i in range(self.N):
 
             # Get the indices for the current horizon step
@@ -166,19 +162,19 @@ class ReferenceTrajectory:
             t_interp = horizon_sim[i]
 
             # Perform interpolation
-            q_horizon_ref[i, :] = self.interpolate(t_interp, t1, t2, q1, q2)
+            self.q_horizon_ref[i, :] = self.interpolate(t_interp, t1, t2, q1, q2)
 
         # compute the velocities by finite differences
         for i in range(self.N - 1):
-            q1 = self.q_ref[i, :]
-            q2 = self.q_ref[i + 1, :]
+            q1 = self.q_horizon_ref[i, :]
+            q2 = self.q_horizon_ref[i + 1, :]
             v_interp = self.finite_difference(q1, q2)
-            v_horizon_ref[i, :] = v_interp
+            self.v_horizon_ref[i, :] = v_interp
 
         # same velcoity for the last step
-        v_horizon_ref[-1, :] = v_horizon_ref[-2, :]
+        self.v_horizon_ref[-1, :] = self.v_horizon_ref[-2, :]
         
-        return q_horizon_ref, v_horizon_ref
+        return self.q_horizon_ref, self.v_horizon_ref
 
     # linear interpolation
     def interpolate(self, t_sim, t1, t2, q1, q2):
@@ -252,16 +248,16 @@ if __name__ == "__main__":
     ref_traj = ReferenceTrajectory(config)
 
     # get the interpolated trajectory
-    # time_vector = ref_traj.horizon
-    # q_ref, _ = ref_traj.get_interpolated_trajectory(0.0)
+    time_vector = ref_traj.horizon
+    q_ref, _ = ref_traj.get_interpolated_trajectory(0.0)
 
     # entire reference trajectory
-    time_vector = ref_traj.t_ref
-    q_ref = ref_traj.q_ref
-    t_window = [0, 10]
-    time_mask = (time_vector >= t_window[0]) & (time_vector <= t_window[1])
-    time_vector = time_vector[time_mask]
-    q_ref = q_ref[time_mask, :]
+    # time_vector = ref_traj.t_ref
+    # q_ref = ref_traj.q_ref
+    # t_window = [0, 10]
+    # time_mask = (time_vector >= t_window[0]) & (time_vector <= t_window[1])
+    # time_vector = time_vector[time_mask]
+    # q_ref = q_ref[time_mask, :]
 
     print(time_vector.shape, q_ref.shape)
 

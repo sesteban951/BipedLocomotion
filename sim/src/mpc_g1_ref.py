@@ -39,7 +39,7 @@ from pyidto import (
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../utils'))
 from mpc_utils import Interpolator, ModelPredictiveController # type: ignore
-from joystick import GamepadCommand                           # type: ignore
+# from reference_trajectory_copy import ReferenceTrajectory          # type: ignore
 from reference_trajectory import ReferenceTrajectory          # type: ignore
 
 # import the yaml config
@@ -207,17 +207,19 @@ class G1_MPC(ModelPredictiveController):
         """
 
         # Get the current state
-        x0 = self.state_input_port.Eval(context)
-        q0 = x0[:self.nq]
-        v0 = x0[self.nq:]
+        # x0 = self.state_input_port.Eval(context)
+        # q0 = x0[:self.nq]
+        # v0 = x0[self.nq:]
 
         #  get the current sim time
         self.t_sim = context.get_time()
 
+        print(f"Current sim time: {self.t_sim:.4f}")
+
         # Get the current nominal trajectory
-        prob = self.optimizer.prob()
-        q_nom = prob.q_nom
-        v_nom = prob.v_nom
+        # prob = self.optimizer.prob()
+        # q_nom = prob.q_nom
+        # v_nom = prob.v_nom
 
         # Shift the nominal trajectory
         # dt = self.optimizer.time_step()
@@ -230,7 +232,6 @@ class G1_MPC(ModelPredictiveController):
         q_nom, v_nom = self.reference_trajectory.get_interpolated_trajectory(self.t_sim)
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
-
 
 #####################################################################################
 

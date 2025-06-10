@@ -13,11 +13,11 @@ seed:
 reference:
     
     # location of the reference trajectory file
-    # path: "../references/walk1_subject5.csv"
-    path: "../references/sprint1_subject2.csv"
+    path: "../references/walk1_subject5.csv"
+    # path: "../references/sprint1_subject2.csv"
 
     # nominal dt between the reference trajectory points
-    hz: 30  # [sec]
+    hz: 20  # [sec]
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -26,16 +26,16 @@ reference:
 MPC:
 
     # position weights
-    Qq: [10.0, 10.0, 10.0, 10.0,       # base orientation
-         1.0, 1.0, 1.0,                # base position
+    Qq: [8.0, 8.0, 8.0, 8.0,       # base orientation
+         2.0, 2.0, 2.0,                # base position
          0.4, 0.4, 0.4, 0.3, 0.4, 0.4, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
          0.4, 0.4, 0.4, 0.3, 0.4, 0.4] # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
 
     # velocity weights
     Qv: [0.4, 0.4, 0.4,                       # base orientation
          0.1, 0.1, 0.1,                       # base position
-         0.03, 0.03, 0.03, 0.03, 0.08, 0.08,  # left leg
-         0.03, 0.03, 0.03, 0.03, 0.08, 0.08]  # right leg
+         0.05, 0.05, 0.05, 0.05, 0.08, 0.08,  # left leg
+         0.05, 0.05, 0.05, 0.05, 0.08, 0.08]  # right leg
 
     # input weights
     R: [100.0, 100.0, 100.0,                         # base orientation
@@ -58,7 +58,7 @@ MPC:
     equality_constraints: False
     Delta0: 5.0
     Delta_max: 100_000
-    num_threads: 4
+    num_threads: 20
     contact_stiffness: 2_000
     dissipation_velocity: 0.1
     smoothing_factor: 0.008
@@ -74,7 +74,7 @@ MPC:
 # drake simulation parameters
 sim:
 
-    duration: 15.0       # [sec], simulation duration
+    duration: 30.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -111,7 +111,7 @@ gains:
 ##################################################################################################
 
 # contact force visualization
-contact_vis: True
+contact_vis: False
 
 # colors to use throughout the simulation
 color:
