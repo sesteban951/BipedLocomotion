@@ -74,36 +74,29 @@ class ReferenceTrajectory:
         self.ref_dt = 1.0 / config['reference']['hz']
 
         # load the CSV file
-        self.data = self.load_reference_trajectory(reference_path)
+        self.data = np.loadtxt(reference_path, delimiter=',', skiprows=1)
         self.ref_length = self.data.shape[0]          
 
         # class that holds the indeces
         self.idx = IDX()
         
         # extract the reference positions for the legs and base
-        self.time_vector = self.create_reference_time_vector() # reference time
-        self.q_legs = self.data[:, self.idx.idx_12dof]         # reference positions
+        self.t_ref = self.create_reference_time_vector() # reference time
+        self.q_ref = self.data[:, self.idx.idx_12dof]          # reference positions
 
         # MPC parameters
         self.mpc_dt = config['MPC']['dt']                # MPC time step
-        self.N = config['MPC']['num_steps'] +1           # MPC horizon length
+        self.N = config['MPC']['num_steps'] + 1          # MPC horizon length
         self.horizon = self.create_horizon_time_vector() # MPC horizon time vector
-        self.q_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)))      # MPC horizon positions
-        self.v_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)-1))   # MPC horizon positions
-
-    # load data from a CSV file
-    def load_reference_trajectory(self,reference_path):
-
-        # load the CSV file
-        data = np.loadtxt(reference_path, delimiter=',', skiprows=1)
-        return data
+        self.q_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)))     # MPC horizon positions
+        self.v_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)-1))   # MPC horizon velocities
     
-    # create a time vector for the reference trajectory
+    # create a time vector for the whole reference trajectory
     def create_reference_time_vector(self):
         
         # get the size of the trajectory 
         rows = self.data.shape[0]
-        
+    
         # create a time vector of the same size
         integer_vec = np.arange(rows)
         time_vec = integer_vec * self.ref_dt
@@ -120,26 +113,25 @@ class ReferenceTrajectory:
         return time_vec
 
     # find interpolation intervals
-    def get_interpolation_indeces(self, t_abs):
+    def get_interpolation_indeces(self, t_sim):
 
         # create the absolute time horizon
-        horizon_abs = self.horizon + t_abs
+        horizon_sim = self.horizon + t_sim
 
         # for each time in the horizon, find the beginning and end indeces
         idx_interp = np.zeros((self.N, 2), dtype=int)   
-  
         for i in range(self.N):
-            t = horizon_abs[i]
+            t = horizon_sim[i]
 
-            # Clip t to the time range
-            if t <= self.time_vector[0]:
+            # Clip t to the time range, TODO: need to wrap around if t is outside the range
+            if t <= self.t_ref[0]:
                 idx_lower = 0
                 idx_upper = 1
-            elif t >= self.time_vector[-1]:
-                idx_lower = len(self.time_vector) - 2
-                idx_upper = len(self.time_vector) - 1
+            elif t >= self.t_ref[-1]:
+                idx_lower = len(self.t_ref) - 2
+                idx_upper = len(self.t_ref) - 1
             else:
-                idx_upper = np.searchsorted(self.time_vector, t, side='right')
+                idx_upper = np.searchsorted(self.t_ref, t, side='right')
                 idx_lower = idx_upper - 1
 
             idx_interp[i, 0] = idx_lower
@@ -148,49 +140,54 @@ class ReferenceTrajectory:
         return idx_interp
     
     # interpolate the reference trajectory to get the full state trajectory
-    def get_interpolated_trajectory(self, t_abs):
+    def get_interpolated_trajectory(self, t_sim):
+
         # Get the interpolation index pairs for each horizon time point
-        idx_pairs = self.get_interpolation_indeces(t_abs)  # shape (N, 2)
+        idx_pairs = self.get_interpolation_indeces(t_sim)  # shape (N, 2)
 
         # Get the absolute time for each step on the horizon
-        horizon_abs = self.horizon + t_abs
+        horizon_sim = self.horizon + t_sim
+
+        # Initialize the reference trajectory arrays
+        q_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)))     # MPC horizon positions
+        v_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)-1))   # MPC horizon velocities
 
         # Initialize the reference trajectory arrays
         for i in range(self.N):
 
             # Get the indices for the current horizon step
             idx_0, idx_1 = idx_pairs[i]
-            t1 = self.time_vector[idx_0]
-            t2 = self.time_vector[idx_1]
-            q1 = self.q_legs[idx_0, :]
-            q2 = self.q_legs[idx_1, :]
+            t1 = self.t_ref[idx_0]
+            t2 = self.t_ref[idx_1]
+            q1 = self.q_ref[idx_0, :]
+            q2 = self.q_ref[idx_1, :]
 
             # interpolate the state at the current horizon time
-            t_interp = horizon_abs[i]
+            t_interp = horizon_sim[i]
 
             # Perform interpolation
-            self.q_horizon_ref[i, :] = self.interpolate(t_interp, t1, t2, q1, q2)
+            q_horizon_ref[i, :] = self.interpolate(t_interp, t1, t2, q1, q2)
 
         # compute the velocities by finite differences
         for i in range(self.N - 1):
-            q1 = self.q_horizon_ref[i, :]
-            q2 = self.q_horizon_ref[i + 1, :]
+            q1 = self.q_ref[i, :]
+            q2 = self.q_ref[i + 1, :]
             v_interp = self.finite_difference(q1, q2)
-            self.v_horizon_ref[i, :] = v_interp
+            v_horizon_ref[i, :] = v_interp
 
         # same velcoity for the last step
-        self.v_horizon_ref[-1, :] = self.v_horizon_ref[-2, :]
+        v_horizon_ref[-1, :] = v_horizon_ref[-2, :]
         
-        return self.q_horizon_ref, self.v_horizon_ref
+        return q_horizon_ref, v_horizon_ref
 
     # linear interpolation
-    def interpolate(self, t_abs, t1, t2, q1, q2):
+    def interpolate(self, t_sim, t1, t2, q1, q2):
 
         # ensure that time eval is in between t1 and t2
-        assert (t1 <= t_abs <= t2), "Time evaluation must be between t1 and t2."
+        assert (t1 <= t_sim <= t2), "Time evaluation must be between t1 and t2."
         
         # interpolate the state between two time points
-        t_interp = t_abs - t1
+        t_interp = t_sim - t1
         t_total = t2 - t1
 
         # cartesian interpolation 
@@ -255,12 +252,18 @@ if __name__ == "__main__":
     ref_traj = ReferenceTrajectory(config)
 
     # get the interpolated trajectory
-    time_vector = ref_traj.horizon
-    q_ref, v_ref = ref_traj.get_interpolated_trajectory(0.0)
+    # time_vector = ref_traj.horizon
+    # q_ref, _ = ref_traj.get_interpolated_trajectory(0.0)
 
     # entire reference trajectory
-    # time_vector = ref_traj.time_vector
-    # q_ref = ref_traj.q_legs
+    time_vector = ref_traj.t_ref
+    q_ref = ref_traj.q_ref
+    t_window = [0, 10]
+    time_mask = (time_vector >= t_window[0]) & (time_vector <= t_window[1])
+    time_vector = time_vector[time_mask]
+    q_ref = q_ref[time_mask, :]
+
+    print(time_vector.shape, q_ref.shape)
 
     # start meshcat
     meshcat = StartMeshcat()
@@ -281,11 +284,13 @@ if __name__ == "__main__":
     plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
     # start recording the meshcat playback
+    meshcat.StartRecording()
+
+    # start recording the meshcat playback
     time_elapsed = 0.0
     tot_time_des = time_vector[-1] - time_vector[0]
-    configs_per_sec = ref_traj.horizon / tot_time_des
     dt = time_vector[1] - time_vector[0]
-    for i in range(ref_traj.horizon.shape[0]):
+    for i in range(q_ref.shape[0]):
 
         # intialize the time for this iteration
         t0 = time.time()
@@ -299,7 +304,7 @@ if __name__ == "__main__":
         diagram_context.SetTime(time_elapsed)
 
         print("Playback time: {:.2f} s, Step: {:d}/{:d}".format(
-            time_elapsed, i + 1, ref_traj.horizon.shape[0]))    
+            time_elapsed, i + 1, q_ref.shape[0]))    
 
         # Perform a forced publish event. This will propagate the plant's state to 
         # meshcat, without doing any physics simulation.

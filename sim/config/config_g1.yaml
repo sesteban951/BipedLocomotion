@@ -13,11 +13,11 @@ seed:
 reference:
     
     # location of the reference trajectory file
-    path: "../references/walk1_subject5.csv"
-    # path: "../references/sprint1_subject2.csv"
+    # path: "../references/walk1_subject5.csv"
+    path: "../references/sprint1_subject2.csv"
 
     # nominal dt between the reference trajectory points
-    hz: 24  # [sec]
+    hz: 30  # [sec]
 
 ##################################################################################################
 # MPC PARAMETERS
