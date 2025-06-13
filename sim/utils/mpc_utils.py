@@ -116,20 +116,12 @@ class ModelPredictiveController(LeafSystem):
         """
         LeafSystem.__init__(self)
 
-        print("flag A")
-
         self.optimizer = optimizer
         self.nq = nq
 
-        print("flag A1")
-
         # Allocate a warm-start
         self.q_guess = q_guess
-
-        print("flag A2")
         self.warm_start = self.optimizer.CreateWarmStart(self.q_guess)
-
-        print("flag B")
 
         # Specify the timestep we'll use to discretize the trajectory
         self.time_step = self.optimizer.time_step()
@@ -140,8 +132,6 @@ class ModelPredictiveController(LeafSystem):
         stats = TrajectoryOptimizerStats()
         self.optimizer.SolveFromWarmStart(self.warm_start, solution, stats)
 
-        print("flag C")
-
         # Declare an abstract-valued state that will hold the optimal trajectory
         state = self.StoreOptimizerSolution(solution, 0.0)
         self.stored_trajectory = self.DeclareAbstractState(Value(state))
@@ -150,16 +140,12 @@ class ModelPredictiveController(LeafSystem):
         # resolve the MPC problem.
         self.DeclarePeriodicUnrestrictedUpdateEvent(
             1. / mpc_rate, 0, self.UpdateAbstractState)
-        
-        print("flag D")
 
         # Declare the input and output ports
         self.state_input_port = self.DeclareVectorInputPort(
             "state", BasicVector(nq + nv))
         self.trajectory_output_port = self.DeclareStateOutputPort(
             "optimal_trajectory", self.stored_trajectory)
-        
-        print("flag E")
 
     def StoreOptimizerSolution(self, solution, start_time):
         """

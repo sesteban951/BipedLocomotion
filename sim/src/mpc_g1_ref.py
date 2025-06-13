@@ -116,17 +116,27 @@ def standing_position():
     """
     Return a reasonable default standing position for the Achilles humanoid. 
     """
-    q_standing = np.array(config['q0'])
-    return q_standing
+    if config['model']['type'] == "half":
+        return np.array(config['q0'])
+    elif config['model']['type'] == "full":
+        return np.array(config['q0_full'])
+    else:
+        raise ValueError("Unknown model type in config: {}".format(config['model']['type']))
 
 def create_optimizer(model_file):
     """
     Create a trajectory optimizer object that can be used for MPC.
     """
 
+    # get the model type from the config
+    if config['model']['type'] == "half":
+        mpc_type = 'MPC'
+    elif config['model']['type'] == "full":
+        mpc_type = 'MPC_full'
+    
     # Create the system diagram that the optimizer uses
     builder = DiagramBuilder()
-    plant, _ = AddMultibodyPlantSceneGraph(builder, time_step=config['MPC']['dt'])
+    plant, _ = AddMultibodyPlantSceneGraph(builder, time_step=config[mpc_type]['dt'])
     Parser(plant).AddModels(model_file)
 
     plant.RegisterCollisionGeometry(
@@ -145,16 +155,16 @@ def create_optimizer(model_file):
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
-    problem.num_steps = config['MPC']['num_steps']
+    problem.num_steps = config[mpc_type]['num_steps']
     problem.q_init = np.copy(q_stand)
     problem.v_init = np.zeros(nv)
     
     # weights
-    problem.Qq = np.diag(config['MPC']['Qq'])
-    problem.Qv = np.diag(config['MPC']['Qv'])
-    problem.R = np.diag(config['MPC']['R'])
-    problem.Qf_q = config['MPC']['Qf_q_scaling'] * np.copy(problem.Qq)
-    problem.Qf_v = config['MPC']['Qf_v_scaling'] * np.copy(problem.Qv)
+    problem.Qq = np.diag(config[mpc_type]['Qq'])
+    problem.Qv = np.diag(config[mpc_type]['Qv'])
+    problem.R = np.diag(config[mpc_type]['R'])
+    problem.Qf_q = config[mpc_type]['Qf_q_scaling'] * np.copy(problem.Qq)
+    problem.Qf_v = config[mpc_type]['Qf_v_scaling'] * np.copy(problem.Qv)
 
     v_nom = np.zeros(nv)
     problem.q_nom = [np.copy(q_stand) for i in range(problem.num_steps + 1)]
@@ -162,18 +172,18 @@ def create_optimizer(model_file):
 
     # Set the solver parameters
     params = SolverParameters()
-    params.max_iterations = config['MPC']['max_iterations']
-    params.scaling = config['MPC']['scaling']
-    params.equality_constraints = config['MPC']['equality_constraints']
-    params.Delta0 = config['MPC']['Delta0']
-    params.Delta_max = config['MPC']['Delta_max']
-    params.num_threads = config['MPC']['num_threads']
-    params.contact_stiffness = config['MPC']['contact_stiffness']
-    params.dissipation_velocity = config['MPC']['dissipation_velocity']
-    params.smoothing_factor = config['MPC']['smoothing_factor']
-    params.friction_coefficient = config['MPC']['friction_coefficient']
-    params.stiction_velocity = config['MPC']['stiction_velocity']
-    params.verbose = config['MPC']['verbose']
+    params.max_iterations = config[mpc_type]['max_iterations']
+    params.scaling = config[mpc_type]['scaling']
+    params.equality_constraints = config[mpc_type]['equality_constraints']
+    params.Delta0 = config[mpc_type]['Delta0']
+    params.Delta_max = config[mpc_type]['Delta_max']
+    params.num_threads = config[mpc_type]['num_threads']
+    params.contact_stiffness = config[mpc_type]['contact_stiffness']
+    params.dissipation_velocity = config[mpc_type]['dissipation_velocity']
+    params.smoothing_factor = config[mpc_type]['smoothing_factor']
+    params.friction_coefficient = config[mpc_type]['friction_coefficient']
+    params.stiction_velocity = config[mpc_type]['stiction_velocity']
+    params.verbose = config[mpc_type]['verbose']
 
     # Create the optimizer
     optimizer = TrajectoryOptimizer(diagram, plant, problem, params)
@@ -190,7 +200,14 @@ class G1_MPC(ModelPredictiveController):
     A Model Predictive Controller for the Achilles humanoid.
     """
     def __init__(self, optimizer, q_guess, mpc_rate):
-        ModelPredictiveController.__init__(self, optimizer, q_guess, 19, 18, mpc_rate)
+
+        if config['model']['type'] == "half":
+            nq = 19
+            nv = 18
+        elif config['model']['type'] == "full":
+            nq = 33
+            nv = 32
+        ModelPredictiveController.__init__(self, optimizer, q_guess, nq, nv, mpc_rate)
 
         # instantiate the model instance indices
         self.idx = IDX()
@@ -242,7 +259,10 @@ if __name__=="__main__":
     meshcat = StartMeshcat()
 
     # set up the model file
-    model_file = "../../models/g1_12dof_obj.urdf"
+    if config['model']['type'] == "half":
+        model_file = config['model']['model_half']
+    elif config['model']['type'] == "full":
+        model_file = config['model']['model_full']
 
     # Set up a Drake diagram for simulation
     builder = DiagramBuilder()
@@ -265,22 +285,30 @@ if __name__=="__main__":
         ground_color)
 
     # Add implicit PD controllers (must use kLagged or kSimilar)
-    Kp = np.array(config['gains']['Kp'])
-    Kd = np.array(config['gains']['Kd'])    
+    if config['model']['type'] == "half":
+        Kp = np.array(config['gains']['Kp'])
+        Kd = np.array(config['gains']['Kd'])
+    elif config['model']['type'] == "full":
+        Kp = np.array(config['gains_full']['Kp'])
+        Kd = np.array(config['gains_full']['Kd'])
+
     actuator_indices = [JointActuatorIndex(i) for i in range(plant.num_actuators())]
     for actuator_index, Kp, Kd in zip(actuator_indices, Kp, Kd):
         plant.get_joint_actuator(actuator_index).set_controller_gains(
             PdControllerGains(p=Kp, d=Kd))    
     plant.Finalize()
 
-    # # Set up the trajectory optimization problem
-    # # Note that the diagram and plant must stay in scope while the optimizer is
-    # # being used
+    # Set up the trajectory optimization problem
+    # Note that the diagram and plant must stay in scope while the optimizer is
+    # being used
     optimizer, ctrl_diagram, ctrl_plant = create_optimizer(model_file)
     q_guess = [standing_position() for _ in range(optimizer.num_steps() + 1)]
 
     # Create the MPC controller and interpolator systems
-    mpc_rate = config['MPC']['mpc_rate']
+    if config["model"]["type"] == "half":
+        mpc_rate = config['MPC']['mpc_rate']
+    elif config["model"]["type"] == "full":
+        mpc_rate = config['MPC_full']['mpc_rate']
     controller = builder.AddSystem(G1_MPC(optimizer, q_guess, mpc_rate))
 
     Bv = plant.MakeActuationMatrix()
@@ -315,7 +343,10 @@ if __name__=="__main__":
 
     # Set the initial state
     q0 = standing_position()
-    v0 = np.array(config['v0'])
+    if config['model']['type'] == "half":
+        v0 = np.array(config['v0'])
+    elif config['model']['type'] == "full":
+        v0 = np.array(config['v0_full'])
 
     plant.SetPositions(plant_context, q0)
     plant.SetVelocities(plant_context, v0)
@@ -331,4 +362,3 @@ if __name__=="__main__":
           f"wall time: {wall_time:.4f}")
     meshcat.StopRecording()
     meshcat.PublishRecording()
-    

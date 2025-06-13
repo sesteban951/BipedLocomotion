@@ -3,7 +3,7 @@
 ##################################################################################################
 
 model: 
-    type: "half" # "full" (every joint except waist) or 
+    type: "full" # "full" (every joint except waist) or 
                  # "half" (only leg joints)
 
     model_half: "../../models/g1_12dof_obj.urdf"     # path to the URDF model of the robot
@@ -51,7 +51,7 @@ MPC:
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 1500  # number of nodes
+    num_steps: 50  # number of nodes
     mpc_rate: 60    # Hz
     dt: 0.025       # time step
 
@@ -76,16 +76,16 @@ MPC_full:
          2.0, 2.0, 2.0,                     # base position
          0.4, 0.4, 0.4, 0.3, 0.4, 0.4,      # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
          0.4, 0.4, 0.4, 0.3, 0.4, 0.4,      # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
-         0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch, wrist_roll, wrist_pitch, wrist_yaw
-         0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1] # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch, wrist_roll, wrist_pitch, wrist_yaw
+         0.3, 0.3, 0.3, 0.2, 0.3, 0.3, 0.3, # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch, wrist_roll, wrist_pitch, wrist_yaw
+         0.3, 0.3, 0.3, 0.2, 0.3, 0.3, 0.3] # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch, wrist_roll, wrist_pitch, wrist_yaw
 
     # velocity weights
     Qv: [0.4, 0.4, 0.4,                            # base orientation
          0.1, 0.1, 0.1,                            # base position
          0.05, 0.05, 0.05, 0.05, 0.08, 0.08,       # left leg
          0.05, 0.05, 0.05, 0.05, 0.08, 0.08,       # right leg
-         0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, # left arm
-         0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01] # right arm
+         0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, # left arm
+         0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03] # right arm
 
     # input weights
     R: [100.0, 100.0, 100.0,                         # base orientation
@@ -100,8 +100,8 @@ MPC_full:
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 1500  # number of nodes
-    mpc_rate: 60    # Hz
+    num_steps: 100    # number of nodes
+    mpc_rate: 60     # Hz
     dt: 0.025        # time step
 
     # solver parameters
@@ -126,7 +126,7 @@ MPC_full:
 # drake simulation parameters
 sim:
 
-    duration: 30.0       # [sec], simulation duration
+    duration: 15.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -168,23 +168,23 @@ v0_full: [0.00, 0.00, 0.00,
 
 gains:
 
-  Kp: [150, 150, 100, 150, 20, 20, # LHP, LHR, LHP, LKP, LAP, LAR
-       150, 150, 100, 150, 20, 20] # RHP, RHR, RHP, RKP, RAP, RAR
-  Kd: [2, 2, 2, 4, 2, 2, 
-       2, 2, 2, 4, 2, 2]
+    Kp: [150, 150, 100, 150, 20, 20, # LHP, LHR, LHP, LKP, LAP, LAR
+        150, 150, 100, 150, 20, 20] # RHP, RHR, RHP, RKP, RAP, RAR
+    Kd: [2, 2, 2, 4, 2, 2, 
+        2, 2, 2, 4, 2, 2]
 
 
 gains_full:
 
-  Kp: [150, 150, 100, 150, 20, 20,     # LHP, LHR, LHP, LKP, LAP, LAR
-       150, 150, 100, 150, 20, 20,     # RHP, RHR, RHP, RKP, RAP, RAR
-       20,  20,  20,  20,  20, 20, 20, # LSP, LSR, LSY, LEP, LWR, LWP, LWY 
-       20,  20,  20,  20,  20, 20, 20] # RSP, RSR, RSY, REP, RWR, RWP, RWY
+    Kp: [150, 150, 100, 150, 20, 20,     # LHP, LHR, LHP, LKP, LAP, LAR
+        150, 150, 100, 150, 20, 20,     # RHP, RHR, RHP, RKP, RAP, RAR
+        20,  20,  20,  20,  20, 20, 20, # LSP, LSR, LSY, LEP, LWR, LWP, LWY 
+        20,  20,  20,  20,  20, 20, 20] # RSP, RSR, RSY, REP, RWR, RWP, RWY
 
-  Kd: [2, 2, 2, 4, 2, 2, 
-       2, 2, 2, 4, 2, 2,
-       1, 1, 1, 1, 1, 1, 1,
-       1, 1, 1, 1, 1, 1, 1] # LSP, LSR, LSY, LEP, LWR, LWP, LWY
+    Kd: [2, 2, 2, 4, 2, 2, 
+        2, 2, 2, 4, 2, 2,
+        1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1] # LSP, LSR, LSY, LEP, LWR, LWP, LWY
 
 
 ##################################################################################################
