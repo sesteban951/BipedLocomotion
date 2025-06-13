@@ -49,10 +49,18 @@ class IDX:
     RWY = 35
 
     # 12 DOF leg indeces
-    idx_12dof = [Q_W, Q_X, Q_Y, Q_Z,
-                 POS_X, POS_Y, POS_Z,
-                 LHP, LHR, LHY, LKP, LAP, LAR,
-                 RHP, RHR, RHY, RKP, RAP, RAR]
+    idx_12dof = [Q_W, Q_X, Q_Y, Q_Z,            # base quat
+                 POS_X, POS_Y, POS_Z,           # base position
+                 LHP, LHR, LHY, LKP, LAP, LAR,  # left leg
+                 RHP, RHR, RHY, RKP, RAP, RAR]  # right leg
+    
+    # full model
+    idx_full = [Q_W, Q_X, Q_Y, Q_Z,                # base quat
+                POS_X, POS_Y, POS_Z,               # base position
+                LHP, LHR, LHY, LKP, LAP, LAR,      # left leg
+                RHP, RHR, RHY, RKP, RAP, RAR,      # right leg
+                LSP, LSR, LSY, LEP, LWR, LWP, LWY, # left arm
+                RSP, RSR, RSY, REP, RWR, RWP, RWY] # right arm
     
     # base position indeces
     idx_base_pos = [POS_X, POS_Y, POS_Z]
@@ -61,13 +69,23 @@ class IDX:
     idx_base_quat = [Q_W, Q_X, Q_Y, Q_Z]
 
     # leg position indeces
-    idx_leg = [LHP, LHR, LHY, LKP, LAP, LAR,
-               RHP, RHR, RHY, RKP, RAP, RAR]
+    idx_legs = [LHP, LHR, LHY, LKP, LAP, LAR,
+                RHP, RHR, RHY, RKP, RAP, RAR]
+    
+    # waist positions
+    idx_waist = [WAY, WAR, WAP]
+
+    # arm positions
+    idx_arms = [LSP, LSR, LSY, LEP, LWR, LWP, LWY,
+                RSP, RSR, RSY, REP, RWR, RWP, RWY]
 
 # main class for getting reference trajectories
 class ReferenceTrajectory:
 
     def __init__(self, config):
+
+        #  get the model type (full or half)
+        self.model_type = config['model']['type']
 
         # load reference trajectory parameters
         reference_path = config['reference']['path']
@@ -82,14 +100,30 @@ class ReferenceTrajectory:
         
         # extract the reference positions for the legs and base
         self.t_ref = self.create_reference_time_vector() # reference time
-        self.q_ref = self.data[:, self.idx.idx_12dof]          # reference positions
+        
+        # half model: 12 DOF
+        if self.model_type == 'half':
+            self.q_ref = self.data[:, self.idx.idx_12dof]  # reference positions        
+        # full model: 36 DOF
+        elif self.model_type == 'full':
+            self.q_ref = self.data[:, self.idx.idx_full]  # reference positions
+        else:
+            raise ValueError("Unknown model type: {}".format(self.model_type))
 
         # MPC parameters
-        self.mpc_dt = config['MPC']['dt']                # MPC time step
-        self.N = config['MPC']['num_steps'] + 1          # MPC horizon length
+        # half model: 12 DOF
+        if self.model_type == 'half':
+            self.mpc_dt = config['MPC']['dt']                # MPC time step
+            self.N = config['MPC']['num_steps'] + 1          # MPC horizon length
+            self.q_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)))     # MPC horizon positions
+            self.v_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)-1))   # MPC horizon velocities
+        # full model: 36 DOF
+        elif self.model_type == 'full':
+            self.mpc_dt = config['MPC_full']['dt']           # MPC time step
+            self.N = config['MPC_full']['num_steps'] + 1     # MPC horizon length
+            self.q_horizon_ref = np.zeros((self.N, len(self.idx.idx_full)))     # MPC horizon positions
+            self.v_horizon_ref = np.zeros((self.N, len(self.idx.idx_full)-1))   # MPC horizon velocities
         self.horizon = self.create_horizon_time_vector() # MPC horizon time vector
-        self.q_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)))     # MPC horizon positions
-        self.v_horizon_ref = np.zeros((self.N, len(self.idx.idx_12dof)-1))   # MPC horizon velocities
     
     # create a time vector for the whole reference trajectory
     def create_reference_time_vector(self):
@@ -259,13 +293,14 @@ if __name__ == "__main__":
     # time_vector = time_vector[time_mask]
     # q_ref = q_ref[time_mask, :]
 
-    print(time_vector.shape, q_ref.shape)
-
     # start meshcat
     meshcat = StartMeshcat()
 
     # create a plant model
-    model_file = "../../models/g1_12dof_obj.urdf"
+    if config['model']['type'] == 'half':
+        model_file = config['model']['model_half']
+    elif config['model']['type'] == 'full':
+        model_file = config['model']['model_full']
     builder = DiagramBuilder()
     plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step=0.0)
     models = Parser(plant).AddModels(model_file)

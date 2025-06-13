@@ -864,6 +864,9 @@
     </collision> -->
   </link>
 
+
+  <!--//////////////////////////////// ACTUATORS ////////////////////////////////-->
+
   <!-- LEFT HIP -->
   <transmission name="left_hip_pitch_transmission">
     <type>transmissions/SimpleTransmission</type>

@@ -1,10 +1,13 @@
 ##################################################################################################
-# RANDOM SEED
+# MODEL
 ##################################################################################################
 
-seed:
-    fixed: False
-    value: 0
+model: 
+    type: "full" # "full" (every joint except waist) or 
+                 # "half" (only leg joints)
+
+    model_half: "../../models/g1_12dof_obj.urdf"     # path to the URDF model of the robot
+    model_full: "../../models/g1_no_hands_obj.urdf"  # path to the URDF model of the robot
 
 ##################################################################################################
 # REFERENCE TRAJECTORY
@@ -48,7 +51,56 @@ MPC:
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 150  # number of nodes
+    num_steps: 1500  # number of nodes
+    mpc_rate: 60    # Hz
+    dt: 0.025       # time step
+
+    # solver parameters
+    max_iterations: 2
+    scaling: True
+    equality_constraints: False
+    Delta0: 5.0
+    Delta_max: 100_000
+    num_threads: 20
+    contact_stiffness: 2_000
+    dissipation_velocity: 0.1
+    smoothing_factor: 0.008
+    friction_coefficient: 0.5
+    stiction_velocity: 0.5
+    verbose: False
+
+MPC_full:
+
+    # position weights
+    Qq: [8.0, 8.0, 8.0, 8.0,                # base orientation
+         2.0, 2.0, 2.0,                     # base position
+         0.4, 0.4, 0.4, 0.3, 0.4, 0.4,      # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
+         0.4, 0.4, 0.4, 0.3, 0.4, 0.4,      # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
+         0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch, wrist_roll, wrist_pitch, wrist_yaw
+         0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1] # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch, wrist_roll, wrist_pitch, wrist_yaw
+
+    # velocity weights
+    Qv: [0.4, 0.4, 0.4,                            # base orientation
+         0.1, 0.1, 0.1,                            # base position
+         0.05, 0.05, 0.05, 0.05, 0.08, 0.08,       # left leg
+         0.05, 0.05, 0.05, 0.05, 0.08, 0.08,       # right leg
+         0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, # left arm
+         0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01] # right arm
+
+    # input weights
+    R: [100.0, 100.0, 100.0,                         # base orientation
+        100.0, 100.0, 100.0,                         # base position
+        0.001, 0.001, 0.001, 0.001, 0.005, 0.005,    # left leg
+        0.001, 0.001, 0.001, 0.001, 0.005, 0.005,    # right leg
+        0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, # left arm
+        0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001] # right arm
+    
+    # terminal scaling
+    Qf_q_scaling: 10.0
+    Qf_v_scaling: 10.0
+
+    # standard parameters
+    num_steps: 1500  # number of nodes
     mpc_rate: 60    # Hz
     dt: 0.025        # time step
 
@@ -83,6 +135,7 @@ sim:
 # INITIAL CONFIGURATION
 ##################################################################################################
 
+
 q0:  [1.00, 0.00, 0.00, 0.00,           # base orientation, (w, x, y, z)
       0.00, 0.00, 0.76,                 # base position, (x, y, z)
       -0.20, 0.00, 0.00, 0.42, -0.23, 0.0,  # left leg, (hip pitch, hip roll, hip yaw, knee, ankle pitch, ankle roll)
@@ -92,6 +145,17 @@ v0: [0.00, 0.00, 0.00,
      0.00, 0.00, 0.00,                   
      0.00, 0.00, 0.00, 0.0, 0.0, 0.0,
      0.00, 0.00, 0.00, 0.0, 0.0, 0.0]  # initial velocities of the robot (base orientation, base position, left leg, right leg)
+
+
+q0_full:  [1.00, 0.00, 0.00, 0.00,           # base orientation, (w, x, y, z)
+           0.00, 0.00, 0.76,                 # base position, (x, y, z)
+          -0.20, 0.00, 0.00, 0.42, -0.23, 0.0,  # left leg, (hip pitch, hip roll, hip yaw, knee, ankle pitch, ankle roll)
+          -0.20, 0.00, 0.00, 0.42, -0.23, 0.0]  # right leg, (hip pitch, hip roll, hip yaw, knee, ankle pitch, ankle roll)
+
+v0_full: [0.00, 0.00, 0.00,            
+          0.00, 0.00, 0.00,                   
+          0.00, 0.00, 0.00, 0.0, 0.0, 0.0,
+          0.00, 0.00, 0.00, 0.0, 0.0, 0.0]  # initial velocities of the robot (base orientation, base position, left leg, right leg)
 
 
 ##################################################################################################
@@ -104,6 +168,19 @@ gains:
        150, 150, 100, 150, 20, 20] # RHP, RHR, RHP, RKP, RAP, RAR
   Kd: [2, 2, 2, 4, 2, 2, 
        2, 2, 2, 4, 2, 2]
+
+
+gains_full:
+
+  Kp: [150, 150, 100, 150, 20, 20,     # LHP, LHR, LHP, LKP, LAP, LAR
+       150, 150, 100, 150, 20, 20,     # RHP, RHR, RHP, RKP, RAP, RAR
+       20,  20,  20,  20,  20, 20, 20, # LSP, LSR, LSY, LEP, LWR, LWP, LWY 
+       20,  20,  20,  20,  20, 20, 20] # RSP, RSR, RSY, REP, RWR, RWP, RWY
+
+  Kd: [2, 2, 2, 4, 2, 2, 
+       2, 2, 2, 4, 2, 2,
+       1, 1, 1, 1, 1, 1, 1,
+       1, 1, 1, 1, 1, 1, 1] # LSP, LSR, LSY, LEP, LWR, LWP, LWY
 
 
 ##################################################################################################
