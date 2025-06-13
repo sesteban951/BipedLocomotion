@@ -72,35 +72,35 @@ MPC:
 MPC_full:
 
     # position weights
-    Qq: [8.0, 8.0, 8.0, 8.0,                # base orientation
-         2.0, 2.0, 2.0,                     # base position
-         0.4, 0.4, 0.4, 0.3, 0.4, 0.4,      # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
-         0.4, 0.4, 0.4, 0.3, 0.4, 0.4,      # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
-         0.3, 0.3, 0.3, 0.2, 0.3, 0.3, 0.3, # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch, wrist_roll, wrist_pitch, wrist_yaw
-         0.3, 0.3, 0.3, 0.2, 0.3, 0.3, 0.3] # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch, wrist_roll, wrist_pitch, wrist_yaw
+    Qq: [8.0, 8.0, 8.0, 8.0,             # base orientation
+         4.0, 4.0, 2.0,                  # base position
+         0.4, 0.4, 0.4, 0.3, 0.4, 0.4,   # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
+         0.4, 0.4, 0.4, 0.3, 0.4, 0.4,   # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
+         0.3, 0.3, 0.3, 0.2,             # left arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
+         0.3, 0.3, 0.3, 0.2]             # right arm: shoulder_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
 
     # velocity weights
-    Qv: [0.4, 0.4, 0.4,                            # base orientation
-         0.1, 0.1, 0.1,                            # base position
-         0.05, 0.05, 0.05, 0.05, 0.08, 0.08,       # left leg
-         0.05, 0.05, 0.05, 0.05, 0.08, 0.08,       # right leg
-         0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, # left arm
-         0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03] # right arm
+    Qv: [0.4, 0.4, 0.4,                       # base orientation
+         0.1, 0.1, 0.1,                       # base position
+         0.05, 0.05, 0.05, 0.05, 0.08, 0.08,  # left leg
+         0.05, 0.05, 0.05, 0.05, 0.08, 0.08,  # right leg
+         0.03, 0.03, 0.03, 0.03,              # left arm
+         0.03, 0.03, 0.03, 0.03]              # right arm
 
     # input weights
-    R: [100.0, 100.0, 100.0,                         # base orientation
-        100.0, 100.0, 100.0,                         # base position
-        0.001, 0.001, 0.001, 0.001, 0.005, 0.005,    # left leg
-        0.001, 0.001, 0.001, 0.001, 0.005, 0.005,    # right leg
-        0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, # left arm
-        0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001] # right arm
+    R: [100.0, 100.0, 100.0,                      # base orientation
+        100.0, 100.0, 100.0,                      # base position
+        0.001, 0.001, 0.001, 0.001, 0.005, 0.005, # left leg
+        0.001, 0.001, 0.001, 0.001, 0.005, 0.005, # right leg
+        0.001, 0.001, 0.001, 0.001,               # left arm
+        0.001, 0.001, 0.001, 0.001]               # right arm
     
     # terminal scaling
     Qf_q_scaling: 10.0
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 100    # number of nodes
+    num_steps: 150    # number of nodes
     mpc_rate: 60     # Hz
     dt: 0.025        # time step
 
@@ -151,15 +151,15 @@ q0_full:  [1.00, 0.00, 0.00, 0.00,           # base orientation, (w, x, y, z)
            0.00, 0.00, 0.76,                 # base position, (x, y, z)
           -0.20, 0.00, 0.00, 0.42, -0.23, 0.0,  # left leg, (hip pitch, hip roll, hip yaw, knee, ankle pitch, ankle roll)
           -0.20, 0.00, 0.00, 0.42, -0.23, 0.0,  # right leg, (hip pitch, hip roll, hip yaw, knee, ankle pitch, ankle roll)
-           0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow pitch, wrist roll, wrist pitch, wrist yaw)
-           0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00] # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow pitch, wrist roll, wrist pitch, wrist yaw)
+           0.00, 0.00, 0.00, 0.00, # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow pitch, wrist roll, wrist pitch, wrist yaw)
+           0.00, 0.00, 0.00, 0.00] # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow pitch, wrist roll, wrist pitch, wrist yaw)
 
 v0_full: [0.00, 0.00, 0.00,            
           0.00, 0.00, 0.00,                   
           0.00, 0.00, 0.00, 0.0, 0.0, 0.0,
           0.00, 0.00, 0.00, 0.0, 0.0, 0.0,
-          0.00, 0.00, 0.00, 0.0, 0.0, 0.0, 0.0,
-          0.00, 0.00, 0.00, 0.0, 0.0, 0.0, 0.0]
+          0.00, 0.00, 0.00, 0.0,
+          0.00, 0.00, 0.00, 0.0]
 
 
 ##################################################################################################
@@ -171,20 +171,20 @@ gains:
     Kp: [150, 150, 100, 150, 20, 20, # LHP, LHR, LHP, LKP, LAP, LAR
         150, 150, 100, 150, 20, 20] # RHP, RHR, RHP, RKP, RAP, RAR
     Kd: [2, 2, 2, 4, 2, 2, 
-        2, 2, 2, 4, 2, 2]
+         2, 2, 2, 4, 2, 2]
 
 
 gains_full:
 
-    Kp: [150, 150, 100, 150, 20, 20,     # LHP, LHR, LHP, LKP, LAP, LAR
-        150, 150, 100, 150, 20, 20,     # RHP, RHR, RHP, RKP, RAP, RAR
-        20,  20,  20,  20,  20, 20, 20, # LSP, LSR, LSY, LEP, LWR, LWP, LWY 
-        20,  20,  20,  20,  20, 20, 20] # RSP, RSR, RSY, REP, RWR, RWP, RWY
+    Kp: [150, 150, 100, 150, 20, 20,   # LHP, LHR, LHP, LKP, LAP, LAR
+         150, 150, 100, 150, 20, 20,    # RHP, RHR, RHP, RKP, RAP, RAR
+         20,  20,  20,  20,             # LSP, LSR, LSY, LEP
+         20,  20,  20,  20]             # RSP, RSR, RSY, REP
 
     Kd: [2, 2, 2, 4, 2, 2, 
-        2, 2, 2, 4, 2, 2,
-        1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1] # LSP, LSR, LSY, LEP, LWR, LWP, LWY
+         2, 2, 2, 4, 2, 2,
+         1, 1, 1, 1,
+         1, 1, 1, 1,]
 
 
 ##################################################################################################

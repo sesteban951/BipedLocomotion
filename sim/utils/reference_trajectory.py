@@ -55,12 +55,12 @@ class IDX:
                  RHP, RHR, RHY, RKP, RAP, RAR]  # right leg
     
     # full model
-    idx_full = [Q_W, Q_X, Q_Y, Q_Z,                # base quat
-                POS_X, POS_Y, POS_Z,               # base position
-                LHP, LHR, LHY, LKP, LAP, LAR,      # left leg
-                RHP, RHR, RHY, RKP, RAP, RAR,      # right leg
-                LSP, LSR, LSY, LEP, LWR, LWP, LWY, # left arm
-                RSP, RSR, RSY, REP, RWR, RWP, RWY] # right arm
+    idx_full = [Q_W, Q_X, Q_Y, Q_Z,           # base quat
+                POS_X, POS_Y, POS_Z,          # base position
+                LHP, LHR, LHY, LKP, LAP, LAR, # left leg
+                RHP, RHR, RHY, RKP, RAP, RAR, # right leg
+                LSP, LSR, LSY, LEP,           # left arm
+                RSP, RSR, RSY, REP]           # right arm
     
     # base position indeces
     idx_base_pos = [POS_X, POS_Y, POS_Z]

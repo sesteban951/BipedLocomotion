@@ -205,8 +205,8 @@ class G1_MPC(ModelPredictiveController):
             nq = 19
             nv = 18
         elif config['model']['type'] == "full":
-            nq = 33
-            nv = 32
+            nq = 27
+            nv = 26
         ModelPredictiveController.__init__(self, optimizer, q_guess, nq, nv, mpc_rate)
 
         # instantiate the model instance indices
