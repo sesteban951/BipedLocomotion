@@ -3,7 +3,7 @@
 ##################################################################################################
 
 model: 
-    type: "full" # "full" (every joint except waist) or 
+    type: "half" # "full" (every joint except waist) or 
                  # "half" (only leg joints)
 
     model_half: "../../models/g1_12dof_obj.urdf"     # path to the URDF model of the robot
@@ -150,12 +150,16 @@ v0: [0.00, 0.00, 0.00,
 q0_full:  [1.00, 0.00, 0.00, 0.00,           # base orientation, (w, x, y, z)
            0.00, 0.00, 0.76,                 # base position, (x, y, z)
           -0.20, 0.00, 0.00, 0.42, -0.23, 0.0,  # left leg, (hip pitch, hip roll, hip yaw, knee, ankle pitch, ankle roll)
-          -0.20, 0.00, 0.00, 0.42, -0.23, 0.0]  # right leg, (hip pitch, hip roll, hip yaw, knee, ankle pitch, ankle roll)
+          -0.20, 0.00, 0.00, 0.42, -0.23, 0.0,  # right leg, (hip pitch, hip roll, hip yaw, knee, ankle pitch, ankle roll)
+           0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, # left arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow pitch, wrist roll, wrist pitch, wrist yaw)
+           0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00] # right arm, (shoulder pitch, shoulder roll, shoulder yaw, elbow pitch, wrist roll, wrist pitch, wrist yaw)
 
 v0_full: [0.00, 0.00, 0.00,            
           0.00, 0.00, 0.00,                   
           0.00, 0.00, 0.00, 0.0, 0.0, 0.0,
-          0.00, 0.00, 0.00, 0.0, 0.0, 0.0]  # initial velocities of the robot (base orientation, base position, left leg, right leg)
+          0.00, 0.00, 0.00, 0.0, 0.0, 0.0,
+          0.00, 0.00, 0.00, 0.0, 0.0, 0.0, 0.0,
+          0.00, 0.00, 0.00, 0.0, 0.0, 0.0, 0.0]
 
 
 ##################################################################################################
