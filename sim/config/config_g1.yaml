@@ -100,9 +100,9 @@ MPC_full:
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 150    # number of nodes
-    mpc_rate: 60     # Hz
-    dt: 0.025        # time step
+    num_steps: 50    # number of nodes
+    mpc_rate: 50     # Hz
+    dt: 0.05        # time step
 
     # solver parameters
     max_iterations: 2
@@ -176,15 +176,15 @@ gains:
 
 gains_full:
 
-    Kp: [150, 150, 100, 150, 20, 20,   # LHP, LHR, LHP, LKP, LAP, LAR
-         150, 150, 100, 150, 20, 20,    # RHP, RHR, RHP, RKP, RAP, RAR
+    Kp: [250, 250, 200, 250, 20, 20,   # LHP, LHR, LHP, LKP, LAP, LAR
+         250, 250, 200, 250, 20, 20,    # RHP, RHR, RHP, RKP, RAP, RAR
          20,  20,  20,  20,             # LSP, LSR, LSY, LEP
          20,  20,  20,  20]             # RSP, RSR, RSY, REP
 
-    Kd: [2, 2, 2, 4, 2, 2, 
-         2, 2, 2, 4, 2, 2,
-         1, 1, 1, 1,
-         1, 1, 1, 1,]
+    Kd: [5, 5, 5, 4, 2, 2, 
+         5, 5, 5, 4, 2, 2,
+         2, 2, 2, 2,
+         2, 2, 2, 2]
 
 
 ##################################################################################################
