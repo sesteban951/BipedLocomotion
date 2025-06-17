@@ -3,7 +3,7 @@
 ##################################################################################################
 
 model: 
-    type: "full" # "full" (every joint except waist) or 
+    type: "half" # "full" (every joint except waist) or 
                  # "half" (only leg joints)
 
     model_half: "../../models/g1_12dof_obj.urdf"     # path to the URDF model of the robot
@@ -21,6 +21,14 @@ reference:
 
     # nominal dt between the reference trajectory points
     hz: 20  # [sec]
+
+reference_nodes:
+
+    # location of nodes
+    path: "../references/gen_pos_trajectory.csv"
+
+    # tiem between the nodes
+    T: 3.0  # [sec]
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -51,7 +59,7 @@ MPC:
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 50  # number of nodes
+    num_steps: 500  # number of nodes
     mpc_rate: 60    # Hz
     dt: 0.025       # time step
 

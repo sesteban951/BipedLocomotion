@@ -92,7 +92,7 @@ class ReferenceTrajectory:
         self.ref_dt = 1.0 / config['reference']['hz']
 
         # load the CSV file
-        self.data = np.loadtxt(reference_path, delimiter=',', skiprows=1)
+        self.data = np.loadtxt(reference_path, delimiter=',')
         self.ref_length = self.data.shape[0]          
 
         # class that holds the indeces
