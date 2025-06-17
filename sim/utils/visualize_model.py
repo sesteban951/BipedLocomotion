@@ -12,7 +12,8 @@ from pydrake.all import *
 
 # load model
 # urdf_path = "../../models/g1_12dof_obj.urdf"
-urdf_path = "../../models/g1_no_hands_obj.urdf"
+# urdf_path = "../../models/g1_no_hands_obj.urdf"
+urdf_path = "../../models/titan_obj.urdf"
 plant = MultibodyPlant(0)
 Parser(plant).AddModels(urdf_path)
 plant.Finalize()

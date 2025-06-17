@@ -6,7 +6,8 @@ model:
     type: "half" # "full" (every joint except waist) or 
                  # "half" (only leg joints)
 
-    model_half: "../../models/g1_12dof_obj.urdf"     # path to the URDF model of the robot
+    # model_half: "../../models/g1_12dof_obj.urdf"     # path to the URDF model of the robot
+    model_half: "../../models/titan_obj.urdf"     # path to the URDF model of the robot
     model_full: "../../models/g1_no_hands_obj.urdf"  # path to the URDF model of the robot
 
 ##################################################################################################
@@ -27,7 +28,7 @@ reference_nodes:
     # location of nodes
     path: "../references/gen_pos_trajectory.csv"
 
-    # tiem between the nodes
+    # time between the nodes
     T: 5.0  # [sec]
 
 ##################################################################################################

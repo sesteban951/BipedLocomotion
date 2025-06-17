@@ -52,8 +52,9 @@ class ReferenceTrajectory:
         xf = np.array(xf).reshape(-1, 1)  # reshape to column vector
 
         # create a bezier curve for the reference trajectory
-        control_pts = np.hstack([x0, x0, x0, (x0 + xf) / 2.0, xf, xf, xf])
         # control_pts = np.hstack([x0, x0, (x0 + xf) / 2.0, xf, xf])
+        control_pts = np.hstack([x0, x0, x0, (x0 + xf) / 2.0, xf, xf, xf])
+        # control_pts = np.hstack([x0, x0, x0, x0, (x0 + xf) / 2.0, xf, xf, xf, xf])
 
         # create a bezier curve
         curve = BezierCurve(t0, tf, control_pts)
