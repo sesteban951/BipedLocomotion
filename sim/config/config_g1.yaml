@@ -29,10 +29,29 @@ reference_nodes:
     path: "../references/gen_pos_trajectory.csv"
 
     # time between the nodes [sec], should be (num_nodes - 1)
-    T: [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
+    T: [1.0, 
+        5.0,
+        1.0, 
+        10.0, 
+        1.0, 
+        10.0, 
+        1.0, 
+        5.0]
 
     # base z offset to the reference trajectory
     z_pos_offset: 0.035
+
+
+##################################################################################################
+# SIMULATION PARAMETERS
+##################################################################################################
+
+# drake simulation parameters
+sim:
+
+    duration: 30.0       # [sec], simulation duration
+    real_time_rate: 0.0  # real-time rate of the simulation
+    time_step: 0.002     # [sec], simulation time step
 
 ##################################################################################################
 # MPC PARAMETERS
@@ -63,8 +82,8 @@ MPC:
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 500  # number of nodes
-    mpc_rate: 50    # Hz
+    num_steps: 40  # number of nodes
+    mpc_rate: 50   # Hz
     dt: 0.05       # time step
 
     # solver parameters
@@ -132,18 +151,6 @@ MPC_full:
 
 
 ##################################################################################################
-# SIMULATION PARAMETERS
-##################################################################################################
-
-# drake simulation parameters
-sim:
-
-    duration: 5.0       # [sec], simulation duration
-    real_time_rate: 0.0  # real-time rate of the simulation
-    time_step: 0.002     # [sec], simulation time step
-
-
-##################################################################################################
 # INITIAL CONFIGURATION
 ##################################################################################################
 
@@ -181,7 +188,7 @@ v0_full: [0.00, 0.00, 0.00,
 gains:
 
     Kp: [150, 150, 100, 150, 20, 20, # LHP, LHR, LHP, LKP, LAP, LAR
-        150, 150, 100, 150, 20, 20] # RHP, RHR, RHP, RKP, RAP, RAR
+         150, 150, 100, 150, 20, 20] # RHP, RHR, RHP, RKP, RAP, RAR
     Kd: [2, 2, 2, 4, 2, 2, 
          2, 2, 2, 4, 2, 2]
 
