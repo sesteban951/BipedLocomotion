@@ -2,7 +2,7 @@
 
 ##
 #
-# MPC with 3D+arms version of the G1 humanoid.
+# 3D reference trajectory for the G1 humanoid model.
 #
 ##
 
