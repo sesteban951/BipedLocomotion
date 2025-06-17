@@ -17,10 +17,6 @@ class ReferenceTrajectory:
 
     def __init__(self, config):
 
-        # TODO: somehow load the sequence of configurations from a file
-        # q_list = 
-        # T_list = 
-
         # load the CSV file, WARNING: fails when there is a trailing comma
         reference_path = config['reference_nodes']['path']
         self.T = config['reference_nodes']['T'] 
@@ -35,14 +31,7 @@ class ReferenceTrajectory:
         self.q_horizon_ref = np.zeros((self.N, 19))     # MPC horizon positions
         self.v_horizon_ref = np.zeros((self.N, 18))   # MPC horizon velocities
 
-        # TEST
-        # create a bezier curve for the reference trajectory
-        # t0 = 1.0
-        # tf = 3.0
-        # x0 = self.data[3]
-        # xf = self.data[4]
-        # t, x_ref = self.create_bezier_curve(x0, xf,t0, tf)
-
+        # create the reference trajectory
         self.create_reference_trajectory()
 
     # create a time vector for MPC horizon
@@ -75,26 +64,17 @@ class ReferenceTrajectory:
         input = list(np.linspace(t0, tf, num=num_eval_pts))
 
         # evaluate the spline
-        output = [curve.value(t) for t in input]
+        output = []
+        for t in input:
 
-        # # evaluate the derivative of the spline
-        # output_deriv = [curve.EvalDerivative(t, 1)[0] for t in input]
+            # evaluate the bezier curve at time t
+            value = curve.value(t)
 
-        # # evaluate the second derivative of the spline
-        # output_deriv2 = [curve.EvalDerivative(t, 2)[0] for t in input]
+            # normalize the quaternion
+            value[:4] /= np.linalg.norm(value[:4])
 
-        # # plot the reference trajectory
-        # plt.figure()
-        # plt.plot(input, output, label='Reference Trajectory')
-        # plt.plot(input, output_deriv, label='Reference Trajectory Derivative', linestyle='--')
-        # plt.plot(input, output_deriv2, label='Reference Trajectory Second Derivative', linestyle=':')
-        # plt.xlabel('Time')
-        # plt.ylabel('Position')
-        # plt.title('Reference Trajectory Bezier Curve')
-        # plt.legend()
-        # plt.show()
-
-        # TODO: normalize the quaternion
+            # append the value to the output
+            output.append(curve.value(t))
 
         return input, output
     
@@ -157,31 +137,6 @@ class ReferenceTrajectory:
                 self.x_ref = np.vstack((self.x_ref, traj_array))
 
         return self.t_ref, self.x_ref
-
-    # # create spline for time
-    # def create_time_spline_vector(self, T1, T2):
-        
-    #     # Create a bezier curve for the time vector
-    #     control_pts = np.array([[T1, T1, T1, (T1+T2)/2.0, T2, T2, T2]])  # 7 points for a degree 1 curve
-        
-    #     # create a bezier curve
-    #     t_0 = 0.0
-    #     t_f = T2-T1
-    #     curve = BezierCurve(t_0, t_f, control_pts)
-
-    #     # create a time vector for the spline
-    #     input = np.linspace(t_0, t_f, num=100)
-
-    #     # evaluate the spline
-    #     output = [curve.value(t)[0][0] for t in input]
-
-    #     # plot the time vector
-    #     plt.figure()
-    #     plt.plot(input, output, label='Time Spline')
-    #     plt.xlabel('Normalized Time')
-    #     plt.ylabel('Time')
-    #     plt.title('Time Spline')
-    #     plt.show()
 
 
 ####################################################################################################
@@ -250,8 +205,8 @@ if __name__ == "__main__":
         time_elapsed += dt
         diagram_context.SetTime(time_elapsed)
 
-        # print("Playback time: {:.2f} s, Step: {:d}/{:d}".format(
-        #     time_elapsed, i + 1, q_ref.shape[0]))    
+        print("Playback time: {:.2f} s, Step: {:d}/{:d}".format(
+            time_elapsed, i + 1, q_ref.shape[0]))    
 
         # Perform a forced publish event. This will propagate the plant's state to 
         # meshcat, without doing any physics simulation.
