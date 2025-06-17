@@ -60,9 +60,9 @@ MPC:
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 500  # number of nodes
-    mpc_rate: 60    # Hz
-    dt: 0.025       # time step
+    num_steps: 50  # number of nodes
+    mpc_rate: 50    # Hz
+    dt: 0.05       # time step
 
     # solver parameters
     max_iterations: 2
@@ -135,7 +135,7 @@ MPC_full:
 # drake simulation parameters
 sim:
 
-    duration: 15.0       # [sec], simulation duration
+    duration: 5.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
