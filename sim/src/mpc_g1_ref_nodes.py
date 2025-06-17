@@ -41,8 +41,7 @@ from pyidto import (
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../utils'))
 from mpc_utils import Interpolator, ModelPredictiveController # type: ignore
-# from reference_trajectory_copy import ReferenceTrajectory          # type: ignore
-from reference_trajectory import ReferenceTrajectory          # type: ignore
+from reference_interpolation import ReferenceTrajectory       # type: ignore
 
 # import the yaml config
 config_path = "../config/config_g1.yaml"
