@@ -41,7 +41,7 @@ from pyidto import (
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../utils'))
 from mpc_utils import Interpolator, ModelPredictiveController # type: ignore
-from reference_interpolation import ReferenceTrajectory       # type: ignore
+from reference_interpolation_crawl import ReferenceTrajectory       # type: ignore
 
 # import the yaml config
 config_path = "../config/config_g1.yaml"
@@ -222,30 +222,30 @@ class G1_MPC(ModelPredictiveController):
         Shift the reference trajectory based on the current position.
         """
 
-        # Get the current state
-        x0 = self.state_input_port.Eval(context)
-        q0 = x0[:self.nq]
-        v0 = x0[self.nq:]
+        # # Get the current state
+        # x0 = self.state_input_port.Eval(context)
+        # q0 = x0[:self.nq]
+        # v0 = x0[self.nq:]
 
-        #  get the current sim time
+        # #  get the current sim time
         self.t_sim = context.get_time()
 
         print(f"Current sim time: {self.t_sim:.4f}")
 
-        # Get the current nominal trajectory
-        prob = self.optimizer.prob()
-        q_nom = prob.q_nom
-        v_nom = prob.v_nom
+        # # Get the current nominal trajectory
+        # prob = self.optimizer.prob()
+        # q_nom = prob.q_nom
+        # v_nom = prob.v_nom
 
-        # Shift the nominal trajectory
-        dt = self.optimizer.time_step()
-        vx = 0.25
-        for i in range(self.num_steps + 1):
-            q_nom[i][self.idx.POS_X] = q0[self.idx.POS_X] + vx * i * dt
-            v_nom[i][self.idx.VEL_X] = vx
+        # # Shift the nominal trajectory
+        # dt = self.optimizer.time_step()
+        # vx = 0.25
+        # for i in range(self.num_steps + 1):
+        #     q_nom[i][self.idx.POS_X] = q0[self.idx.POS_X] + vx * i * dt
+        #     v_nom[i][self.idx.VEL_X] = vx
 
         # Update the reference trajectory
-        # q_nom, v_nom = self.reference_trajectory.get_interpolated_trajectory(self.t_sim)
+        q_nom, v_nom = self.reference_trajectory.get_interpolated_trajectory(self.t_sim)
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
 

@@ -314,10 +314,20 @@ if __name__=="__main__":
     builder.Connect(plant.get_state_output_port(), 
                     logger_state.get_input_port())
     
-    # Logger torque
-    logger_torque = builder.AddSystem(VectorLogSink(plant.num_actuators()))
+    # Logger applied torque
+    logger_applied_torque = builder.AddSystem(VectorLogSink(plant.num_actuators()))
     builder.Connect(plant.get_net_actuation_output_port(), 
-                    logger_torque.get_input_port())
+                    logger_applied_torque.get_input_port())
+    
+    # Logger commanded state
+    logger_commanded_state = builder.AddSystem(VectorLogSink(plant.num_actuators() * 2))
+    builder.Connect(interpolator.GetOutputPort("state"),
+                    logger_commanded_state.get_input_port())
+    
+    # Logger torque feedforward 
+    logger_torque_ff = builder.AddSystem(VectorLogSink(plant.num_actuators()))
+    builder.Connect(interpolator.GetOutputPort("control"),
+                    logger_torque_ff.get_input_port())
 
     # Connect the plant to meshcat for visualization
     vis_config = VisualizationConfig()
@@ -350,11 +360,34 @@ if __name__=="__main__":
 
     # unpack the logged data
     state_log = logger_state.FindLog(diagram_context)
-    torque_log = logger_torque.FindLog(diagram_context)
+    applied_torque_log = logger_applied_torque.FindLog(diagram_context)
+    cmd_log = logger_commanded_state.FindLog(diagram_context)
+    torque_ff_log = logger_torque_ff.FindLog(diagram_context)
 
     times = state_log.sample_times()
     states = state_log.data().T
-    torques = torque_log.data().T
+    torques = applied_torque_log.data().T
+    commanded_states = cmd_log.data().T
+    torque_ff = torque_ff_log.data().T
+
+    print(times.shape)
+    print(states.shape)
+    print(torques.shape)
+    print(commanded_states.shape)
+    print(torque_ff.shape)
+
+    print("-" * 50)
+
+    # parse the state data
+    base_quat_w_actual = states[:, :4]
+    base_pos_w_actual = states[:, 4:7]
+    q_joint_target = commanded_states[:, :12]
+    v_joint_target = commanded_states[:, 12:]
+
+    print(base_quat_w_actual.shape)
+    print(base_pos_w_actual.shape)
+    print(q_joint_target.shape)
+    print(v_joint_target.shape)
 
     # save the state data to CSV files
     save_folder = "./data/"
@@ -365,15 +398,32 @@ if __name__=="__main__":
         for i in range(len(times)):
             writer.writerow([times[i]])
 
-    states_label = save_folder + "states.csv"
-    with open(states_label, mode='w') as file:
+    base_quat_w_actual_label = save_folder + "base_quat_w_actual.csv"
+    with open(base_quat_w_actual_label, mode='w') as file:
         writer = csv.writer(file)
-        for i in range(len(states)):
-            writer.writerow(states[i])
+        for i in range(len(base_quat_w_actual)):
+            writer.writerow(base_quat_w_actual[i])
 
-    torques_label = save_folder + "torques.csv"
-    with open(torques_label, mode='w') as file:
+    base_pos_w_actual_label = save_folder + "base_pos_w_actual.csv"
+    with open(base_pos_w_actual_label, mode='w') as file:
         writer = csv.writer(file)
-        for i in range(len(torques)):
-            writer.writerow(torques[i])
-            
+        for i in range(len(base_pos_w_actual)):
+            writer.writerow(base_pos_w_actual[i])
+
+    q_joint_target_label = save_folder + "q_joint_target.csv"
+    with open(q_joint_target_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(q_joint_target)):
+            writer.writerow(q_joint_target[i])
+
+    v_joint_target_label = save_folder + "v_joint_target.csv"
+    with open(v_joint_target_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(v_joint_target)):
+            writer.writerow(v_joint_target[i])
+    
+    torque_ffs_label = save_folder + "torques_ff.csv"
+    with open(torque_ffs_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(torque_ff)):
+            writer.writerow(torque_ff[i])

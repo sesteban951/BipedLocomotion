@@ -69,6 +69,12 @@ class Interpolator(LeafSystem):
                                                            BasicVector(
                                                                num_actuators),
                                                            self.SendControl)
+        
+        # # Add a position des output port for logging
+        # pos_cmd_output_port  = self.DeclareVectorOutputPort("pos_cmd",
+        #                                                    BasicVector(
+        #                                                        num_actuators),
+        #                                                    self.SendPosCmd)
 
     def SendState(self, context, output):
         """
@@ -88,6 +94,16 @@ class Interpolator(LeafSystem):
         u = self.Bv @ trajectory.tau.value(context.get_time() -
                                            trajectory.start_time)
         output.SetFromVector(u)
+
+    # def SendPosCmd(self, context, output):
+    #     """
+    #     Send the position command at the current time.
+    #     This is useful for logging purposes.
+    #     """
+    #     trajectory = self.EvalAbstractInput(context, 0).get_value()
+    #     t = context.get_time() - trajectory.start_time
+    #     pos_cmd = self.Bq @ trajectory.q.value(t)
+    #     output.SetFromVector(pos_cmd)
 
 
 class ModelPredictiveController(LeafSystem):
