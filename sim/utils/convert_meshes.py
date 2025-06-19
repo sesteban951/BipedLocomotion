@@ -13,7 +13,8 @@ import pymeshlab
 robot = "titan"
 
 # path to the robot's model files
-model_directory = "./models/{}/meshes".format(robot)
+# model_directory = "../models/{}/meshes".format(robot)
+model_directory = "../../models/meshes"
 
 # get list of all files in the model directory
 files = [f for f in os.listdir(model_directory) if os.path.isfile(os.path.join(model_directory, f))]
