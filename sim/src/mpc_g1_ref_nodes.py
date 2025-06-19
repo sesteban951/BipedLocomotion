@@ -27,7 +27,8 @@ from pydrake.all import (
     Simulator,
     JointActuatorIndex,
     PdControllerGains,
-    VectorLogSink
+    VectorLogSink,
+    BasicVector
 )
 
 # import the pyidto modules
@@ -328,7 +329,7 @@ if __name__=="__main__":
     logger_torque_ff = builder.AddSystem(VectorLogSink(plant.num_actuators()))
     builder.Connect(interpolator.GetOutputPort("control"),
                     logger_torque_ff.get_input_port())
-
+    
     # Connect the plant to meshcat for visualization
     vis_config = VisualizationConfig()
     vis_config.publish_contacts = config['contact_vis']
@@ -364,30 +365,25 @@ if __name__=="__main__":
     cmd_log = logger_commanded_state.FindLog(diagram_context)
     torque_ff_log = logger_torque_ff.FindLog(diagram_context)
 
+    # unpack the logged data into numpy arrays
     times = state_log.sample_times()
     states = state_log.data().T
     torques = applied_torque_log.data().T
     commanded_states = cmd_log.data().T
     torque_ff = torque_ff_log.data().T
 
-    print(times.shape)
-    print(states.shape)
-    print(torques.shape)
-    print(commanded_states.shape)
-    print(torque_ff.shape)
-
-    print("-" * 50)
+    # build the trajectory number vector
+    trajectory_indeces = np.arange(len(times)).reshape(-1, 1)
+    ref_traj = ReferenceTrajectory(config)
+    for i in range(len(times)):
+        traj_idx = ref_traj.get_current_index_in_trajectory(times[i])
+        trajectory_indeces[i] = traj_idx
 
     # parse the state data
     base_quat_w_actual = states[:, :4]
     base_pos_w_actual = states[:, 4:7]
     q_joint_target = commanded_states[:, :12]
     v_joint_target = commanded_states[:, 12:]
-
-    print(base_quat_w_actual.shape)
-    print(base_pos_w_actual.shape)
-    print(q_joint_target.shape)
-    print(v_joint_target.shape)
 
     # save the state data to CSV files
     save_folder = "./data/"
@@ -427,3 +423,11 @@ if __name__=="__main__":
         writer = csv.writer(file)
         for i in range(len(torque_ff)):
             writer.writerow(torque_ff[i])
+
+    traj_idx_label = save_folder + "trajectory_idx.csv"
+    with open(traj_idx_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(trajectory_indeces)):
+            writer.writerow(trajectory_indeces[i])
+
+    print("Saved data to CSV files.")

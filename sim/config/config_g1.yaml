@@ -9,8 +9,8 @@ model:
 
     # model_half: "../../models/g1_12dof_obj.urdf"     # path to the URDF model of the robot
     model_half: "../../models/titan_obj.urdf"        # path to the URDF model of the robot
-    model_full: "../../models/g1_no_hands_obj.urdf"  # path to the URDF model of the robot
-    model_crawl: "../../models/titan_crawl_obj.urdf" # path to the URDF model of the robot
+    # model_full: "../../models/g1_no_hands_obj.urdf"  # path to the URDF model of the robot
+    # model_crawl: "../../models/titan_crawl_obj.urdf" # path to the URDF model of the robot
 
 ##################################################################################################
 # REFERENCE TRAJECTORY
@@ -39,13 +39,13 @@ reference_nodes:
     #     10.0]
 
     # time between the nodes [sec], should be (num_nodes - 1)
-    T: [1.0, 
+    T: [5.0, 
         5.0,
         1.0, 
         10.0, 
-        1.0, 
+        15.0, 
         10.0, 
-        3.0, 
+        10.0, 
         3.0]
 
     # base z offset to the reference trajectory
@@ -59,7 +59,8 @@ reference_nodes:
 # drake simulation parameters
 sim:
 
-    duration: 35.0       # [sec], simulation duration
+    duration: 60.0       # [sec], simulation duration
+    # duration: 5.1       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -70,7 +71,7 @@ sim:
 MPC:
 
     # position weights
-    Qq: [8.0, 8.0, 8.0, 8.0,       # base orientation
+    Qq: [8.0, 8.0, 12.0, 8.0,       # base orientation
          2.0, 2.0, 2.0,                # base position
          0.4, 0.4, 0.4, 0.3, 0.4, 0.4, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
          0.4, 0.4, 0.4, 0.3, 0.4, 0.4] # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
@@ -260,8 +261,8 @@ v0_crawl: [0.00, 0.00, 0.00,
 
 gains:
 
-    Kp: [150, 150, 100, 150, 20, 20, # LHP, LHR, LHY, LKP, LAP, LAR
-         150, 150, 100, 150, 20, 20] # RHP, RHR, RHY, RKP, RAP, RAR
+    Kp: [250, 250, 200, 250, 40, 40, # LHP, LHR, LHY, LKP, LAP, LAR
+         250, 250, 200, 250, 40, 40] # RHP, RHR, RHY, RKP, RAP, RAR
     Kd: [2, 2, 2, 4, 2, 2, 
          2, 2, 2, 4, 2, 2]
 

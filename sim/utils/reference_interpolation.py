@@ -35,12 +35,12 @@ class ReferenceTrajectory:
         self.node_data[:, 6] += z_offset
 
         # create the reference trajectory
-        self.t_ref, self.x_ref = self.create_reference_trajectory()
+        self.i_ref, self.t_ref, self.x_ref = self.create_reference_trajectory()
         self.ref_dt = self.t_ref[1] - self.t_ref[0]
         self.data = self.x_ref           # store the reference trajectory data
 
         self.t_ref = self.create_reference_time_vector()  
-        self.q_ref = self.x_ref[:, :19]  # take the first 19 elements of the state vector
+        self.q_ref = self.x_ref[:, :19]  # take the first 19 elements of the state vector        
 
     # create a bezier curve for the reference trajectory
     def create_bezier_curve(self, x0, xf, t0, tf):
@@ -89,10 +89,6 @@ class ReferenceTrajectory:
         # make sure that the number of periods in self.T is equal to the number of data points
         assert (num_data_pts-1) == len(self.T)
 
-        # create list of periods
-        T = 1.0
-        integer_vec = np.arange(num_data_pts) * T
-
         # create the time vector for the reference trajectory
         integer_vec = np.zeros(len(self.T) + 1)
         T_now = 0.0
@@ -104,6 +100,7 @@ class ReferenceTrajectory:
         # create a bezier curve for each trajectory
         t_ref_list = []
         x_ref_list = []
+        i_ref_list = []
         for i in range(num_trajs):
             
             # get the first and last points of the trajectory
@@ -120,12 +117,19 @@ class ReferenceTrajectory:
                 t_list.pop()  # remove the last point
                 x_list.pop()  # remove the last point
 
+            # create an index vector for the trajectory
+            i_list = np.ones(len(t_list), dtype=int) * i
+
             # append the time and position vectors to the list
             t_ref_list.append(t_list)
             x_ref_list.append(x_list)
+            i_ref_list.append(i_list)
 
-        # parse time lists
+        # concatenate time lists
         self.t_ref = np.concatenate(t_ref_list).reshape(-1, 1)  # reshape to column vector
+
+        # concatentate the index lists
+        self.i_ref = np.concatenate(i_ref_list).reshape(-1, 1)  # reshape to column vector
 
         # parse position lists
         for i in range(num_trajs):
@@ -148,7 +152,7 @@ class ReferenceTrajectory:
             else:
                 self.x_ref = np.vstack((self.x_ref, traj_array))
 
-        return self.t_ref, self.x_ref
+        return self.i_ref, self.t_ref, self.x_ref
     
 
     # create a time vector for the whole reference trajectory
@@ -238,6 +242,23 @@ class ReferenceTrajectory:
         self.v_horizon_ref[-1, :] = self.v_horizon_ref[-2, :]
         
         return self.q_horizon_ref, self.v_horizon_ref
+    
+    # given a sim time, return, the index that correspodns to this time
+    def get_current_index_in_trajectory(self, t_sim):
+
+        # find where t_sim is in the time reference
+        if t_sim < self.t_ref[0]:
+            idx = 0
+        elif t_sim >= self.t_ref[-1]:
+            idx = len(self.t_ref) - 1
+        else:
+            idx = np.searchsorted(self.t_ref, t_sim, side='right')
+
+        # index of the trajectory
+        idx = self.i_ref[idx][0]
+
+
+        return idx
 
     # linear interpolation
     def interpolate(self, t_sim, t1, t2, q1, q2):
