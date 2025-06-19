@@ -541,6 +541,19 @@
     <limit lower="-0.52" upper="0.52" effort="50" velocity="37"/>
   </joint>
 
+  <link name="m4_link">
+    <inertial>
+      <origin xyz="-0.03171 0 0" rpy="0 0 0"/>
+      <mass value="5.0"/>
+      <inertia ixx="0.0396025592" ixy="0" ixz="0" iyy="0.0281511706" iyz="0" izz="0.015158583"/>
+    </inertial>
+  </link>
+  <joint name="m4_joint" type="fixed">
+    <origin xyz="-0.08 0 0.14" rpy="0 0 0"/>
+    <parent link="torso_link"/>
+    <child link="m4_link"/>
+  </joint>
+
 
   <!--geom type="box" pos="-0.125 0 0.1" mass="7.5" diaginertia="0.15625 0.10625 0.0625" size="0.05 0.15 0.20" rgba="0.2 0.2 0.2 1" /-->
   <!--link name="m4_link">
