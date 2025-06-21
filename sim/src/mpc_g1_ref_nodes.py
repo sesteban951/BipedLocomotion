@@ -28,7 +28,10 @@ from pydrake.all import (
     JointActuatorIndex,
     PdControllerGains,
     VectorLogSink,
-    BasicVector
+    BasicVector,
+    MultibodyPlant,
+    Sphere,
+    Rgba
 )
 
 # import the pyidto modules
@@ -194,17 +197,30 @@ class G1_MPC(ModelPredictiveController):
     """
     A Model Predictive Controller for the Achilles humanoid.
     """
-    def __init__(self, optimizer, q_guess, mpc_rate):
+    def __init__(self, optimizer, q_guess, mpc_rate, meshcat):
         ModelPredictiveController.__init__(self, optimizer, q_guess, 19, 18, mpc_rate)
 
         # instantiate the model instance indices
         self.idx = IDX()
+
+        # create an internal plant for the controller
+        model_path = config['model']['model_half']
+        self.plant = MultibodyPlant(0.0)
+        Parser(self.plant).AddModels(model_path)
+        self.plant.Finalize()
+        self.plant_context = self.plant.CreateDefaultContext()
 
         # create internal reference trajecotry object
         self.reference_trajectory = ReferenceTrajectory(config)
 
         # current sim time
         self.t_sim = 0.0
+
+        # for visualzing the COM
+        self.meshcat = meshcat
+        self.sphere_com = Sphere(0.015)
+        self.red_color = Rgba(1.0, 0.0, 0.0, 1.0)
+        self.meshcat.SetObject("com", self.sphere_com, self.red_color)
 
     def UpdateNominalTrajectory(self, context):
         """
@@ -216,10 +232,11 @@ class G1_MPC(ModelPredictiveController):
         # q0 = x0[:self.nq]
         # v0 = x0[self.nq:]
 
-        #  get the current sim time
+        # get the current sim time
         self.t_sim = context.get_time()
 
-        print(f"Current sim time: {self.t_sim:.4f}")
+        # visualize the COM
+        self.VisualizeCOM(context)
 
         # Get the current nominal trajectory
         # prob = self.optimizer.prob()
@@ -235,8 +252,33 @@ class G1_MPC(ModelPredictiveController):
 
         # Update the reference trajectory
         q_nom, v_nom = self.reference_trajectory.get_interpolated_trajectory(self.t_sim)
+        idx_traj = self.reference_trajectory.get_current_index_in_trajectory(self.t_sim)
+
+        # print the sim time and the current trajectory index
+        print(f"index: {idx_traj}, sim time: {self.t_sim:.4f}")
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
+
+    # print the current state
+    def VisualizeCOM(self, context):
+        """
+        Visualize the center of mass of the model instance.
+        """
+        # Get the current state
+        x0 = self.state_input_port.Eval(context)
+        q0 = x0[:self.nq]
+        v0 = x0[self.nq:]
+
+        # Set the positions and velocities in the internal plant
+        self.plant.SetPositions(self.plant_context, q0)
+        self.plant.SetVelocities(self.plant_context, v0)
+
+        # Get the center of mass position projection onto ground
+        com_pos = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context)
+        com_pos[2] = 0.0  # project onto ground plane
+
+        # plot it on meshcat
+        self.meshcat.SetTransform("com", RigidTransform(com_pos), self.t_sim)
 
 #####################################################################################
 
@@ -288,7 +330,7 @@ if __name__=="__main__":
 
     # Create the MPC controller and interpolator systems
     mpc_rate = config['MPC']['mpc_rate']
-    controller = builder.AddSystem(G1_MPC(optimizer, q_guess, mpc_rate))
+    controller = builder.AddSystem(G1_MPC(optimizer, q_guess, mpc_rate, meshcat))
 
     Bv = plant.MakeActuationMatrix()
     N = plant.MakeVelocityToQDotMap(plant.CreateDefaultContext())

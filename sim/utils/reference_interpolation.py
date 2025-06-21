@@ -52,8 +52,8 @@ class ReferenceTrajectory:
 
         # create a bezier curve for the reference trajectory
         # control_pts = np.hstack([x0, (x0 + xf) / 2.0, xf])
-        # control_pts = np.hstack([x0, x0, (x0 + xf) / 2.0, xf, xf])
-        control_pts = np.hstack([x0, x0, x0, (x0 + xf) / 2.0, xf, xf, xf])
+        control_pts = np.hstack([x0, x0, (x0 + xf) / 2.0, xf, xf])
+        # control_pts = np.hstack([x0, x0, x0, (x0 + xf) / 2.0, xf, xf, xf])
         # control_pts = np.hstack([x0, x0, x0, x0, (x0 + xf) / 2.0, xf, xf, xf, xf])
 
         # create a bezier curve
