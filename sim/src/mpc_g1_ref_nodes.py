@@ -428,13 +428,19 @@ if __name__=="__main__":
     v_joint_target = commanded_states[:, 12:]
 
     # save the state data to CSV files
-    save_folder = "./data/"
+    save_folder = "./data/data/"
 
     times_label = save_folder + "times.csv"
     with open(times_label, mode='w') as file:
         writer = csv.writer(file)
         for i in range(len(times)):
             writer.writerow([times[i]])
+
+    full_state_label = save_folder + "full_state.csv"
+    with open(full_state_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(states)):
+            writer.writerow(states[i])
 
     base_quat_w_actual_label = save_folder + "base_quat_w_actual.csv"
     with open(base_quat_w_actual_label, mode='w') as file:

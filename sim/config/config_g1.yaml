@@ -29,26 +29,18 @@ reference_nodes:
 
     # location of nodes
     path: "../references/gen_pos_trajectory.csv"
-    # path: "../references/gen_pos_trajectory_crawl.csv"
 
     # time between the nodes [sec], should be (num_nodes - 1)
-    # T: [1.0, 
-    #     5.0,
-    #     1.0, 
-    #     10.0, 
-    #     10.0]
-
-    # time between the nodes [sec], should be (num_nodes - 1)
-    T: [5.0,  # 0: stay standing
-        5.0,  # 1: squat
+    T: [3.0,  # 0: stay standing
+        3.0,  # 1: squat
         1.0,  # 2: stay squating
-        10.0, # 3: bend over to 45
-        15.0,  # 4: bend over to 90
-        15.0,  # 5: stay bent over
-        15.0,  # 6: 
-        10.0,  # 7: standing
-        3.0,   # 8: standing
-        3.0]   # 9: standing
+        3.0, # 3: bend over to 45
+        3.0,  # 4: bend over to 90
+        3.0,  # 5: stay bent over
+        3.0,  # 6: 
+        3.0,  # 7: standing
+        2.0,   # 8: standing
+        2.0]   # 9: standing
 
     # base z offset to the reference trajectory
     z_pos_offset: 0.035
@@ -61,7 +53,7 @@ reference_nodes:
 # drake simulation parameters
 sim:
 
-    duration: 85.0       # [sec], simulation duration
+    duration: 25.0       # [sec], simulation duration
     # duration: 5.1       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step

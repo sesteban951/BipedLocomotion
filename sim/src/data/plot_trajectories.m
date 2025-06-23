@@ -5,10 +5,10 @@ clear all; close all; clc;
 
 
 % Load the csv data
-time = csvread('times.csv');
-q_joint_des = csvread('q_joint_target.csv');
-v_joint_des = csvread('v_joint_target.csv');
-tau_ff = csvread('torques_ff.csv');
+time = csvread('./data/times.csv');
+q_joint_des = csvread('./data/q_joint_target.csv');
+v_joint_des = csvread('./data/v_joint_target.csv');
+tau_ff = csvread('./data/torques_ff.csv');
 
 % joint labels
 joint_labels = ["LHP", "LHR", "LHY", "LKP", "LAP", "LAR", ...
