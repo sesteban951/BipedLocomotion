@@ -12,9 +12,13 @@ from pydrake.all import *
 
 # load model
 # urdf_path = "../../models/g1_12dof_obj.urdf"
+urdf_path = "../../models/g1_29dof_obj.urdf"
 # urdf_path = "../../models/g1_no_hands_obj.urdf"
 # urdf_path = "../../models/titan_obj.urdf"
-urdf_path = "../../models/titan_crawl_obj.urdf"
+# urdf_path = "../../models/titan_obj.urdf"
+
+robot = "g1_29dof"
+
 plant = MultibodyPlant(0)
 Parser(plant).AddModels(urdf_path)
 plant.Finalize()
@@ -22,8 +26,7 @@ plant.Finalize()
 ########################################################################################
 
 # model instance index
-# model_instance_idx = plant.GetModelInstanceByName("g1_12dof")
-model_instance_idx = plant.GetModelInstanceByName("g1")
+model_instance_idx = plant.GetModelInstanceByName(robot)
 
 # BODIES
 print("-"*50)

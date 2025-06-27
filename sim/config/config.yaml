@@ -14,7 +14,7 @@ MPC:
 
     # position weights
     Qq: [4.0, 4.0, 4.0, 4.0,  # base orientation
-         1.0, 1.0, 1.0,           # base position
+         10.0, 1.0, 1.0,           # base position
          0.4, 0.4, 0.4, 0.3, 0.8, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
          0.1, 0.1, 0.01, 0.01,    # left arm: shoudler_pitch, shoulder_roll, shoulder_yaw, elbow_pitch
          0.4, 0.4, 0.4, 0.3, 0.8, # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch
@@ -41,12 +41,12 @@ MPC:
     Qf_v_scaling: 10.0
 
     # standard parameters
-    num_steps: 20  # number of nodes
+    num_steps: 40  # number of nodes
     mpc_rate: 50   # Hz
     dt: 0.05       # time step
 
     # solver parameters
-    max_iterations: 3
+    max_iterations: 2
     scaling: True
     equality_constraints: False
     Delta0: 10.0

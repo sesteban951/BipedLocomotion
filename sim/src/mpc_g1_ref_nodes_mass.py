@@ -116,13 +116,10 @@ class IDX():
 
 #####################################################################################
 
-def standing_position():
+def initial_position():
     """
     Return a reasonable default standing position for the Achilles humanoid. 
     """
-
-    # use default one
-    # q0 = np.array(config['q0'])
 
     # use first node of the reference trajectory
     ref_traj = ReferenceTrajectory(config)
@@ -157,7 +154,7 @@ def create_optimizer(model_file):
     nq = plant.num_positions()
     nv = plant.num_velocities()
 
-    q_stand = standing_position()
+    q_stand = initial_position()
 
     # Specify a cost function and target trajectory
     problem = ProblemDefinition()
@@ -334,7 +331,7 @@ if __name__=="__main__":
     # Note that the diagram and plant must stay in scope while the optimizer is
     # being used
     optimizer, ctrl_diagram, ctrl_plant = create_optimizer(model_file)
-    q_guess = [standing_position() for _ in range(optimizer.num_steps() + 1)]
+    q_guess = [initial_position() for _ in range(optimizer.num_steps() + 1)]
 
     # Create the MPC controller and interpolator systems
     mpc_rate = config['MPC']['mpc_rate']
@@ -391,7 +388,7 @@ if __name__=="__main__":
     plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
     # Set the initial state
-    q0 = standing_position()
+    q0 = initial_position()
     v0 = np.array(config['v0'])
     # ref_traj = ReferenceTrajectory(config)
     # a = ref_traj.node_data

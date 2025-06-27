@@ -8,7 +8,8 @@ model:
                  # "crawl" (leg joints, no waist, shoulder pitch, elbow)
 
     # model_half: "../../models/g1_12dof_obj.urdf"     # path to the URDF model of the robot
-    model_half: "../../models/titan_obj.urdf"        # path to the URDF model of the robot
+    model_half: "../../models/g1_29dof_obj.urdf"     # path to the URDF model of the robot
+    # model_half: "../../models/titan_obj.urdf"        # path to the URDF model of the robot
     # model_full: "../../models/g1_no_hands_obj.urdf"  # path to the URDF model of the robot
     # model_crawl: "../../models/titan_crawl_obj.urdf" # path to the URDF model of the robot
 
@@ -32,19 +33,25 @@ reference_nodes:
 
     # time between the nodes [sec], should be (num_nodes - 1)
     T: [3.0,  # 0: stay standing
-        3.0,  # 1: squat
-        1.0,  # 2: stay squating
-        3.0, # 3: bend over to 45
-        3.0,  # 4: bend over to 90
-        3.0,  # 5: stay bent over
-        3.0,  # 6: 
-        3.0,  # 7: standing
-        2.0,   # 8: standing
-        2.0]   # 9: standing
+        5.0,  # 1: squat
+        3.0,  # 2: stay squating
+        10.0, # 3: bend over to 45
+        15.0,  # 4: bend over to 90
+        10.0,  # 5: stay bent over
+        10.0,  # 6: 
+        10.0,  # 7: standing
+        5.0,   # 8: standing
+        5.0]   # 9: standing
+
+    # checkpoint index
+    checkpt_idx: 2
 
     # base z offset to the reference trajectory
     z_pos_offset: 0.035
 
+    # interpolation 
+    type: 1  # order of the interpolation
+              # 1: linear, 2: quadratic, 3: cubic
 
 ##################################################################################################
 # SIMULATION PARAMETERS
@@ -53,8 +60,7 @@ reference_nodes:
 # drake simulation parameters
 sim:
 
-    duration: 25.0       # [sec], simulation duration
-    # duration: 5.1       # [sec], simulation duration
+    duration: 70.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -65,8 +71,8 @@ sim:
 MPC:
 
     # position weights
-    Qq: [4.0, 4.0, 16.0, 4.0,       # base orientation
-         0.1, 0.1, 2.0,                # base position
+    Qq: [4.0,  4.0, 4.0, 16.0,       # base orientation
+         0.1, 0.1, 0.1,                # base position
          0.4, 0.4, 0.4, 0.3, 0.4, 0.4, # left leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
          0.4, 0.4, 0.4, 0.3, 0.4, 0.4] # right leg: hip_yaw, hip_roll, hip_pitch, knee_pitch, ankle_pitch, ankle_roll
 

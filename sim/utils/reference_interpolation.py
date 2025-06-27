@@ -29,6 +29,7 @@ class ReferenceTrajectory:
         reference_path = config['reference_nodes']['path']
         self.T = config['reference_nodes']['T']
         self.node_data = np.loadtxt(reference_path, delimiter=',')
+        self.interp_type = config['reference_nodes']['type']  # interpolation type
 
         # add a constant offset to the base
         z_offset = config['reference_nodes']['z_pos_offset']
@@ -51,10 +52,16 @@ class ReferenceTrajectory:
         xf = np.array(xf).reshape(-1, 1)  # reshape to column vector
 
         # create a bezier curve for the reference trajectory
-        # control_pts = np.hstack([x0, (x0 + xf) / 2.0, xf])
-        control_pts = np.hstack([x0, x0, (x0 + xf) / 2.0, xf, xf])
-        # control_pts = np.hstack([x0, x0, x0, (x0 + xf) / 2.0, xf, xf, xf])
-        # control_pts = np.hstack([x0, x0, x0, x0, (x0 + xf) / 2.0, xf, xf, xf, xf])
+        if self.interp_type == 1:
+            control_pts = np.hstack([x0, (x0 + xf) / 2.0, xf])
+        elif self.interp_type == 2:
+            control_pts = np.hstack([x0, x0, (x0 + xf) / 2.0, xf, xf])
+        elif self.interp_type == 3:
+            control_pts = np.hstack([x0, x0, x0, (x0 + xf) / 2.0, xf, xf, xf])
+        elif self.interp_type == 4:
+            control_pts = np.hstack([x0, x0, x0, x0, (x0 + xf) / 2.0, xf, xf, xf, xf])
+        else:
+            raise ValueError("Invalid interpolation type: {}".format(self.interp_type))
 
         # create a bezier curve
         curve = BezierCurve(t0, tf, control_pts)

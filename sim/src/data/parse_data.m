@@ -112,6 +112,7 @@ idx_leg_vel_isaac = [VEL_LHP, VEL_RHP, ...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % extract the data
+base_pos_w = state(:, idx_base_pos_w);
 base_quat_w = state(:, idx_base_quat_w);
 base_vel_w = state(:, idx_base_vel_w);
 base_ang_b = state(:, idx_base_ang_b);
@@ -141,6 +142,7 @@ joint_vel_isaac = state(:, idx_leg_vel_isaac);
 % save the data into a CSV file
 output_folder = "./parsed/";
 time_file = output_folder + "time.csv";
+base_pos_w_file = output_folder + "base_pos_w.csv";
 base_lin_vel_b_file = output_folder + "base_lin_vel_b.csv";
 base_ang_vel_b_file = output_folder + "base_ang_vel_b.csv";
 gravity_orientation_b_file = output_folder + "gravity_orientation_b.csv";
@@ -148,6 +150,7 @@ joint_pos_isaac_file = output_folder + "joint_pos_isaac.csv";
 joint_vel_isaac_file = output_folder + "joint_vel_isaac.csv";
 
 writematrix(time, time_file);
+writematrix(base_pos_w, base_pos_w_file);
 writematrix(base_lin_vel_b, base_lin_vel_b_file);
 writematrix(base_ang_b, base_ang_vel_b_file);
 writematrix(gravity_orientation_b, gravity_orientation_b_file);

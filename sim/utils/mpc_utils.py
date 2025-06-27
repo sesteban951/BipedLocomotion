@@ -69,12 +69,6 @@ class Interpolator(LeafSystem):
                                                            BasicVector(
                                                                num_actuators),
                                                            self.SendControl)
-        
-        # # Add a position des output port for logging
-        # pos_cmd_output_port  = self.DeclareVectorOutputPort("pos_cmd",
-        #                                                    BasicVector(
-        #                                                        num_actuators),
-        #                                                    self.SendPosCmd)
 
     def SendState(self, context, output):
         """
