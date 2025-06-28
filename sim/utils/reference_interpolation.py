@@ -16,6 +16,13 @@ class ReferenceTrajectory:
 
     def __init__(self, config):
 
+
+        self.initialize(config)
+
+
+    # initialize the class variables
+    def initialize(self, config):
+
         # MPC parameters
         self.mpc_dt = config['MPC']['dt']                # MPC time step
         self.N = config['MPC']['num_steps'] + 1          # MPC horizon length
@@ -41,7 +48,8 @@ class ReferenceTrajectory:
         self.data = self.x_ref           # store the reference trajectory data
 
         self.t_ref = self.create_reference_time_vector()  
-        self.q_ref = self.x_ref[:, :19]  # take the first 19 elements of the state vector        
+        self.q_ref = self.x_ref[:, :19]  # take the first 19 elements of the state vector
+
 
     # create a bezier curve for the reference trajectory
     def create_bezier_curve(self, x0, xf, t0, tf):
@@ -347,10 +355,11 @@ if __name__ == "__main__":
     ref_traj = ReferenceTrajectory(config)
 
     # get the interpolated trajectory
-    time_vector = ref_traj.horizon
-    q_ref, _ = ref_traj.get_interpolated_trajectory(0.0)
+    # time_vector = ref_traj.horizon
+    # q_ref, _ = ref_traj.get_interpolated_trajectory(0.0)
 
     # # entire reference trajectory
+    # time_vector = ref_traj.horizon
     # time_vector = ref_traj.t_ref
     # q_ref = ref_traj.q_ref
     # t_window = [0, 10]

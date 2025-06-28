@@ -7,25 +7,29 @@ model:
                  # "half" (only leg joints)
                  # "crawl" (leg joints, no waist, shoulder pitch, elbow)
 
-    # model_half: "../../models/g1_12dof_obj.urdf"     # path to the URDF model of the robot
-    model_half: "../../models/g1_29dof_obj.urdf"     # path to the URDF model of the robot
-    # model_half: "../../models/titan_obj.urdf"        # path to the URDF model of the robot
     # model_full: "../../models/g1_no_hands_obj.urdf"  # path to the URDF model of the robot
-    # model_crawl: "../../models/titan_crawl_obj.urdf" # path to the URDF model of the robot
+    model_crawl: "../../models/titan_crawl_obj.urdf" # path to the URDF model of the robot
+
+    # for the m4 leaning over test
+    model_half: "../../models/g1_29dof_obj.urdf"   # path to the URDF model of the robot
+    # model_m4: "../../models/g1_29dof_m4_obj.urdf"
 
 ##################################################################################################
 # REFERENCE TRAJECTORY
 ##################################################################################################
 
+# CSV data with alot of points
 reference:
     
     # location of the reference trajectory file
-    path: "../references/walk1_subject5.csv"
-    # path: "../references/sprint1_subject2.csv"
+    path: "../references/gen_pos.csv"
 
     # nominal dt between the reference trajectory points
-    hz: 20  # [sec]
+    hz: 250  # [sec]
 
+    z_pos_offset: 0.10
+
+# CSV data with a few nodes
 reference_nodes:
 
     # location of nodes
@@ -44,14 +48,15 @@ reference_nodes:
         5.0]   # 9: standing
 
     # checkpoint index
-    checkpt_idx: 2
+    checkpoint_idx: 2
 
     # base z offset to the reference trajectory
-    z_pos_offset: 0.035
+    # z_pos_offset: 0.035
+    z_pos_offset: 0.105
 
-    # interpolation 
+    # interpolation between the nodes
     type: 1  # order of the interpolation
-              # 1: linear, 2: quadratic, 3: cubic
+             # 1: linear, 2: quadratic, 3: cubic
 
 ##################################################################################################
 # SIMULATION PARAMETERS
@@ -60,7 +65,7 @@ reference_nodes:
 # drake simulation parameters
 sim:
 
-    duration: 70.0       # [sec], simulation duration
+    duration: 65.0       # [sec], simulation duration
     real_time_rate: 0.0  # real-time rate of the simulation
     time_step: 0.002     # [sec], simulation time step
 
@@ -263,8 +268,8 @@ gains:
 
     Kp: [500, 500, 500, 500, 200, 200, # LHP, LHR, LHY, LKP, LAP, LAR
          500, 500, 500, 500, 200, 200] # RHP, RHR, RHY, RKP, RAP, RAR
-    Kd: [2, 2, 2, 4, 2, 2, 
-         2, 2, 2, 4, 2, 2]
+    Kd: [10, 10, 10, 10, 10, 10, 
+         10, 10, 10, 10, 10, 10]
 
 
 gains_full:

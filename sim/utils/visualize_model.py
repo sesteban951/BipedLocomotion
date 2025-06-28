@@ -12,7 +12,8 @@ from pydrake.all import *
 
 # load model
 # urdf_path = "../../models/g1_12dof_obj.urdf"
-urdf_path = "../../models/g1_29dof_obj.urdf"
+# urdf_path = "../../models/g1_29dof_obj.urdf"
+urdf_path = "../../models/g1_29dof_m4_obj.urdf"
 # urdf_path = "../../models/g1_no_hands_obj.urdf"
 # urdf_path = "../../models/titan_obj.urdf"
 # urdf_path = "../../models/titan_obj.urdf"

@@ -11,13 +11,20 @@ from pydrake.all import *
 class IDX:
 
     # generalized position indeces
-    POS_X = 0  # BASE POSITION
-    POS_Y = 1
-    POS_Z = 2
-    Q_X = 3    # BASE ORIENTATION
-    Q_Y = 4
-    Q_Z = 5
-    Q_W = 6
+    # Q_X = 3    # BASE ORIENTATION
+    # Q_Y = 4
+    # Q_Z = 5
+    # Q_W = 6
+    # POS_X = 0  # BASE POSITION
+    # POS_Y = 1
+    # POS_Z = 2
+    POS_X = 4  # BASE POSITION
+    POS_Y = 5
+    POS_Z = 6
+    Q_X = 1    # BASE ORIENTATION
+    Q_Y = 2
+    Q_Z = 3
+    Q_W = 0
     LHP = 7    # LEFT LEG
     LHR = 8   
     LHY = 9
@@ -110,6 +117,10 @@ class ReferenceTrajectory:
         else:
             raise ValueError("Unknown model type: {}".format(self.model_type))
 
+        # add the z offset to the base position
+        z_offset = config['reference']['z_pos_offset']
+        self.q_ref[:, self.idx.POS_Z] += z_offset
+
         # MPC parameters
         # half model: 12 DOF
         if self.model_type == 'half':
@@ -125,6 +136,9 @@ class ReferenceTrajectory:
             self.v_horizon_ref = np.zeros((self.N, len(self.idx.idx_full)-1))   # MPC horizon velocities
         self.horizon = self.create_horizon_time_vector() # MPC horizon time vector
     
+        # referene for the index
+        self.i_ref = np.arange(self.ref_length)  # index for the reference trajectory
+
     # create a time vector for the whole reference trajectory
     def create_reference_time_vector(self):
         
@@ -209,32 +223,57 @@ class ReferenceTrajectory:
         self.v_horizon_ref[-1, :] = self.v_horizon_ref[-2, :]
         
         return self.q_horizon_ref, self.v_horizon_ref
+    
+
+    # given a sim time, return, the index that correspodns to this time
+    def get_current_index_in_trajectory(self, t_sim):
+
+        # find where t_sim is in the time reference
+        if t_sim < self.t_ref[0]:
+            idx = 0
+        elif t_sim >= self.t_ref[-1]:
+            idx = len(self.t_ref) - 1
+        else:
+            idx = np.searchsorted(self.t_ref, t_sim, side='right')
+
+        # index of the trajectory
+        idx = self.i_ref[idx - 1] if idx > 0 else 0
+
+        return idx
 
     # linear interpolation
     def interpolate(self, t_sim, t1, t2, q1, q2):
 
-        # ensure that time eval is in between t1 and t2
-        assert (t1 <= t_sim <= t2), "Time evaluation must be between t1 and t2."
-        
-        # interpolate the state between two time points
-        t_interp = t_sim - t1
-        t_total = t2 - t1
+        # beyond the bounds of the reference trajectory, return the last state
+        if (t_sim >= t2):
+            q_interp = q2
 
-        # cartesian interpolation 
-        q1_cartesian = q1[4:] 
-        q2_cartesian = q2[4:]
-        q_cart_interp = q1_cartesian + (t_interp / t_total) * (q2_cartesian - q1_cartesian)
+        # before the reference trajectory, return the first state
+        elif (t_sim <= t1):
+            q_interp = q1
+            
+        # between two time points, interpolate the state
+        else:
+            # interpolate the state between two time points
+            t_interp = t_sim - t1
+            t_total = t2 - t1
 
-        # quaternion interpolation
-        q1_quat = q1[:4]
-        q2_quat = q2[:4]
-        q_quat_interp = q1_quat + (t_interp / t_total) * (q2_quat - q1_quat)
-        q_quat_interp /= np.linalg.norm(q_quat_interp)
+            # cartesian interpolation 
+            q1_cartesian = q1[4:] 
+            q2_cartesian = q2[4:]
+            q_cart_interp = q1_cartesian + (t_interp / t_total) * (q2_cartesian - q1_cartesian)
 
-        # stack the interpolated quaternion and cartesian positions
-        q_interp = np.hstack((q_quat_interp, q_cart_interp))
+            # quaternion interpolation
+            q1_quat = q1[:4]
+            q2_quat = q2[:4]
+            q_quat_interp = q1_quat + (t_interp / t_total) * (q2_quat - q1_quat)
+            q_quat_interp /= np.linalg.norm(q_quat_interp)
+
+            # stack the interpolated quaternion and cartesian positions
+            q_interp = np.hstack((q_quat_interp, q_cart_interp))
 
         return q_interp
+    
     
     # finite difference
     def finite_difference(self, q1, q2):
@@ -286,7 +325,7 @@ if __name__ == "__main__":
     q_ref, _ = ref_traj.get_interpolated_trajectory(0.0)
 
     # entire reference trajectory
-    # time_vector = ref_traj.t_ref
+    # time_vector = ref_traj.horizon
     # q_ref = ref_traj.q_ref
     # t_window = [0, 10]
     # time_mask = (time_vector >= t_window[0]) & (time_vector <= t_window[1])

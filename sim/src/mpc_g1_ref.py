@@ -10,6 +10,7 @@
 import time
 import numpy as np
 import yaml
+import csv
 
 # import the pydrake modules
 from pydrake.all import (
@@ -26,6 +27,10 @@ from pydrake.all import (
     Simulator,
     JointActuatorIndex,
     PdControllerGains,
+    VectorLogSink,
+    MultibodyPlant,
+    Sphere,
+    Rgba
 )
 
 # import the pyidto modules
@@ -39,7 +44,6 @@ from pyidto import (
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../utils'))
 from mpc_utils import Interpolator, ModelPredictiveController # type: ignore
-# from reference_trajectory_copy import ReferenceTrajectory          # type: ignore
 from reference_trajectory import ReferenceTrajectory          # type: ignore
 
 # import the yaml config
@@ -47,68 +51,6 @@ config_path = "../config/config_g1.yaml"
 with open(config_path, 'r') as file:
     config = yaml.safe_load(file)
 
-########################################################################################
-
-class IDX():
-    """
-    Class to hold the indices of the model instance.
-    """
-    def __init__(self):
-        
-        # generalized positions
-        self.QUAT_W = 0
-        self.QUAT_X = 1
-        self.QUAT_Y = 2
-        self.QUAT_Z = 3
-        self.POS_X = 4
-        self.POS_Y = 5
-        self.POS_Z = 6
-        self.POS_LHP = 7
-        self.POS_LHR = 8
-        self.POS_LHY = 9
-        self.POS_LKP = 10
-        self.POS_LAP = 11
-        self.POS_LAR = 12
-        self.POS_RHP = 13
-        self.POS_RHR = 14
-        self.POS_RHY = 15
-        self.POS_RKP = 16
-        self.POS_RAP = 17
-        self.POS_RAR = 18
-
-        # generalized velocities
-        self.ANG_X = 0
-        self.ANG_Y = 1
-        self.ANG_Z = 2
-        self.VEL_X = 3
-        self.VEL_Y = 4
-        self.VEL_Z = 5
-        self.VEL_LHP = 6
-        self.VEL_LHR = 7
-        self.VEL_LHY = 8
-        self.VEL_LKP = 9
-        self.VEL_LAP = 10
-        self.VEL_LAR = 11
-        self.VEL_RHP = 12
-        self.VEL_RHR = 13
-        self.VEL_RHY = 14
-        self.VEL_RKP = 15
-        self.VEL_RAP = 16
-        self.VEL_RAR = 17
-
-        # joints
-        self.JOINT_LHP = 0
-        self.JOINT_LHR = 1
-        self.JOINT_LHY = 2
-        self.JOINT_LKP = 3
-        self.JOINT_LAP = 4
-        self.JOINT_LAR = 5
-        self.JOINT_RHP = 6
-        self.JOINT_RHR = 7
-        self.JOINT_RHY = 8
-        self.JOINT_RKP = 9
-        self.JOINT_RAP = 10
-        self.JOINT_RAR = 11
 
 #####################################################################################
 
@@ -116,12 +58,17 @@ def standing_position():
     """
     Return a reasonable default standing position for the Achilles humanoid. 
     """
-    if config['model']['type'] == "half":
-        return np.array(config['q0'])
-    elif config['model']['type'] == "full":
-        return np.array(config['q0_full'])
-    else:
-        raise ValueError("Unknown model type in config: {}".format(config['model']['type']))
+    # if config['model']['type'] == "half":
+    #     return np.array(config['q0'])
+    # elif config['model']['type'] == "full":
+    #     return np.array(config['q0_full'])
+    # else:
+    #     raise ValueError("Unknown model type in config: {}".format(config['model']['type']))
+
+    ref = ReferenceTrajectory(config)
+    q0 = ref.q_ref[0, :]
+
+    return np.array(q0)  # return the first position in the reference trajectory as the standing position. This is a reasonable default standing position for the Achilles humanoid.
 
 def create_optimizer(model_file):
     """
@@ -209,14 +156,24 @@ class G1_MPC(ModelPredictiveController):
             nv = 26
         ModelPredictiveController.__init__(self, optimizer, q_guess, nq, nv, mpc_rate)
 
-        # instantiate the model instance indices
-        self.idx = IDX()
+        # create an internal plant for the controller
+        model_path = config['model']['model_half']
+        self.plant = MultibodyPlant(0.0)
+        Parser(self.plant).AddModels(model_path)
+        self.plant.Finalize()
+        self.plant_context = self.plant.CreateDefaultContext()
 
         # create internal reference trajecotry object
         self.reference_trajectory = ReferenceTrajectory(config)
 
         # current sim time
         self.t_sim = 0.0
+
+        # for visualzing the COM
+        self.meshcat = meshcat
+        self.sphere_com = Sphere(0.015)
+        self.red_color = Rgba(1.0, 0.0, 0.0, 1.0)
+        self.meshcat.SetObject("com", self.sphere_com, self.red_color)
 
     def UpdateNominalTrajectory(self, context):
         """
@@ -231,7 +188,8 @@ class G1_MPC(ModelPredictiveController):
         #  get the current sim time
         self.t_sim = context.get_time()
 
-        print(f"Current sim time: {self.t_sim:.4f}")
+        # visualize the COM
+        self.VisualizeCOM(context)
 
         # Get the current nominal trajectory
         # prob = self.optimizer.prob()
@@ -247,8 +205,33 @@ class G1_MPC(ModelPredictiveController):
 
         # Update the reference trajectory
         q_nom, v_nom = self.reference_trajectory.get_interpolated_trajectory(self.t_sim)
+        idx_traj = self.reference_trajectory.get_current_index_in_trajectory(self.t_sim)
+
+        # print the sim time and the current trajectory index
+        print(f"index: {idx_traj}, sim time: {self.t_sim:.4f}")
 
         self.optimizer.UpdateNominalTrajectory(q_nom, v_nom)
+
+    # print the current state
+    def VisualizeCOM(self, context):
+        """
+        Visualize the center of mass of the model instance.
+        """
+        # Get the current state
+        x0 = self.state_input_port.Eval(context)
+        q0 = x0[:self.nq]
+        v0 = x0[self.nq:]
+
+        # Set the positions and velocities in the internal plant
+        self.plant.SetPositions(self.plant_context, q0)
+        self.plant.SetVelocities(self.plant_context, v0)
+
+        # Get the center of mass position projection onto ground
+        com_pos = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context)
+        com_pos[2] = 0.0  # project onto ground plane
+
+        # plot it on meshcat
+        self.meshcat.SetTransform("com", RigidTransform(com_pos), self.t_sim)
 
 #####################################################################################
 
@@ -331,6 +314,26 @@ if __name__=="__main__":
         plant.get_desired_state_input_port(models[0])
     )
 
+    # Logger state
+    logger_state = builder.AddSystem(VectorLogSink(plant.num_positions() + plant.num_velocities()))
+    builder.Connect(plant.get_state_output_port(), 
+                    logger_state.get_input_port())
+    
+    # Logger applied torque
+    logger_applied_torque = builder.AddSystem(VectorLogSink(plant.num_actuators()))
+    builder.Connect(plant.get_net_actuation_output_port(), 
+                    logger_applied_torque.get_input_port())
+    
+    # Logger commanded state
+    logger_commanded_state = builder.AddSystem(VectorLogSink(plant.num_actuators() * 2))
+    builder.Connect(interpolator.GetOutputPort("state"),
+                    logger_commanded_state.get_input_port())
+    
+    # Logger torque feedforward 
+    logger_torque_ff = builder.AddSystem(VectorLogSink(plant.num_actuators()))
+    builder.Connect(interpolator.GetOutputPort("control"),
+                    logger_torque_ff.get_input_port())
+
     # Connect the plant to meshcat for visualization
     vis_config = VisualizationConfig()
     vis_config.publish_contacts = config['contact_vis']
@@ -343,11 +346,7 @@ if __name__=="__main__":
 
     # Set the initial state
     q0 = standing_position()
-    if config['model']['type'] == "half":
-        v0 = np.array(config['v0'])
-    elif config['model']['type'] == "full":
-        v0 = np.array(config['v0_full'])
-
+    v0 = np.zeros(plant.num_velocities())
     plant.SetPositions(plant_context, q0)
     plant.SetVelocities(plant_context, v0)
 
@@ -362,3 +361,92 @@ if __name__=="__main__":
           f"wall time: {wall_time:.4f}")
     meshcat.StopRecording()
     meshcat.PublishRecording()
+
+    # unpack the logged data
+    state_log = logger_state.FindLog(diagram_context)
+    applied_torque_log = logger_applied_torque.FindLog(diagram_context)
+    cmd_log = logger_commanded_state.FindLog(diagram_context)
+    torque_ff_log = logger_torque_ff.FindLog(diagram_context)
+
+    # unpack the logged data into numpy arrays
+    times = state_log.sample_times()
+    states = state_log.data().T
+    torques = applied_torque_log.data().T
+    commanded_states = cmd_log.data().T
+    torque_ff = torque_ff_log.data().T
+
+    # build the trajectory number vector
+    trajectory_indeces = np.arange(len(times)).reshape(-1, 1)
+    ref_traj = ReferenceTrajectory(config)
+    for i in range(len(times)):
+        traj_idx = ref_traj.get_current_index_in_trajectory(times[i])
+        trajectory_indeces[i] = traj_idx
+
+    # parse the state data
+    base_quat_w_actual = states[:, :4]
+    base_pos_w_actual = states[:, 4:7]
+    q_joint_target = commanded_states[:, :12]
+    v_joint_target = commanded_states[:, 12:]
+
+    # for every trajectory remove the first row
+    times = times[1:]
+    states = states[1:, :]
+    base_quat_w_actual = base_quat_w_actual[1:, :]
+    base_pos_w_actual = base_pos_w_actual[1:, :]
+    q_joint_target = q_joint_target[1:, :]
+    v_joint_target = v_joint_target[1:, :]
+    torque_ff = torque_ff[1:, :]
+    trajectory_indeces = trajectory_indeces[1:, :]
+
+    # save the state data to CSV files
+    save_folder = "./data/data/"
+
+    times_label = save_folder + "times.csv"
+    with open(times_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(times)):
+            writer.writerow([times[i]])
+
+    full_state_label = save_folder + "full_state.csv"
+    with open(full_state_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(states)):
+            writer.writerow(states[i])
+
+    base_quat_w_actual_label = save_folder + "base_quat_w_actual.csv"
+    with open(base_quat_w_actual_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(base_quat_w_actual)):
+            writer.writerow(base_quat_w_actual[i])
+
+    base_pos_w_actual_label = save_folder + "base_pos_w_actual.csv"
+    with open(base_pos_w_actual_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(base_pos_w_actual)):
+            writer.writerow(base_pos_w_actual[i])
+
+    q_joint_target_label = save_folder + "q_joint_target.csv"
+    with open(q_joint_target_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(q_joint_target)):
+            writer.writerow(q_joint_target[i])
+
+    v_joint_target_label = save_folder + "v_joint_target.csv"
+    with open(v_joint_target_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(v_joint_target)):
+            writer.writerow(v_joint_target[i])
+    
+    torque_ffs_label = save_folder + "torques_ff.csv"
+    with open(torque_ffs_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(torque_ff)):
+            writer.writerow(torque_ff[i])
+
+    traj_idx_label = save_folder + "trajectory_idx.csv"
+    with open(traj_idx_label, mode='w') as file:
+        writer = csv.writer(file)
+        for i in range(len(trajectory_indeces)):
+            writer.writerow(trajectory_indeces[i])
+
+    print("Saved data to CSV files.")

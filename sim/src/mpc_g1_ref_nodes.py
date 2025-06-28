@@ -298,6 +298,7 @@ if __name__=="__main__":
 
     # set up the model file
     model_file = config['model']['model_half']
+    # model_file = config['model']['model_m4']
 
     # Set up a Drake diagram for simulation
     builder = DiagramBuilder()
