@@ -44,7 +44,7 @@ from pyidto import (
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../utils'))
 from mpc_utils import Interpolator, ModelPredictiveController # type: ignore
-from reference_trajectory import ReferenceTrajectory          # type: ignore
+from reference_trajectory_split import ReferenceTrajectory          # type: ignore
 
 # import the yaml config
 config_path = "../config/config_g1_split_traj.yaml"
@@ -124,11 +124,10 @@ class G1_MPC(ModelPredictiveController):
     """
     A Model Predictive Controller for the Achilles humanoid.
     """
-    def __init__(self, optimizer, q_guess, mpc_rate, meshcat, reference_trajectory):
+    def __init__(self, optimizer, q_guess, mpc_rate, meshcat, reference_trajectory, model_path):
         ModelPredictiveController.__init__(self, optimizer, q_guess, 19, 18, mpc_rate)
 
         # create an internal plant for the controller
-        model_path = config['model']['model_half']
         self.plant = MultibodyPlant(0.0)
         Parser(self.plant).AddModels(model_path)
         self.plant.Finalize()
@@ -204,16 +203,18 @@ if __name__=="__main__":
 
     #############################################################################
 
-    # initialize the reference trajectory
-    ref_traj = ReferenceTrajectory(config)
+    # # initialize the reference trajectory
+    # ref_traj = ReferenceTrajectory(config)
 
-    # intial configurations
-    model_files = [config['model']['model_m4'],
-                   config['model']['model_half']]
+    # exit(0)
+
+    # # intial configurations
+    # model_files = [config['model']['model_m4'],
+    #                config['model']['model_half']]
     
-    # initial positions
-    q0 = np.array(config['q0'])  # initial position
-    v0 = np.zeros(18)  # initial velocity
+    # # initial positions
+    # q0 = np.array(config['q0'])  # initial position
+    # v0 = np.zeros(18)  # initial velocity
 
     # start meshcat recording
     meshcat.StartRecording()
@@ -221,14 +222,24 @@ if __name__=="__main__":
     # loop over the simulation runs
     for j in range(2):
 
-        # simualtion segment 
-        print(f"Running simulation segment {j}...")
+        # create a reference object
+        ref_traj = ReferenceTrajectory(config, path_num=j)
 
-        # create an object of the reference trajectory
-        ref_traj = ReferenceTrajectory(config)
+        # extract the model 
+        model_file = config['model']['model_list'][j]
 
-        # get the model file for this simulation segment
-        model_file = model_files[j]
+        # extract the initial position
+        # if the first time, use the initial position from the reference trajectory 
+        if j == 0:
+            q0 = ref_traj.q_ref[0,:]  # initial position for the M4 model
+            v0 = np.zeros(18)         # initial velocity
+        else:
+            q0 = q_final
+            v0 = v_final
+
+        # compute the duration of the simulation
+        hz_frames = config['reference']['hz']
+        sim_duration = (ref_traj.ref_length - 1) * (1.0 / hz_frames)
 
         # Set up a Drake diagram for simulation
         builder = DiagramBuilder()
@@ -262,7 +273,7 @@ if __name__=="__main__":
         q_guess = [q0 for _ in range(optimizer.num_steps() + 1)]
 
         # Create the MPC controller and interpolator systems
-        controller = builder.AddSystem(G1_MPC(optimizer, q_guess, mpc_rate, meshcat, ref_traj))
+        controller = builder.AddSystem(G1_MPC(optimizer, q_guess, mpc_rate, meshcat, ref_traj, model_file))
 
         Bv = plant.MakeActuationMatrix()
         N = plant.MakeVelocityToQDotMap(plant.CreateDefaultContext())
@@ -314,18 +325,17 @@ if __name__=="__main__":
         diagram_context = diagram.CreateDefaultContext()
         plant_context = diagram.GetMutableSubsystemContext(plant, diagram_context)
 
-        # Set the initial state
-        # q0 = initial_position(q0_idx)
-        # v0 = np.array(config['v0'])
-
         plant.SetPositions(plant_context, q0)
         plant.SetVelocities(plant_context, v0)
 
         # Simulate and play back on meshcat
-        
         simulator = Simulator(diagram, diagram_context)
         simulator.set_target_realtime_rate(config['sim']['real_time_rate'])
-        simulator.AdvanceTo(config['sim']['duration'])
+        simulator.AdvanceTo(sim_duration)
+
+        # get the final state in the simualtion
+        q_final = plant.GetPositions(plant_context)
+        v_final = plant.GetVelocities(plant_context)
     
     meshcat.StopRecording()
     meshcat.PublishRecording()

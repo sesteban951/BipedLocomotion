@@ -7,42 +7,24 @@ model:
                  # "half" (only leg joints)
                  # "crawl" (leg joints, no waist, shoulder pitch, elbow)
 
-    # for the m4 leaning over test
-    model_m4: "../../models/g1_29dof_m4_obj.urdf"
-    model_half: "../../models/g1_29dof_obj.urdf"  
+    model_list: ["../../models/g1_29dof_m4_obj.urdf",
+                "../../models/g1_29dof_obj.urdf"]
 
 ##################################################################################################
 # REFERENCE TRAJECTORY
 ##################################################################################################
 
-reference_nodes:
-
+# CSV data with alot of points
+reference:
+    
     # location of nodes
-    path: "../references/gen_pos_trajectory.csv"
-    # path_1: "../references/gen_pos_trajectory.csv"
-    # path_2: "../references/gen_pos_trajectory.csv"
+    path_list: ["../references/gen_pos_1.csv",
+                "../references/gen_pos_2.csv"]
 
-    # time between the nodes [sec], should be (num_nodes - 1)
-    T: [3.0,  # 0: stay standing
-        5.0,  # 1: squat
-        3.0,  # 2: stay squating
-        10.0, # 3: bend over to 45
-        15.0,  # 4: bend over to 90
-        10.0,  # 5: stay bent over
-        10.0,  # 6: 
-        10.0,  # 7: standing
-        5.0,   # 8: standing
-        5.0]   # 9: standing
+    # nominal dt between the reference trajectory points
+    hz: 400  # [sec]
 
-    # checkpoint index
-    checkpoint_idx: 2
-
-    # base z offset to the reference trajectory
-    z_pos_offset: 0.035
-
-    # interpolation 
-    type: 1  # order of the interpolation
-              # 1: linear, 2: quadratic, 3: cubic
+    z_pos_offset: 0.10
 
 ##################################################################################################
 # SIMULATION PARAMETERS
@@ -101,22 +83,6 @@ MPC:
     friction_coefficient: 0.5
     stiction_velocity: 0.5
     verbose: False
-
-
-##################################################################################################
-# INITIAL CONFIGURATION
-##################################################################################################
-
-
-q0:  [1.00, 0.00, 0.00, 0.00,           # base orientation, (w, x, y, z)
-      0.00, 0.00, 0.78,                 # base position, (x, y, z)
-      -0.20, 0.00, 0.00, 0.42, -0.23, 0.0,  # left leg, (hip pitch, hip roll, hip yaw, knee, ankle pitch, ankle roll)
-      -0.20, 0.00, 0.00, 0.42, -0.23, 0.0]  # right leg, (hip pitch, hip roll, hip yaw, knee, ankle pitch, ankle roll)
-
-v0: [0.00, 0.00, 0.00,            
-     0.00, 0.00, 0.00,                   
-     0.00, 0.00, 0.00, 0.0, 0.0, 0.0,
-     0.00, 0.00, 0.00, 0.0, 0.0, 0.0]  # initial velocities of the robot (base orientation, base position, left leg, right leg)
 
 ##################################################################################################
 # PD GAINS
